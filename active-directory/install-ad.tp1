@@ -1,4 +1,0 @@
-# Install Active Directory
-Add-WindowsFeature AD-Domain-Services;
-# Create a new Active Directory forest and domain, install Domain Name Services (DNS), and promote the server to a domain controller
-Install-ADDSForest -DomainName ${domain_name} -InstallDNS -SafeModeAdministratorPassword ${safe_mode_admin_password} -Force;
