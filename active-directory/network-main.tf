@@ -1,12 +1,11 @@
-
 resource "google_compute_network" "vpc" {
-  name                    = "bomin-terraform-vpc"
+  name                    = "active-directory-sample-app-terraform-vpc"
   auto_create_subnetworks = "false"
   routing_mode            = "GLOBAL"
 }
 
 resource "google_compute_subnetwork" "network_subnet" {
-  name          = "bomin-terraform-subnet"
+  name          = "active-directory-sample-app-subnet"
   ip_cidr_range = var.network-subnet-cidr
   network       = google_compute_network.vpc.name
   region        = var.region
@@ -14,7 +13,7 @@ resource "google_compute_subnetwork" "network_subnet" {
 
 # Allow http
 resource "google_compute_firewall" "allow-http" {
-  name    = "bomin-terraform-fw-allow-http"
+  name    = "active-directory-sample-app-fw-allow-http"
   network = google_compute_network.vpc.name
   allow {
     protocol = "tcp"
@@ -27,7 +26,7 @@ resource "google_compute_firewall" "allow-http" {
 
 # allow rdp
 resource "google_compute_firewall" "allow-rdp" {
-  name    = "bomin-terraform-fw-allow-rdp"
+  name    = "active-directory-sample-app-fw-allow-rdp"
   network = google_compute_network.vpc.name
   allow {
     protocol = "tcp"
