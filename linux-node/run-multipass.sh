@@ -1,0 +1,1 @@
+multipass launch -n linux-sample-app --cloud-init cloud-init.yaml
