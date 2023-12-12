@@ -12,6 +12,7 @@ runcmd:
 - [ sed, -e, s/CUSTOM_ARGS=.*/CUSTOM_ARGS="--server.http.listen-addr=0.0.0.0:8080"/g, -i, /etc/default/grafana-agent-flow ]
 - [ systemctl, enable, grafana-agent-flow ]
 - [ systemctl, start, --no-block, grafana-agent-flow ]
+- [ sh, -xc, "echo $(ip r | grep default | cut -d' ' -f3) grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost >> /etc/hosts" ]
 
 write_files:
 - owner: root:grafana-agent
@@ -69,10 +70,12 @@ write_files:
       endpoint {
         url = "{{loki_url}}"
 
+        {% if loki_user and loki_pass -%}
         basic_auth {
           username = "{{loki_user}}"
           password = "{{loki_pass}}"
         }
+        {%- endif %}
       }
       external_labels = {}
     }
@@ -113,10 +116,12 @@ write_files:
       endpoint {
         url = "{{prom_url}}"
 
+        {% if prom_user and prom_pass -%}
         basic_auth {
           username = "{{prom_user}}"
           password = "{{prom_pass}}"
         }
+        {%- endif %}
 
         queue_config { }
 
@@ -147,7 +152,7 @@ write_files:
 
       rule {
         target_label = "instance"
-        replacement  = "<your-instance-name>"
+        replacement  = "{{instance_name}}"
       }
 
       rule {
