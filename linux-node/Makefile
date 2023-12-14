@@ -9,6 +9,17 @@ run-multipass: cloud-init.yaml
 clean:
 	@rm -f cloud-init.yaml jinja/variables/cloud-init.yaml
 
+.PHONY: defaultconfig
+defaultconfig:
+	@echo "instance_name: linux-sample-app" > jinja/variables/cloud-init.yaml; \
+		echo "loki_url: http://loki.k3d.localhost:9999/loki/api/v1/push" >> jinja/variables/cloud-init.yaml; \
+		echo "loki_user: " >> jinja/variables/cloud-init.yaml; \
+		echo "loki_pass: " >> jinja/variables/cloud-init.yaml; \
+		echo "prom_url: http://mimir.k3d.localhost:9999/api/v1/push" >> jinja/variables/cloud-init.yaml; \
+		echo "prom_user: " >> jinja/variables/cloud-init.yaml; \
+		echo "prom_pass:" >> jinja/variables/cloud-init.yaml
+
+
 cloud-init.yaml: jinja/variables/cloud-init.yaml
 	@docker run --rm -it \
 		-v $(shell pwd)/jinja/templates:/templates \
