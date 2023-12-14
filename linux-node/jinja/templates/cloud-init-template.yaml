@@ -46,10 +46,6 @@ write_files:
       max_age       = "24h0m0s"
       relabel_rules = discovery.relabel.logs_integrations_integrations_node_exporter_journal_scrape.rules
       forward_to    = [loki.write.logs_integrations.receiver]
-      labels        = {
-        instance = "{{instance_name}}",
-        job      = "integrations/node_exporter",
-      }
     }
 
     local.file_match "logs_integrations_integrations_node_exporter_direct_scrape" {
