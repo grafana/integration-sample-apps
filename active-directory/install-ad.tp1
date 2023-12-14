@@ -1,4 +1,27 @@
+# Set password for local admin account.
+$adminPassword = ConvertTo-SecureString "AdminPassword123!" -AsPlainText -Force
+Set-LocalUser -Name "Administrator" -Password $adminPassword
+
+# Install windows exporter for grafana
+Invoke-WebRequest -Uri "https://github.com/grafana/agent/releases/download/v0.38.1/grafana-agent-windows-amd64.exe.zip" -OutFile "grafana-agent-windows-amd64.exe.zip"
+Expand-Archive -LiteralPath "grafana-agent-windows-amd64.exe.zip" -DestinationPath "C:\Users\Administrator"
+cd ~
+
+$agent_config_content = "testthisout"
+#Create agent-config
+$agent_config_content | Out-File -FilePath "agent-config.yaml" -Encoding UTF8
+
+# Configure Grafana Agent to run at startup
+$agentPath = "C:\Users\Administrator\grafana-agent-windows-amd64.exe"
+$action = New-ScheduledTaskAction -Execute $agentPath -Argument '--config.file $env:USERPROFILE\agent-config.yaml'
+$trigger = New-ScheduledTaskTrigger -AtStartup
+Register-ScheduledTask -TaskName "GrafanaAgentStartup" -Action $action -Trigger $trigger
+
 # Install Active Directory
 Add-WindowsFeature AD-Domain-Services;
+# Convert the plaintext password to a SecureString
+$securePassword = ConvertTo-SecureString "PasswordPassword123!" -AsPlainText -Force
+
 # Create a new Active Directory forest and domain, install Domain Name Services (DNS), and promote the server to a domain controller
-Install-ADDSForest -DomainName ${domain_name} -InstallDNS -SafeModeAdministratorPassword ${safe_mode_admin_password} -Force;
+Install-ADDSForest -DomainName vdom.local -InstallDNS -SafeModeAdministratorPassword $securePassword -Force;
+

@@ -6,11 +6,13 @@ run-cloud-vm:
 		read -p "Enter GCP region name: " region_name; \
 		read -p "Enter GCP zone name: " zone_name; \
 		read -p "Enter path to GCP service account credentials file: " credentials_file_path; \
+		read -p "Enter path to agent-config.yaml file: " agent_config_path; \
+		agent_config_content=$$(cat $$agent_config_path); \
 		echo "project=\"$$project_name\"" > terraform.tfvars; \
 		echo "region=\"$$region_name\"" >> terraform.tfvars; \
 		echo "zone=\"$$zone_name\"" >> terraform.tfvars; \
 		echo "credentials=\"$$credentials_file_path\"" >> terraform.tfvars; \
-		terraform apply
+		terraform apply -var "agent_config_content=$$agent_config_content"
 
 .PHONY: fmt
 fmt:

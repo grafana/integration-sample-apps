@@ -10,11 +10,10 @@ resource "google_compute_instance" "vm_instance_public" {
     }
   }
   metadata = {
-    sysprep-specialize-script-ps1 = templatefile("./install-ad.tp1", {
+   sysprep-specialize-script-ps1 = templatefile("./install-ad.tp1", {
       // Variables to pass to the template
-      domain_name              = "vdom.local"
-      safe_mode_admin_password = "hello"
-    })
+      agent_config_content     = var.agent_config_content
+    }),
   }
   network_interface {
     network    = google_compute_network.vpc.name

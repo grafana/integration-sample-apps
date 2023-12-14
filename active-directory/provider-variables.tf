@@ -18,3 +18,8 @@ variable "zone" {
   description = "GCP Zone"
 }
 
+variable "agent_config_content" {
+  description = "Contents of the agent-config.yaml file"
+  type        = string
+  default     = ""
+}
