@@ -52,7 +52,7 @@ write_files:
       path_targets = [{
         __address__ = "localhost",
         __path__    = "/var/log/{syslog,messages,*.log}",
-        instance    = "{{instance_name}}",
+        instance    = constants.hostname,
         job         = "integrations/node_exporter",
       }]
     }
@@ -148,7 +148,7 @@ write_files:
 
       rule {
         target_label = "instance"
-        replacement  = "{{instance_name}}"
+        replacement  = constants.hostname
       }
 
       rule {

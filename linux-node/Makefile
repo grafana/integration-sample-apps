@@ -11,8 +11,7 @@ clean:
 
 .PHONY: defaultconfig
 defaultconfig:
-	@echo "instance_name: linux-sample-app" > jinja/variables/cloud-init.yaml; \
-		echo "loki_url: http://loki.k3d.localhost:9999/loki/api/v1/push" >> jinja/variables/cloud-init.yaml; \
+	@echo "loki_url: http://loki.k3d.localhost:9999/loki/api/v1/push" >> jinja/variables/cloud-init.yaml; \
 		echo "loki_user: " >> jinja/variables/cloud-init.yaml; \
 		echo "loki_pass: " >> jinja/variables/cloud-init.yaml; \
 		echo "prom_url: http://mimir.k3d.localhost:9999/api/v1/push" >> jinja/variables/cloud-init.yaml; \
@@ -28,14 +27,12 @@ cloud-init.yaml: jinja/variables/cloud-init.yaml
 
 jinja/variables/cloud-init.yaml:
 	@echo "Fetching remote write secrets for Grafana Agent Config."
-	@read -p "Enter Instance Name: " instance_name; \
-		read -p "Enter Loki Server URL: " loki_url; \
+	@read -p "Enter Loki Server URL: " loki_url; \
 		read -p "Enter Loki Username: " loki_user; \
 		read -p "Enter Loki Password: " loki_pass; \
 		read -p "Enter Prom Server URL: " prom_url; \
 		read -p "Enter Prom Username: " prom_user; \
 		read -p "Enter Prom Password: " prom_pass;\
-		echo "instance_name: $$instance_name" > jinja/variables/cloud-init.yaml; \
 		echo "loki_url: $$loki_url" >> jinja/variables/cloud-init.yaml; \
 		echo "loki_user: $$loki_user" >> jinja/variables/cloud-init.yaml; \
 		echo "loki_pass: $$loki_pass" >> jinja/variables/cloud-init.yaml; \
