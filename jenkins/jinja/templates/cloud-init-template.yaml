@@ -1,0 +1,63 @@
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+    jenkins:
+      source: deb https://pkg.jenkins.io/debian-stable binary/
+      keyid: 63667EE74BBA1F0A08A698725BA31D57EF5975CA
+      keyserver: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+
+packages:
+- grafana-agent-flow
+- fontconfig
+- openjdk-17-jre
+- jenkins
+
+runcmd:
+- [ sed, -e, s/CUSTOM_ARGS=.*/CUSTOM_ARGS="--server.http.listen-addr=0.0.0.0:8088"/g, -i, /etc/default/grafana-agent-flow ]
+- [ systemctl, enable, grafana-agent-flow ]
+- [ systemctl, start, --no-block, grafana-agent-flow ]
+- [ systemctl, stop, jenkins.service ]
+- [ sed, -e, s/COMMAND=java/COMMAND=/usr/lib/jvm/java-17-openjdk-amd64/bin/java/g, -i, /etc/init.d/jenkins ]
+- [ sh, -xc, "echo $(ip r | grep default | cut -d' ' -f3) grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost >> /etc/hosts" ]
+
+write_files:
+- owner: root:grafana-agent
+  path: /etc/grafana-agent-flow.river
+  content: |
+    discovery.relabel "metrics_integrations_jenkins" {
+      targets = [{
+        __address__ = "localhost:8080",
+      }]
+
+      rule {
+        target_label = "instance"
+        replacement  = "{{instance}}"
+      }
+    }
+
+    prometheus.scrape "metrics_integrations_jenkins" {
+      targets      = discovery.relabel.metrics_integrations_jenkins.output
+      forward_to   = [prometheus.remote_write.grafana_cloud.receiver]
+      job_name     = "integrations/jenkins"
+      metrics_path = "/prometheus"
+    }
+
+    prometheus.remote_write "grafana_cloud" {
+      endpoint {
+        url = "{{prom_url}}"
+
+        {% if prom_user and prom_pass -%}
+        basic_auth {
+          username = "{{prom_user}}"
+          password = "{{prom_pass}}"
+        }
+        {%- endif %}
+
+        queue_config { }
+
+        metadata_config { }
+      }
+    }
