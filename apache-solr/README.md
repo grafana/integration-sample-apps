@@ -24,8 +24,8 @@ To get started with setting up the cluster, follow these steps:
 1. **Clone the Repository:**
    
    ```sh
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/grafana/integration-sample-apps.git
+   cd grafana/integration-sample-apps/apache-solr
    ```
 
 2. **Configure Grafana Agent:**
