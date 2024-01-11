@@ -27,10 +27,8 @@ run:
 	rm vms_ips.txt
 
 load-test:
-	for i in 1 2 3; do \
-        multipass transfer scripts/load_generation.sh $(VM_PREFIX)-$$i:/home/ubuntu/load_generation.sh; \
-        multipass exec $(VM_PREFIX)-$$i -- bash -c "chmod +x /home/ubuntu/load_generation.sh && /home/ubuntu/load_generation.sh"; \
-    done
+	multipass transfer scripts/load_generation.sh $(VM_PREFIX)-1:/home/ubuntu/load_generation.sh; \
+    multipass exec $(VM_PREFIX)-1 -- bash -c "chmod +x /home/ubuntu/load_generation.sh && nohup /home/ubuntu/load_generation.sh > load_gen.log 2>&1 &"
 
 fetch-prometheus-metrics:
 	multipass exec $(VM_PREFIX)-1 -- bash -c "curl http://localhost:9854/metrics" > prometheus_metrics
