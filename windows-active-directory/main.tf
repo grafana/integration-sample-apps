@@ -12,8 +12,27 @@ locals {
   dc1_install_ad_3 = "-SafeModeAdministratorPassword (ConvertTo-SecureString AdminPassword123! -AsPlainText -Force)"
   
   dc1_shutdown_command   = "shutdown -r -t 10"
+
+	grafana_prereq_1 =  "Invoke-WebRequest -Uri https://raw.githubusercontent.com/BominRahmani/windows-grafana-template/main/agent-config.yaml -OutFile C:/agent-config.yaml"
+	grafana_prereq_2 = "(Get-Content C:/agent-config.yaml) | ForEach-Object { $_.Replace('promuser', '${var.prometheus_username}')} | Set-Content C:/agent-config.yaml"
+  grafana_prereq_3 = "(Get-Content C:/agent-config.yaml) | ForEach-Object { $_.Replace('prompass', '${var.prometheus_password}')} | Set-Content C:/agent-config.yaml"
+	grafana_prereq_4 = "(Get-Content C:/agent-config.yaml) | ForEach-Object { $_.Replace('promendpoint', '${var.prometheus_url}')} | Set-Content C:/agent-config.yaml"
+	grafana_prereq_5 = "(Get-Content C:/agent-config.yaml) | ForEach-Object { $_.Replace('lokiuser', '${var.loki_username}')} | Set-Content C:/agent-config.yaml"
+	grafana_prereq_6 = "(Get-Content C:/agent-config.yaml) | ForEach-Object { $_.Replace('lokipass', '${var.loki_password}')} | Set-Content C:/agent-config.yaml"
+	grafana_prereq_7 = "(Get-Content C:/agent-config.yaml) | ForEach-Object { $_.Replace('lokiendpoint', '${var.loki_url}')} | Set-Content C:/agent-config.yaml"
+
+	grafana_script_1 = "Start-BitsTransfer -Source 'https://github.com/grafana/agent/releases/download/v0.39.0/grafana-agent-windows-amd64.exe.zip' -Destination 'C:/grafana-agent-windows-amd64.exe.zip'"
+  grafana_script_2 = "Expand-Archive -Path C:/grafana-agent-windows-amd64.exe.zip -DestinationPath C:/grafana-agent"
+
+	grafana_service = "New-Service -Name 'GrafanaAgent' -BinaryPathName 'C:/grafana-agent/grafana-agent-windows-amd64.exe --config.file=C:/agent-config.yaml' -DisplayName 'Grafana Agent Service' -Description 'This service runs the Grafana Agent' -StartupType Automatic"
+	grafana_service_run = "Start-Service -Name 'GrafanaAgent'"
+	grafana_schedule_task_1 = "$Action = New-ScheduledTaskAction -Execute 'C:/grafana-agent/grafana-agent-windows-amd64.exe' -Argument '--config.file=C:/agent-config.yaml'"
+	grafana_schedule_task_2 = "$Trigger = New-ScheduledTaskTrigger -AtStartup" 
+  grafana_schedule_task_3 = "Register-ScheduledTask -Action $Action -Trigger $Trigger -TaskName 'GrafanaAgent' -Description 'Run Grafana Agent on Startup'"
+	grafana_schedule_task_4 = "Start-ScheduledTask -TaskName 'GrafanaAgent'"
+
   dc1_exit_code_hack     = "exit 0"
-  dc1_powershell_command = "${local.dc1_prereq_ad_1}; ${local.dc1_prereq_ad_2}; ${local.dc1_prereq_ad_3}; ${local.dc1_prereq_ad_4}; ${local.dc1_prereq_ad_5}; ${local.dc1_install_ad_1}${local.dc1_install_ad_2}${local.dc1_install_ad_3}; ${local.dc1_shutdown_command}; ${local.dc1_exit_code_hack}"
+  dc1_powershell_command = "${local.grafana_prereq_1}; ${local.grafana_prereq_2}; ${local.grafana_prereq_3}; ${local.grafana_prereq_4}; ${local.grafana_prereq_5}; ${local.grafana_prereq_6};${local.grafana_prereq_7}; ${local.dc1_prereq_ad_1}; ${local.dc1_prereq_ad_2}; ${local.dc1_prereq_ad_3}; ${local.dc1_prereq_ad_4}; ${local.dc1_prereq_ad_5}; ${local.dc1_install_ad_1}${local.dc1_install_ad_2}${local.dc1_install_ad_3}; ${local.grafana_script_1}; ${local.grafana_script_2}; ${local.grafana_service}; ${local.grafana_service_run}; ${local.dc1_shutdown_command}; ${local.dc1_exit_code_hack};" 
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -114,6 +133,7 @@ resource "azurerm_windows_virtual_machine" "main" {
   resource_group_name   = azurerm_resource_group.rg.name
   network_interface_ids = [azurerm_network_interface.my_terraform_nic.id]
   size                  = "Standard_DS1_v2"
+
 
   os_disk {
     name                 = "myOsDisk"
