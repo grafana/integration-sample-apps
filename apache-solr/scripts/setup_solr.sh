@@ -22,8 +22,10 @@ sudo wget https://downloads.apache.org/lucene/solr/$SOLR_VERSION/solr-$SOLR_VERS
 sudo tar xzf solr-$SOLR_VERSION.tgz
 sudo solr-$SOLR_VERSION/bin/install_solr_service.sh solr-$SOLR_VERSION.tgz
 
-# Configure Solr for ZooKeeper
+# Configure Solr for ZooKeeper and set Solr port
+SOLR_PORT=$((8983 + VM_ID))
 SOLR_IN_SH=$(sudo find / -name solr.in.sh 2>/dev/null)
+sudo sed -i "/^SOLR_PORT=/c\SOLR_PORT=\"$SOLR_PORT\"" $SOLR_IN_SH
 sudo bash -c "echo ZK_HOST=\\\"$IP1:2181,$IP2:2181,$IP3:2181\\\" >> $SOLR_IN_SH"
 
 # Restart
