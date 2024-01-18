@@ -14,9 +14,9 @@ IP3=${IPS[2]}
 echo "Setting up ZooKeeper on VM_ID: $VM_ID"
 
 # Update and install dependencies
-sudo apt-get update
-sudo apt-get upgrade -y
-sudo apt-get install default-jdk zookeeperd netcat -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -yq
+sudo DEBIAN_FRONTEND=noninteractive apt-get install default-jdk zookeeperd netcat -y
 
 # Configure ZooKeeper
 ZOO_CFG="/etc/zookeeper/conf/zoo.cfg"
