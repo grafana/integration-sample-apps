@@ -1,4 +1,4 @@
-variable "resource_group_location" {
+vriable "resource_group_location" {
   default     = "centralus"
   description = "Location of the resource group."
 }
@@ -11,7 +11,7 @@ variable "prefix" {
 
 variable "loki_url" {
 	type        = string
-	description = "The Loki username to set in the agent-config.yaml file."
+	description = "The Loki url to set in the agent-config.yaml file."
 }
 
 variable "loki_username" {
