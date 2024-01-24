@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  pull_request:
+    paths:
+      - 'cert-manager/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  PROMETHEUS_VALUES: "${{ github.workspace }}/.github/configs/prometheus.yaml"
+  LOKI_VALUES: "${{ github.workspace }}/.github/configs/loki.yaml"
+
+jobs:
+  test-chart:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+
+    - name: Create services cluster
+      uses: helm/kind-action@v1
+
+    - name: Set up Helm repositories
+      run: |
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo add jetstack https://charts.jetstack.io
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo update
+
+    - name: Deploy Prometheus
+      run: |
+        helm install prometheus prometheus-community/prometheus -f "${PROMETHEUS_VALUES}" -n prometheus --create-namespace --wait
+
+    - name: Deploy Loki
+      run: |
+        helm install loki grafana/loki -f "${LOKI_VALUES}" -n loki --create-namespace --wait
+
+    - name: Test Integration
+      run: |
+        cd cert-manager
+        make localclusterconfig
+        make run-kubernetes

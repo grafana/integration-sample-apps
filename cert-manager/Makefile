@@ -1,9 +1,11 @@
 .PHONY: run
-run: run-kind
+run: run-kubernetes
 
-.PHONY: run-kind
-run-kind: values.yaml
+kubeconfig.yaml:
 	@kind create cluster --name cert-manager-test --kubeconfig ./kubeconfig.yaml
+
+.PHONY: run-kubernetes
+run-kubernetes: values.yaml kubeconfig.yaml
 	@helm repo add jetstack https://charts.jetstack.io
 	@helm repo add grafana https://grafana.github.io/helm-charts
 	@helm repo update
@@ -13,12 +15,11 @@ run-kind: values.yaml
 
 .PHONY: clean
 clean:
-	@kind delete cluster --name cert-manager-test
 	@rm -f kubeconfig.yaml values.yaml jinja/variables/servers.yaml
 
 .PHONY: defaultconfig
 defaultconfig:
-	@echo "loki_host: http://loki.k3d.localhost:9999" >> jinja/variables/servers.yaml; \
+	@echo "loki_host: http://loki.k3d.localhost:9999" > jinja/variables/servers.yaml; \
 		echo "loki_user: " >> jinja/variables/servers.yaml; \
 		echo "loki_pass: " >> jinja/variables/servers.yaml; \
 		echo "loki_path: /loki/api/v1/push" >> jinja/variables/servers.yaml; \
@@ -26,6 +27,17 @@ defaultconfig:
 		echo "prom_user: " >> jinja/variables/servers.yaml; \
 		echo "prom_pass:" >> jinja/variables/servers.yaml
 		echo "prom_path: /api/v1/push" >> jinja/variables/servers.yaml; \
+
+.PHONY: localclusterconfig
+localclusterconfig:
+	@echo "loki_host: http://loki.loki.svc:3100" > jinja/variables/servers.yaml; \
+		echo "loki_path: /loki/api/v1/push" >> jinja/variables/servers.yaml; \
+		echo "loki_user: loki" >> jinja/variables/servers.yaml; \
+		echo "loki_pass: lokipassword" >> jinja/variables/servers.yaml; \
+		echo "prom_host: http://prometheus-server.prometheus.svc:80" >> jinja/variables/servers.yaml; \
+		echo "prom_path: /api/v1/write" >> jinja/variables/servers.yaml; \
+		echo "prom_user: promuser" >> jinja/variables/servers.yaml; \
+		echo "prom_pass: prometheuspassword" >> jinja/variables/servers.yaml
 
 values.yaml: jinja/variables/servers.yaml
 	@docker run --rm -it \
@@ -42,8 +54,8 @@ jinja/variables/servers.yaml:
 		read -p "Enter Prom Server Host (no paths): " prom_host; \
 		read -p "Enter Prom write path (/api/prom/push): " prom_path; \
 		read -p "Enter Prom Username: " prom_user; \
-		read -p "Enter Prom Password: " prom_pass;\
-		echo "loki_host: $$loki_host" >> jinja/variables/servers.yaml; \
+		read -p "Enter Prom Password: " prom_pass; \
+		echo "loki_host: $$loki_host" > jinja/variables/servers.yaml; \
 		echo "loki_path: $$loki_path" >> jinja/variables/servers.yaml; \
 		echo "loki_user: $$loki_user" >> jinja/variables/servers.yaml; \
 		echo "loki_pass: $$loki_pass" >> jinja/variables/servers.yaml; \
