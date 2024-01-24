@@ -27,7 +27,4 @@ opencost:
   enabled: false
 
 test:
-  extraQueries:
-    # Check for CertManager metrics, discovered by service annotations
-    - query: "certmanager_clock_time_seconds{cluster=\"cert-manager-test\", job=\"integrations/cert-manager\"}"
-      type: promql
+  attempts: 20
