@@ -40,7 +40,7 @@ localclusterconfig:
 		echo "prom_pass: prometheuspassword" >> jinja/variables/servers.yaml
 
 values.yaml: jinja/variables/servers.yaml
-	@docker run --rm -it \
+	@docker run --rm \
 		-v $(shell pwd)/jinja/templates:/templates \
 		-v $(shell pwd)/jinja/variables:/variables \
 		dinutac/jinja2docker:latest /templates/values-template.yaml /variables/servers.yaml --format=yaml > values.yaml
