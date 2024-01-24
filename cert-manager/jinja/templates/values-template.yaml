@@ -1,0 +1,33 @@
+cluster:
+  name: cert-manager-test
+
+externalServices:
+  prometheus:
+    host: "{{prom_host}}"
+    basicAuth:
+      username: "{{prom_user}}"
+      password: "{{prom_pass}}"
+    {% if prom_path -%}
+    writeEndpoint: "{{prom_path}}"
+    {%- endif %}
+  loki:
+    host: "{{loki_host}}"
+    basicAuth:
+      username: "{{loki_user}}"
+      password: "{{loki_pass}}"
+    {% if loki_path -%}
+    writeEndpoint: "{{loki_path}}"
+    {%- endif %}
+
+metrics:
+  cost:
+    enabled: false
+
+opencost:
+  enabled: false
+
+test:
+  extraQueries:
+    # Check for CertManager metrics, discovered by service annotations
+    - query: "certmanager_clock_time_seconds{cluster=\"cert-manager-test\", job=\"integrations/cert-manager\"}"
+      type: promql
