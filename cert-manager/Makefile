@@ -11,9 +11,9 @@ run-kubernetes: values.yaml kubeconfig.yaml
 	@helm repo update
 	@helm install cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set installCRDs=true --wait --kubeconfig ./kubeconfig.yaml
 	@helm install k8s-monitoring grafana/k8s-monitoring -n monitoring --create-namespace --wait --kubeconfig ./kubeconfig.yaml \
-		-f values.yaml \
+		--values values.yaml \
 		--set-file extraConfig=cert-manager.river \
-		--set-file test.extraQueries=test-queries.yaml
+		--values test-queries.yaml
 	@helm test k8s-monitoring -n monitoring --kubeconfig ./kubeconfig.yaml
 
 .PHONY: clean

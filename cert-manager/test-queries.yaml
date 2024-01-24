@@ -1,2 +1,4 @@
-- query: certmanager_clock_time_seconds{job="integrations/cert-manager"}
-  type: promql
+test:
+  extraQueries:
+  - query: certmanager_clock_time_seconds{job="integrations/cert-manager"}
+    type: promql
