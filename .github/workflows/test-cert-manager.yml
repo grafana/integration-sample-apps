@@ -13,7 +13,7 @@ env:
   LOKI_VALUES: "${{ github.workspace }}/.github/configs/loki.yaml"
 
 jobs:
-  test-chart:
+  test-cert-manager:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
