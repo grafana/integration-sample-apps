@@ -10,6 +10,9 @@ externalServices:
     {% if prom_path -%}
     writeEndpoint: "{{prom_path}}"
     {%- endif %}
+    {% if prom_query_path -%}
+    queryEndpoint: "{{prom_query_path}}"
+    {%- endif %}
   loki:
     host: "{{loki_host}}"
     basicAuth:

@@ -39,6 +39,7 @@ localclusterconfig:
 		echo "loki_pass: lokipassword" >> jinja/variables/servers.yaml; \
 		echo "prom_host: http://prometheus-server.prometheus.svc:80" >> jinja/variables/servers.yaml; \
 		echo "prom_path: /api/v1/write" >> jinja/variables/servers.yaml; \
+		echo "prom_query_path: /api/v1/query" >> jinja/variables/servers.yaml; \
 		echo "prom_user: promuser" >> jinja/variables/servers.yaml; \
 		echo "prom_pass: prometheuspassword" >> jinja/variables/servers.yaml
 
