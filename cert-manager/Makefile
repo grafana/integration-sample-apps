@@ -2,19 +2,19 @@
 run: run-kubernetes
 
 kubeconfig.yaml:
-	@kind create cluster --name cert-manager-test --kubeconfig ./kubeconfig.yaml
+	kind create cluster --name cert-manager-test --kubeconfig ./kubeconfig.yaml
 
 .PHONY: run-kubernetes
 run-kubernetes: values.yaml kubeconfig.yaml
 	@helm repo add jetstack https://charts.jetstack.io
 	@helm repo add grafana https://grafana.github.io/helm-charts
 	@helm repo update
-	@helm install cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set installCRDs=true --wait --kubeconfig ./kubeconfig.yaml
-	@helm install k8s-monitoring grafana/k8s-monitoring -n monitoring --create-namespace --wait --kubeconfig ./kubeconfig.yaml \
+	helm install cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set installCRDs=true --wait --kubeconfig ./kubeconfig.yaml
+	helm install k8s-monitoring grafana/k8s-monitoring -n monitoring --create-namespace --wait --kubeconfig ./kubeconfig.yaml \
 		--values values.yaml \
 		--set-file extraConfig=cert-manager.river \
 		--values test-queries.yaml
-	@helm test k8s-monitoring -n monitoring --kubeconfig ./kubeconfig.yaml --logs
+	helm test k8s-monitoring -n monitoring --kubeconfig ./kubeconfig.yaml --logs
 
 .PHONY: clean
 clean:
