@@ -2,7 +2,15 @@
     
 sudo snap install kubectl --classic
 
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-arm64
+# Get the architecture
+ARCH=$(uname -m)
+if [ "$ARCH" == "x86_64" ]; then
+    MINIKUBE_URL="https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
+else
+    MINIKUBE_URL="https://storage.googleapis.com/minikube/releases/latest/minikube-linux-arm64"
+fi
+
+curl -LO "$MINIKUBE_URL"
 sudo install minikube-linux-arm64 /usr/local/bin/minikube
 minikube start --memory=12000 --cpus=4 --kubernetes-version=v1.23.17 # Last version that fully supported docker
 
