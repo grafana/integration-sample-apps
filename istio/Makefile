@@ -24,8 +24,8 @@ stop: stop-multipass
 .PHONY: stop-multipass
 stop-multipass:
 	@multipass delete istio-sample-app; \
-		echo "Waiting delete to finish..." \
-    	sleep 5 \
+		echo "Waiting delete to finish..."; \
+    	sleep 5; \
 		multipass purge
 
 .PHONY: clean
