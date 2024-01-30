@@ -5,14 +5,17 @@ sudo snap install kubectl --classic
 # Get the architecture
 ARCH=$(uname -m)
 if [ "$ARCH" == "x86_64" ]; then
-    MINIKUBE_URL="https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
+    MINIKUBE_BIN="minikube-linux-amd64"
 else
-    MINIKUBE_URL="https://storage.googleapis.com/minikube/releases/latest/minikube-linux-arm64"
+    MINIKUBE_BIN="minikube-linux-arm64"
 fi
 
-curl -LO "$MINIKUBE_URL"
-sudo install minikube-linux-arm64 /usr/local/bin/minikube
+# Setup minikube
+curl -LO "https://storage.googleapis.com/minikube/releases/latest/$MINIKUBE_BIN"
+sudo install $MINIKUBE_BIN /usr/local/bin/minikube
 minikube start --memory=12000 --cpus=4 --kubernetes-version=v1.23.17 # Last version that fully supported docker
+MINIKUBE_IP=$(minikube ip)
+echo $MINIKUBE_IP grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost | sudo tee -a /etc/hosts
 
 # Setup metallb for Istio's gateway to work
 minikube addons enable metallb
