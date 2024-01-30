@@ -14,6 +14,9 @@ run-kubernetes: values.yaml kubeconfig.yaml
 		--values values.yaml \
 		--set-file extraConfig=cert-manager.river \
 		--values test-queries.yaml
+
+.PHONY: test-kubernetes
+test-kubernetes:
 	helm test k8s-monitoring -n monitoring --kubeconfig ./kubeconfig.yaml --logs
 
 .PHONY: clean

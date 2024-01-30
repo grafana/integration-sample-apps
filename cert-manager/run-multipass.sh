@@ -1,1 +1,0 @@
-multipass launch -n cert-manager-app --cloud-init cloud-init.yaml
