@@ -7,6 +7,12 @@ sudo apt-get install -y wget
 # Copy the Grafana Agent configuration file from local directory to VM
 GRAFANA_AGENT_YAML="grafana-agent.yaml"
 
+# Check if the configuration file already exists
+if [ -f "/etc/grafana-agent.yaml" ]; then
+    # Backup the existing configuration file
+    sudo mv /etc/grafana-agent.yaml /etc/grafana-agent.yaml.backup
+fi
+
 # Download the specified version of Grafana Agent for arm64 architecture
 GRAFANA_AGENT_VERSION="0.39.0-1"
 GRAFANA_AGENT_FILE="grafana-agent-${GRAFANA_AGENT_VERSION}.arm64.deb"
@@ -18,8 +24,9 @@ wget "$GRAFANA_AGENT_URL"
 if [ -f "$GRAFANA_AGENT_FILE" ]; then
     sudo dpkg -i "$GRAFANA_AGENT_FILE"
 
-    # Copy the Grafana Agent configuration file
-    sudo cp "$GRAFANA_AGENT_YAML" /etc/grafana-agent.yaml
+    if [ -f "/etc/grafana-agent.yaml.backup" ]; then
+        sudo mv /etc/grafana-agent.yaml.backup /etc/grafana-agent.yaml
+    fi
 
     # Set up Grafana Agent as a systemd service
     sudo tee /etc/systemd/system/grafana-agent.service > /dev/null <<EOF

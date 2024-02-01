@@ -1,73 +1,107 @@
 # Apache Solr and ZooKeeper Cluster Sample App
 
-This project sets up a cluster of Apache Solr and ZooKeeper instances, integrated with Grafana agent for metric and log collection. It uses Multipass to create virtual machines where Apache Solr and ZooKeeper are deployed and configured. Additionally, a Grafana Agent is installed for metrics and logs collection and forwarding.
+This sample application creates 3 VMs each with an Apache Solr and ZooKeeper instance, integrated with Grafana Agent for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of Apache Solr and ZooKeeper instances.
+
+*Note*: In order to have a working apache-solr-zookeeper-instances, additional memory and cpu resources are allocated to each VM.
 
 ## Prerequisites
 
-- Multipass: Used to create and manage VMs.
-- Grafana Cloud Account: For metrics and log forwarding (optional).
-- Basic understanding of Solr, ZooKeeper, and Grafana.
+Before you begin, ensure you have the following installed:
 
-## Versions
-Apache Solr: 8.11.2
-ZooKeeper: 3.4.13
-Grafana Agent: 0.39.0-1 for arm64 architecture (adjust as per your architecture)
+- [Multipass](https://multipass.run/)
+- Docker (for rendering the cloud-init configuration)
+- Git (for cloning the repository)
 
-## Configuration
+## Quick Start for New Users
 
-Before running the setup, ensure to fill out the `grafana-agent-template.yaml` with your Grafana Cloud credentials and endpoints. Replace placeholders like `<your grafana.com password>`, `<your grafana.com username>`, `<your prometheus push endpoint>`, etc., with actual values. Rename the file to `grafana-agent.yaml` after configuration.
+To get started with the Apache Solr and ZooKeeper cluster along with monitoring tools, follow these steps:
 
-## Getting Started
-
-To get started with setting up the cluster, follow these steps:
-
-1. **Clone the Repository:**
-   
+1. **Clone the Repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
-   cd grafana/integration-sample-apps/apache-solr
+   cd integration-sample-apps/apache-solr
    ```
 
-2. **Configure Grafana Agent:**
+2. **Set Up Default Config**: 
+   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect to a Grafana agent.
 
-   Copy `grafana-agent-template.yaml` to `grafana-agent.yaml` and fill in your specific Grafana Cloud details.
+3. **Render Cloud-init Configuration**: 
+   Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
 
-3. **Run the Makefile Commands:**
+4. **Create and Set Up VMs**: 
+   Use `make run` to start VMs with Apache Solr and ZooKeeper clusters.
 
-   - To create and setup VMs with Solr and ZooKeeper:
+5. **Fetch Prometheus Metrics**: 
+   Fetch metrics from the Prometheus exporter and save them with `make fetch-prometheus-metrics`.
 
-     ```sh
-     make run
-     ```
+6. **Stop and Clean Up**: 
+   Use `make stop` to clean up the VM and `make clean` to remove temporary files.
 
-   - To generate load which is also needed to populate solr prometheus metrics:
+## Make Commands
 
-     ```sh
-     make load-test
-     ```
-
-   - To setup Grafana Agent on VMs:
-
-     ```sh
-     make setup-grafana-agent
-     ```
-
-   - To fetch Prometheus metrics:
-
-     ```sh
-     make fetch-prometheus-metrics
-     ```
-
-   - To clean up and delete VMs:
-
-     ```sh
-     make clean
-     ```
-
-## Makefile Commands
-
+- `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
+- `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates VMs and sets up Solr and ZooKeeper clusters.
 - `make load-test`: Generates load on the Solr cluster for testing purposes.
-- `make fetch-prometheus-metrics`: Fetches metrics from Prometheus exporter and saves to `prometheus_metrics`.
+- `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
 - `make setup-grafana-agent`: Sets up Grafana Agent on each VM for forwarding metrics and logs.
 - `make clean`: Deletes all created VMs and performs cleanup.
+
+## Default Configuration Variables
+
+- `prom_pass`: Your Prometheus password.
+- `prom_user`: Your Prometheus username.
+- `prom_url`: URL for Prometheus push endpoint (e.g., `http://your-prometheus-instance:9090/api/v1/push`).
+- `solr_cluster_name`: Name of the Solr cluster.
+- `solr_host`: Hostname for Solr (e.g., `localhost`).
+- `solr_port`: Port for Solr (e.g., `9854`).
+- `solr_log_path`: Path to Solr log files (e.g., `/var/solr/logs/*.log`).
+- `instance_name`: Name of the Solr instance.
+- `loki_url`: URL for Loki push endpoint (e.g., `http://your-loki-instance:3100/loki/api/v1/push`).
+- `loki_user`: Your Loki username.
+- `loki_pass`: Your Loki password.
+
+# Debugging Tips
+
+When deploying the Apache Solr and ZooKeeper Cluster Sample App, you may encounter issues that require debugging. Here are some tips to validate the setup and troubleshoot common problems.
+
+## Accessing the Multipass Instances
+
+To access the Multipass instances for Apache Solr and ZooKeeper, use the following command for each instance:
+
+```bash
+multipass shell apache-solr-zookeeper-instance-1
+```
+
+## Validating Services
+
+### Apache Solr Service
+- **Check Service Status**: Ensure the Apache Solr service is active and running.
+  ```bash
+  systemctl status solr
+  ```
+- **Check Logs**: If the service isn't running, check the logs for errors.
+  ```bash
+  journalctl -u solr
+  ```
+
+### ZooKeeper Service
+- **Check Service Status**: Verify that the ZooKeeper service is active.
+  ```bash
+  systemctl status zookeeper
+  ```
+- **Check Logs**: Look for errors in the service logs if it's not running.
+  ```bash
+  journalctl -u zookeeper
+  ```
+
+### Grafana Agent
+- **Check Service Status**: Confirm that the Grafana Agent is running.
+  ```bash
+  systemctl status grafana-agent
+  ```
+- **Review Configuration**: Verify the configuration in `/etc/grafana-agent.yaml` is correct.
+- **Check Logs**: Review Grafana Agent logs for any connectivity or configuration issues.
+  ```bash
+  journalctl -u grafana-agent
+  ```
