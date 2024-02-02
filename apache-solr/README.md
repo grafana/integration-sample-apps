@@ -23,7 +23,7 @@ To get started with the Apache Solr and ZooKeeper cluster along with monitoring 
    ```
 
 2. **Set Up Default Config**: 
-   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect to a Grafana agent.
+   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect the Grafana agent to an external Prometheus compatible TSDB and/or Loki server.
 
 3. **Render Cloud-init Configuration**: 
    Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
