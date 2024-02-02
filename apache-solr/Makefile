@@ -47,8 +47,9 @@ setup-grafana-agent:
 stop:
 	# Delete VMs
 	for i in 1 2 3; do \
-        multipass delete $(VM_PREFIX)-$$i && multipass purge; \
+        multipass delete $(VM_PREFIX)-$$i; \
     done
+	multipass purge
 
 render-grafana-agent-config:
 	@docker run --rm -it -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
