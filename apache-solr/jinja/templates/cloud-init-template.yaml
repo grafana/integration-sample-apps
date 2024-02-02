@@ -12,15 +12,22 @@ write_files:
           - replacement: hostname
             target_label: instance
         prometheus_remote_write:
-        - basic_auth:
-            password: "{{ prom_pass }}"
-            username: "{{ prom_user }}"
-          url: "{{ prom_url }}"
+          - url: "{{ prom_url }}"
+            {% if prom_user and prom_pass -%}
+            basic_auth:
+              password: "{{ prom_pass }}"
+              username: "{{ prom_user }}"
+            {%- endif %}
       logs:
         configs:
         - name: integrations/apache-solr
           clients:
             - url: "{{ loki_url }}"
+              {% if loki_user and loki_pass -%}
+              basic_auth:
+                username: "{{ loki_user }}"
+                password: "{{ loki_pass }}"
+              {%- endif %}
           positions:
             filename: /tmp/positions.yaml
           target_config:
@@ -45,10 +52,12 @@ write_files:
         configs:
         - name: integrations/apache-solr
           remote_write:
-            - basic_auth:
+            - url: "{{ prom_url }}"
+              {% if prom_user and prom_pass -%}
+              basic_auth:
                 password: "{{ prom_pass }}"
                 username: "{{ prom_user }}"
-              url: "{{ prom_url }}"
+              {%- endif %}
           scrape_configs:
             - job_name: integrations/apache-solr
               metrics_path: /metrics
