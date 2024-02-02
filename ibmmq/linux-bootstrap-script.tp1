@@ -1,0 +1,45 @@
+# Install Docker
+sudo apt install docker.io
+
+sudo usermod -aG docker $USER && newgrp docker
+
+# Download Minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+# Download Kubectl
+sudo apt update
+sudo snap install kubectl --classic
+
+# Download helm chart
+wget https://github.com/ibm-messaging/mq-helm/archive/refs/tags/ibm-mq-8.0.0.tar.gz
+tar -xvf ibm-mq-8.0.0.tar.gz
+
+# IBM MQ installation script
+sudo addgroup mqclient
+sudo useradd -m app -s /bin/bash
+echo 'app:password' | sudo chpasswd
+sudo adduser app mqclient
+groups app
+
+wget https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqadv/9.3.4.0-IBM-MQ-Advanced-for-Developers-UbuntuLinuxX64.tar.gz
+tar -xvf 9.3.4.0-IBM-MQ-Advanced-for-Developers-UbuntuLinuxX64.tar.gz
+
+# Handle liscencing for IBM MQ
+cd MQServer
+sudo ./mqlicense.sh -accept
+
+# Installing of IBMMQ 
+cd /etc/apt/sources.list.d
+MQ_PACKAGES_LOCATION=/MQServer
+echo "deb [trusted=yes] file:$MQ_PACKAGES_LOCATION ./" | sudo tee /etc/apt/sources.list.d/mq-install.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y "ibmmq-*"
+
+# Start MQ Cluster with minikube
+cd /mq-helm-ibm-mq-8.0.0/samples/Minikube/deploy
+
+
+minikube start -n 3 -p nativeha
+./install.sh
+
