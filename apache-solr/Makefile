@@ -1,15 +1,15 @@
 VM_PREFIX=apache-solr-zookeeper-instance
 
-.PHONY: run create-vms setup-zookeeper setup-solr load-test fetch-prometheus-metrics setup-grafana-agent clean render-grafana-agent-config defaultconfig
+.PHONY: run create-vms setup-zookeeper setup-solr load-test fetch-prometheus-metrics setup-grafana-agent clean render-config defaultconfig
 
 run: create-vms setup-zookeeper setup-solr load-test fetch-prometheus-metrics setup-grafana-agent
 	@echo "VMs and services configured."
 
 create-vms:
 	# Create VMs
-	multipass launch --name $(VM_PREFIX)-1 --cpus 4 --memory 4G --disk 10G --cloud-init cloud-init.yaml
-	multipass launch --name $(VM_PREFIX)-2 --cpus 4 --memory 4G --disk 10G --cloud-init cloud-init.yaml
-	multipass launch --name $(VM_PREFIX)-3 --cpus 4 --memory 4G --disk 10G --cloud-init cloud-init.yaml
+	multipass launch --name $(VM_PREFIX)-1 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
+	multipass launch --name $(VM_PREFIX)-2 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
+	multipass launch --name $(VM_PREFIX)-3 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
 	# Run the script to collect IP addresses
 	./scripts/collect_ips.sh
 	# Read IP addresses from the file and print them
@@ -51,7 +51,7 @@ stop:
     done
 	multipass purge
 
-render-grafana-agent-config:
+render-config:
 	@docker run --rm -it -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
 defaultconfig:

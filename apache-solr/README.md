@@ -12,6 +12,9 @@ Before you begin, ensure you have the following installed:
 - Docker (for rendering the cloud-init configuration)
 - Git (for cloning the repository)
 
+## Platform Support
+Currently, this sample app only supports the amd64 platform.
+
 ## Quick Start for New Users
 
 To get started with the Apache Solr and ZooKeeper cluster along with monitoring tools, follow these steps:

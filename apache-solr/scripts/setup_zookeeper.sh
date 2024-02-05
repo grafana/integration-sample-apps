@@ -15,8 +15,9 @@ echo "Setting up ZooKeeper on VM_ID: $VM_ID"
 
 # Update and install dependencies
 sudo DEBIAN_FRONTEND=noninteractive apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -yq
-sudo DEBIAN_FRONTEND=noninteractive apt-get install default-jdk zookeeperd netcat -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confnew" upgrade
+sudo DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confnew" install default-jdk zookeeperd netcat
+
 
 # Configure ZooKeeper
 ZOO_CFG="/etc/zookeeper/conf/zoo.cfg"

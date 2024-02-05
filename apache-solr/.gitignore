@@ -1,2 +1,5 @@
+# Ignore cloud-init configuration
 cloud-init.yaml
-grafana-agent.yaml
+
+# Except the default file
+!cloud-init.yaml
