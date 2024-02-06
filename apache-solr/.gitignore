@@ -1,5 +1,2 @@
 # Ignore cloud-init configuration
 cloud-init.yaml
-
-# Except the default file
-!cloud-init.yaml
