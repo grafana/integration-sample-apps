@@ -3,11 +3,13 @@ The following is aimed at running a Windows VM through Azure with an Active Dire
 
 # Instruction
 
-- Ensure that Terraform is installed.
-- Ensure you have Azure CLI installed
+- Ensure that [Terraform](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli) is installed.
+- Ensure you have [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed.
 - Sign into Azure CLI by running `az login`
 - Run `make init` the first time you use this.
+- Populate the credentials in `variables.tfvars`
 - Run `make run-cloud-vm` to create the VM.
+- When finished, run `make destroy` to delete the VM.
 
 # Further details
 
