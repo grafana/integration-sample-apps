@@ -1,0 +1,70 @@
+# cloud-init-template.yaml
+
+# Create Grafana Agent configuration
+write_files:
+  - owner: root:root
+    path: /etc/grafana-agent.yaml
+    content: |
+      integrations:
+        node_exporter:
+          enabled: true
+          relabel_configs:
+          - replacement: hostname
+            target_label: instance
+        prometheus_remote_write:
+          - url: "{{ prom_url }}"
+            {% if prom_user and prom_pass -%}
+            basic_auth:
+              password: "{{ prom_pass }}"
+              username: "{{ prom_user }}"
+            {%- endif %}
+      logs:
+        configs:
+        - name: integrations/apache-solr
+          clients:
+            - url: "{{ loki_url }}"
+              {% if loki_user and loki_pass -%}
+              basic_auth:
+                username: "{{ loki_user }}"
+                password: "{{ loki_pass }}"
+              {%- endif %}
+          positions:
+            filename: /tmp/positions.yaml
+          target_config:
+            sync_period: 10s
+          scrape_configs:
+            - job_name: integrations/apache-solr
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: integrations/apache-solr
+                    instance: "{{ instance_name }}"
+                    solr_cluster: "{{ solr_cluster_name }}"
+                    __path__: "{{ solr_log_path }}"
+              pipeline_stages:
+                - multiline:
+                    firstline: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}'
+                - regex:
+                    expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} (?P<level>\w+)'
+                - labels:
+                    level:
+      metrics:
+        configs:
+        - name: integrations/apache-solr
+          remote_write:
+            - url: "{{ prom_url }}"
+              {% if prom_user and prom_pass -%}
+              basic_auth:
+                password: "{{ prom_pass }}"
+                username: "{{ prom_user }}"
+              {%- endif %}
+          scrape_configs:
+            - job_name: integrations/apache-solr
+              metrics_path: /metrics
+              static_configs:
+                - targets: ["{{ solr_host }}:{{ solr_port }}"]
+                  labels:
+                    solr_cluster: "{{ solr_cluster_name }}"
+        global:
+          scrape_interval: 60s
+        wal_directory: /tmp/grafana-agent-wal
