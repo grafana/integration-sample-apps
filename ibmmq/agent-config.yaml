@@ -1,0 +1,61 @@
+integrations:
+  prometheus_remote_write:
+  - basic_auth:
+      password: promPass
+      username: promUser
+    url: promUrl
+  agent:
+    enabled: true
+    relabel_configs:
+    - action: replace
+      source_labels:
+      - agent_hostname
+      target_label: instance
+    - action: replace
+      target_label: job
+      replacement: "integrations/agent-check"
+    metric_relabel_configs:
+    - action: keep
+      regex: (prometheus_target_.*|prometheus_sd_discovered_targets|agent_build.*|agent_wal_samples_appended_total|process_start_time_seconds)
+      source_labels:
+      - __name__
+  # Add here any snippet that belongs to the `integrations` section.
+  # For a correct indentation, paste snippets copied from Grafana Cloud at the beginning of the line.
+logs:
+  configs:
+  - clients:
+    - url: logUrl 
+    name: integrations
+    positions:
+      filename: /tmp/positions.yaml
+    scrape_configs:
+    - job_name: integrations/ibm_mq
+      static_configs:
+        - targets:
+            - localhost
+          labels:
+            job: integrations/ibm_mq
+            instance: localhost:9157
+            __path__: /var/mqm/errors/*.LOG
+      pipeline_stages:
+        - multiline:
+            firstline: '^\s*\d{2}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2}\s*-'
+      # Add here any snippet that belongs to the `logs.configs.scrape_configs` section.
+      # For a correct indentation, paste snippets copied from Grafana Cloud at the beginning of the line.
+metrics:
+  configs:
+  - name: integrations
+    remote_write:
+      - url: metricsUrl 
+    scrape_configs:
+      - job_name: integrations/ibm_mq
+        metrics_path: /metrics
+        static_configs:
+         - targets: ['localhost:9157']
+           labels:
+              mq_cluster:  <mq_cluster>
+      # Add here any snippet that belongs to the `metrics.configs.scrape_configs` section.
+      # For a correct indentation, paste snippets copied from Grafana Cloud at the beginning of the line.
+  global:
+    scrape_interval: 15s
+  wal_directory: /tmp/grafana-agent-wal

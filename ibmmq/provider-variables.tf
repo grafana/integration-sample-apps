@@ -19,3 +19,8 @@ variable "gcp_zone" {
 	default     = "us-central1-a"
   description = "GCP zone name"
 }
+
+variable "gcp_instance_username" {
+	type        = string
+	description = "Instance username (can be found using the command gcloud compute os-login describe-profile"
+}

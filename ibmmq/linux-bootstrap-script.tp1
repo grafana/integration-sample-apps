@@ -1,7 +1,12 @@
 # Install Docker
-sudo apt install docker.io
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl software-properties-common -y
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+apt-cache policy docker-ce
+sudo apt install docker-ce -y
 
-sudo usermod -aG docker $USER && newgrp docker
+sudo usermod -aG docker ${username} && newgrp docker
 
 # Download Minikube
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
@@ -12,8 +17,11 @@ sudo apt update
 sudo snap install kubectl --classic
 
 # Download helm chart
-wget https://github.com/ibm-messaging/mq-helm/archive/refs/tags/ibm-mq-8.0.0.tar.gz
-tar -xvf ibm-mq-8.0.0.tar.gz
+curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+sudo apt-get install apt-transport-https --yes
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm -y
 
 # IBM MQ installation script
 sudo addgroup mqclient
@@ -41,5 +49,25 @@ cd /mq-helm-ibm-mq-8.0.0/samples/Minikube/deploy
 
 
 minikube start -n 3 -p nativeha
-./install.sh
+#./install.sh
+
+# Install grafana and agent config
+# sudo mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt-get update
+sudo apt-get install grafana-agent
+sudo rm /etc/grafana-agent.yaml
+sudo wget https://storage.cloud.google.com/ibm-mq-grafana-agent-config/ibm-mq-grafana-agent-config
+sudo mv ibm-mq-grafana-agent-config /etc/grafana-agent.yaml
+
+
+# Install go and exporter
+sudo snap install go --classic
+sudo git clone https://github.com/ibm-messaging/mq-metric-samples.git
+cd mq-metric-samples/
+go mod vendor
+export CGO_LDFLAGS_ALLOW='-Wl,-rpath.*'
+mkdir -p /tmp/go/bin
+go build -mod=vendor -o /tmp/go/bin/mq_prometheus ./cmd/mq_prometheus/*.go
 
