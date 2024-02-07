@@ -10,32 +10,32 @@ variable "prefix" {
 }
 
 variable "loki_url" {
-	type        = string
-	description = "The Loki url to set in the agent-config.yaml file."
+  type        = string
+  description = "The Loki url to set in the agent-config.yaml file."
 }
 
 variable "loki_username" {
   type        = string
-	description = "The Loki username to set in the agent-config.yaml file."
+  description = "The Loki username to set in the agent-config.yaml file."
 }
 
 variable "loki_password" {
   type        = string
-	description = "The Loki password to set in the agent-config.yaml file."
+  description = "The Loki password to set in the agent-config.yaml file."
 }
 
 variable "prometheus_username" {
   type        = string
-	description = "The Prometheus username to set in the agent-config.yaml file."
+  description = "The Prometheus username to set in the agent-config.yaml file."
 }
 
 variable "prometheus_password" {
   type        = string
-	description = "The Prometheus password to set in the agent-config.yaml file."
+  description = "The Prometheus password to set in the agent-config.yaml file."
 }
 
 variable "prometheus_url" {
   type        = string
-	description = "The Prometheus push endpoint to set in the agent-config.yaml file."
+  description = "The Prometheus push endpoint to set in the agent-config.yaml file."
 }
 

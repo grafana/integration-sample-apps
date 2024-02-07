@@ -1,7 +1,7 @@
 # Runs an interactive prompt that asks users for information to then pass to terraform script
 .PHONY: run-cloud-vm
 run-cloud-vm:
-	terraform apply
+	terraform apply -var-file="variables.tfvars"
 
 .PHONY: fmt
 fmt:
@@ -21,4 +21,4 @@ init:
 
 .PHONY: destroy
 destroy:
-	terraform destroy
+	terraform destroy -var-file="variables.tfvars"
