@@ -3,6 +3,8 @@ run: run-kubernetes
 
 kubeconfig.yaml:
 	kind create cluster --name cert-manager-test --kubeconfig ./kubeconfig.yaml
+	helm install --kubeconfig kubeconfig.yaml prometheus prometheus-community/prometheus -f ../.github/configs/prometheus.yaml -n prometheus --create-namespace --wait
+	helm install --kubeconfig kubeconfig.yaml loki grafana/loki -f ../.github/configs/loki.yaml -n loki --create-namespace --wait
 
 .PHONY: run-kubernetes
 run-kubernetes: values.yaml kubeconfig.yaml
