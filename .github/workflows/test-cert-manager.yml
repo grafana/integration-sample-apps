@@ -47,5 +47,5 @@ jobs:
         cd cert-manager
         make localclusterconfig
         make run-kubernetes
-        sleep 30
+        sleep 60  # Sleep long enough for the Grafana Agent to do a scrape of each of the metric sources 
         make test-kubernetes
