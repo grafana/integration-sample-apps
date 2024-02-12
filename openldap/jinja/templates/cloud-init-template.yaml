@@ -108,7 +108,11 @@ write_files:
             - targets: [localhost]
               labels:
                 job: integrations/openldap
-                __path__: /var/log/*.log
+                __path__: /var/log/kern.log
+            - targets: [localhost]
+              labels:
+                job: integrations/openldap
+                __path__: /var/log/auth.log
     metrics:
       configs:
       - name: integrations/openldap
