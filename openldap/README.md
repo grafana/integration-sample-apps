@@ -28,6 +28,7 @@ To get started with the OpenLDAP server and monitoring tools, follow these steps
 - `make run`: Launches the virtual machine and performs the entire setup for OpenLDAP.
 - `make stop`: Stops and deletes the OpenLDAP virtual machine, cleaning up all resources.
 - `make fetch-prometheus-metrics`: Retrieves Prometheus metrics from the exporter and saves them to a local file.
+- `make load-test`: Generates load on the OpenLDAP for testing purposes.
 - `make clean`: Removes generated files like `cloud-init.yaml`.
 
 ## Default Configuration Variables
