@@ -2,13 +2,17 @@ VM_NAME := ldap-server
 
 .PHONY: run stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
-run: launch-vm
+run: launch-vm load-test
 	@echo "VM $(VM_NAME) launched and configured."
 
 stop:
 	@multipass stop $(VM_NAME)
 	@multipass delete $(VM_NAME)
 	@multipass purge
+
+load-test:
+	multipass transfer scripts/load_generation.sh $(VM_NAME):/home/ubuntu/load_generation.sh; \
+    multipass exec $(VM_NAME) -- bash -c "chmod +x /home/ubuntu/load_generation.sh && nohup /home/ubuntu/load_generation.sh > load_gen.log 2>&1 &"
 
 fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:8080/metrics > prometheus_metrics
