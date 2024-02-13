@@ -1,4 +1,4 @@
-VM_NAME := pgbouncer-sampleapp
+VM_NAME := pgbouncer-sample-app
 
 .PHONY: run stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
