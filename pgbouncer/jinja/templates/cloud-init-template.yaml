@@ -1,0 +1,112 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Postgres, PGbouncer, PGbouncer Exporter, and Grafana Agent
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- grafana-agent
+
+runcmd:
+  # Install and configure postgresql
+  - sudo apt-get update
+  - sudo apt install postgresql
+  - sudo apt-get install -y pgbouncer
+
+  # Configure pgbouncer 
+  - sudo truncate -s 0 /etc/pgbouncer/pgbouncer.ini
+  - cat << EOF | sudo tee /etc/pgbouncer/pgbouncer.ini
+   [databases]
+   test_db= dbname=postgres host=localhost port=5432
+   [users]
+   [pgbouncer]
+   user = postgres
+   logfile = /var/log/postgresql/pgbouncer.log
+   pidfile = /var/run/postgresql/pgbouncer.pid
+   listen_addr = localhost
+   listen_port = 6543
+   unix_socket_dir = /var/run/postgresql
+   auth_type = any
+   log_pooler_errors = 1
+   ignore_startup_parameters = extra_float_digits
+   EOF
+  - sudo systemctl restart pgbouncer
+
+  
+  #Install Exporter
+  - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
+  - cd pgbouncer_exporter/
+  - sudo apt install make -y
+  - sudo snap install go --classic
+  - make build
+  - ./pgbouncer_exporter
+ 
+  # Configure Grafana Agent
+  - systemctl enable grafana-agent
+  - systemctl start grafana-agent
+
+
+write_files:
+# Grafana Agent configuration
+- owner: root:root
+  path: /etc/grafana-agent.yaml
+  content: |
+    integrations:
+      node_exporter:
+        enabled: true
+        relabel_configs:
+        - replacement: hostname
+          target_label: instance
+      prometheus_remote_write:
+      - url: "{{ prom_url }}"
+        {% if prom_user and prom_pass -%}
+        basic_auth:
+          password: "{{ prom_pass }}"
+          username: "{{ prom_user }}"
+        {%- endif %}
+    logs:
+      configs:
+      - name: integrations/pgbouncer
+        clients:
+          - url: "{{ loki_url }}"
+            {% if loki_user and loki_pass -%}
+            basic_auth:
+              username: "{{ loki_user }}"
+              password: "{{ loki_pass }}"
+            {%- endif %}
+        positions:
+          filename: /tmp/positions.yaml
+        target_config:
+          sync_period: 10s
+        scrape_configs:
+        - job_name: integrations/pgbouncer
+          static_configs:
+            - targets: [localhost]
+              labels:
+                job: integrations/pgbouncer
+                __path__: /var/log/postgresql/pgbouncer.log
+
+    metrics:
+      configs:
+      - name: integrations/pgbouncer
+        remote_write:
+        - url: "{{ prom_url }}"
+          {% if prom_user and prom_pass -%}
+          basic_auth:
+            password: "{{ prom_pass }}"
+            username: "{{ prom_user }}"
+          {%- endif %}
+        scrape_configs:
+        - job_name: integrations/pgbouncer
+          metrics_path: /metrics
+          static_configs:
+          - targets: ["localhost:9127"]
+
+      global:
+        scrape_interval: 60s
+      wal_directory: /tmp/grafana-agent-wal
