@@ -27,7 +27,7 @@ clean:
 	@rm -f cloud-init.yaml
 
 defaultconfig:
-	@echo "exporter_repo: https://github.com/tomcz/openldap_exporter.git" > jinja/variables/cloud-init.yaml
+	@echo "exporter_repo: https://github.com/tomcz/openldap_exporter.git" >> jinja/variables/cloud-init.yaml
 	@echo "exporter_dir: openldap_exporter" >> jinja/variables/cloud-init.yaml
 	@echo "prom_addr: \":8080\"" >> jinja/variables/cloud-init.yaml
 	@echo "ldap_addr: \"localhost:389\"" >> jinja/variables/cloud-init.yaml

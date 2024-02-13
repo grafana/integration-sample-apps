@@ -2,6 +2,11 @@
 
 This OpenLDAP Sample App simplifies the deployment of an OpenLDAP server with integrated monitoring through Prometheus and Grafana Loki. Utilizing cloud-init and Make commands, the app facilitates the setup, configuration, and monitoring of OpenLDAP instances.
 
+## Platform Support
+- Linux (x86 and ARM64): Fully supported on both x86 and ARM64 architectures, making it suitable for a wide range of Linux distributions, including Ubuntu, CentOS, and others.
+- macOS (Intel and M2+ Chip): Compatible with macOS running on Intel-based systems and the M2+ chip. However, users with M1 chips might face some compatibility issues due to architecture differences.
+- Windows (x86): Supported on Windows with the help of virtualization tools Multipass and Docker.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
