@@ -20,36 +20,33 @@ runcmd:
 
   # Configure pgbouncer 
   - sudo truncate -s 0 /etc/pgbouncer/pgbouncer.ini
-  - cat << EOF | sudo tee /etc/pgbouncer/pgbouncer.ini
-   [databases]
-   test_db= dbname=postgres host=localhost port=5432
-   [users]
-   [pgbouncer]
-   user = postgres
-   logfile = /var/log/postgresql/pgbouncer.log
-   pidfile = /var/run/postgresql/pgbouncer.pid
-   listen_addr = localhost
-   listen_port = 6543
-   unix_socket_dir = /var/run/postgresql
-   auth_type = any
-   log_pooler_errors = 1
-   ignore_startup_parameters = extra_float_digits
-   EOF
+  - echo "[databases]" | sudo tee /etc/pgbouncer/pgbouncer.ini
+  - echo "test_db= dbname=postgres host=localhost port=5432" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "[users]" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "[pgbouncer]" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "user = postgres" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "logfile = /var/log/postgresql/pgbouncer.log" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "pidfile = /var/run/postgresql/pgbouncer.pid" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "listen_addr = localhost" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "listen_port = 6543" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "unix_socket_dir = /var/run/postgresql" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "auth_type = any" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "log_pooler_errors = 1" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "ignore_startup_parameters = extra_float_digits" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
   - sudo systemctl restart pgbouncer
 
-  
-  #Install Exporter
-  - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
-  - cd pgbouncer_exporter/
-  - sudo apt install make -y
-  - sudo snap install go --classic
-  - make build
-  - ./pgbouncer_exporter
- 
   # Configure Grafana Agent
   - systemctl enable grafana-agent
   - systemctl start grafana-agent
-
+  
+  #Install Exporter
+  - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
+  - cd /pgbouncer_exporter/
+  - git config --global --add safe.directory /pgbouncer_exporter
+  - sudo apt install make -y
+  - sudo snap install go --classic
+  - sudo make build
+  - ./pgbouncer_exporter
 
 write_files:
 # Grafana Agent configuration
