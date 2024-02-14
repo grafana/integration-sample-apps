@@ -38,6 +38,7 @@ runcmd:
   # Configure Grafana Agent
   - systemctl enable grafana-agent
   - systemctl start grafana-agent
+  - sudo apt-get install postgresql-contrib -y
   
   #Install Exporter
   - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
