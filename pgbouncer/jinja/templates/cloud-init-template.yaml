@@ -47,7 +47,7 @@ runcmd:
   - sudo apt install make -y
   - sudo snap install go --classic
   - sudo make build
-  - ./pgbouncer_exporter
+  - ./pgbouncer_exporter &
 
 write_files:
 # Grafana Agent configuration
