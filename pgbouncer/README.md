@@ -40,6 +40,7 @@ To get started with the sample app, follow these steps:
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates the PgBouncer sample app.
+- `make load-gen`: Sets up a load generation for the sample app.
 - `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
 - `make setup-grafana-agent`: Sets up Grafana Agent on each VM for forwarding metrics and logs.
 - `make clean`: Deletes all created VMs and performs cleanup.
@@ -49,7 +50,6 @@ To get started with the sample app, follow these steps:
 - `prom_pass`: Your Prometheus password.
 - `prom_user`: Your Prometheus username.
 - `prom_url`: URL for Prometheus push endpoint (e.g., `http://your-prometheus-instance:9090/api/v1/push`).
-- `instance_name`: Name of the PgBouncer instance.
 - `loki_url`: URL for Loki push endpoint (e.g., `http://your-loki-instance:3100/loki/api/v1/push`).
 - `loki_user`: Your Loki username.
 - `loki_pass`: Your Loki password.
