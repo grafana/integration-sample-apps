@@ -8,7 +8,7 @@ server:
 
   probeHeaders:
     - name: "Authorization"
-      value: "Basic cHJvbXVzZXI6cHJvbWV0aGV1c3Bhc3N3b3Jk"
+      value: "Basic cHJvbXVzZXI6cHJvbWV0aGV1c3Bhc3N3b3Jk"  # "promuser:prometheuspassword"
 
 serverFiles:
   prometheus.yml:
