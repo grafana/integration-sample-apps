@@ -1,0 +1,53 @@
+
+STACK_USER=stack
+sudo apt update
+
+# Install DevStack
+git clone https://git.openstack.org/openstack-dev/devstack
+git config --global --add safe.directory /devstack
+cd /devstack
+sudo ./tools/create-stack-user.sh
+echo "[[local|localrc]]" > local.conf
+echo "ADMIN_PASSWORD=password" >> local.conf
+echo "DATABASE_PASSWORD=password" >> local.conf
+echo "RABBIT_PASSWORD=password" >> local.conf
+echo "SERVICE_PASSWORD=password" >> local.conf
+HOST_IP=$(hostname -I | cut -f1 -d ' ')
+echo "HOST_IP=$HOST_IP" >> local.conf
+chown -R stack:stack /devstack
+su -c './stack.sh' -s /bin/sh stack
+cd ..
+
+
+# Install exporter
+sudo apt-get update
+sudo apt -y install golang-go
+git clone https://github.com/openstack-exporter/openstack-exporter.git
+cd openstack-exporter
+sudo go build -buildvcs=false -o ./openstack-exporter .
+./openstack-exporter --os-client-config /etc/openstack/clouds.yaml devstack-admin > /dev/null 2>&1 &
+
+# Install Grafana agent
+sudo mkdir -p /etc/apt/keyrings/
+sudo wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt-get update
+sudo apt-get install grafana-agent
+cat <<'CONFIG' | sudo tee /etc/grafana-agent.yaml
+${config}
+CONFIG
+sudo sed -i 's/var.loki_username/${loki_username}/g' /etc/grafana-agent.yaml
+sudo sed -i 's/var.loki_password/${loki_password}/g' /etc/grafana-agent.yaml
+sudo sed -i 's/var.loki_url/${loki_url}/g' /etc/grafana-agent.yaml
+sudo sed -i 's/var.prometheus_username/${prometheus_username}/g' /etc/grafana-agent.yaml
+sudo sed -i 's/var.prometheus_password/${prometheus_password}/g' /etc/grafana-agent.yaml
+sudo sed -i 's/var.prometheus_url/${prometheus_url}/g' /etc/grafana-agent.yaml
+sudo systemctl restart grafana-agent.service
+
+# Start loadgen script
+touch /devstack/loadgen.sh
+cat <<'LOADGEN' | sudo tee /devstack/loadgen.sh
+${loadgen}
+LOADGEN
+cd /devstack
+sudo bash ./loadgen.sh &
