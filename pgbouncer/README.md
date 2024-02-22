@@ -10,6 +10,8 @@ Before you begin, ensure you have the following installed:
 - Docker (for rendering the cloud-init configuration)
 - Git (for cloning the repository)
 
+This sample app supports the following platforms: Linux, Windows, Darwin. The sample app was also tested with the ARM64 architecture.
+
 ## Quick Start for New Users
 
 To get started with the sample app, follow these steps:

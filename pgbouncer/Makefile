@@ -14,7 +14,7 @@ fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:9127/metrics > prometheus_metrics
 
 load-gen:
-	@multipass exec $(VM_NAME) -- sudo bash -c "su postgres -c 'pgbench -i; pgbench; exit;'"
+	@multipass exec $(VM_NAME) -- sudo bash -c "su postgres -c 'pgbench -i; pgbench -c 50 -T 60 -h 127.0.0.1 -p 6543; exit;'"
 
 render-config:
 	@docker run --rm -it -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
