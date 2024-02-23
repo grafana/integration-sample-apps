@@ -13,11 +13,6 @@ externalServices:
       username: "$LOKI_USER"
       password: "$LOKI_PASS"
 
-logs:
-  enabled: true
-  pod_logs:
-    enabled: true
-
 extraConfig: |-
   discovery.relabel "istio_proxy_metrics" {
     targets = discovery.kubernetes.pods.targets
@@ -42,10 +37,6 @@ extraConfig: |-
     rule {
       target_label = "job"
       replacement = "integrations/istio"
-    }
-    rule {
-      target_label  = "cluster"
-      replacement   = "minikube"
     }
     rule {
       source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
@@ -90,10 +81,6 @@ extraConfig: |-
       replacement = "integrations/istio"
     }
     rule {
-      target_label  = "cluster"
-      replacement   = "minikube"
-    }
-    rule {
       source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
       separator = "-"
       target_label = "instance"
@@ -123,10 +110,6 @@ logs:
       rule {
         target_label = "job"
         replacement = "integrations/istio"
-      }
-      rule {
-        target_label  = "cluster"
-        replacement   = "minikube"
       }
       rule {
         source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
