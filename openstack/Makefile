@@ -21,4 +21,4 @@ init:
 
 .PHONY: destroy
 destroy:
-	terraform destroy
+	terraform destroy -var-file="variables.tfvars" 
