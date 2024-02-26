@@ -18,7 +18,7 @@ logs:
       - basic_auth:
           password: var.loki_password
           username: var.loki_username
-        - url: var.loki_url
+        url: var.loki_url
       positions:
         filename: /tmp/positions.yaml
       target_config:
