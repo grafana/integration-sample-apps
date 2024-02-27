@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-agent
+  labels:
+    app: grafana-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana-agent
+  template:
+    metadata:
+      labels:
+        app: grafana-agent
+    spec:
+      containers:
+      - name: grafana-agent
+        image: grafana/agent:latest
+        args: ["-config.file=/etc/grafana-agent/grafana-agent.yaml"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/grafana-agent
+      volumes:
+      - name: config
+        configMap:
+          name: grafana-agent-config

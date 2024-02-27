@@ -1,6 +1,14 @@
-# OpenLDAP Sample App
+# OpenLDAP Sample App with VM and Kubernetes Support
 
-This OpenLDAP Sample App simplifies the deployment of an OpenLDAP server with integrated monitoring through Prometheus and Grafana Loki. Utilizing cloud-init and Make commands, the app facilitates the setup, configuration, and monitoring of OpenLDAP instances.
+This OpenLDAP Sample App simplifies the deployment of an OpenLDAP server with integrated monitoring through Prometheus and Grafana Loki. It now includes support for both traditional VM environments using cloud-init and Make commands, as well as Kubernetes environments.
+
+## Enhanced Logging Feature
+The app includes detailed logging for the OpenLDAP server, configured to increase log level and capture logs in a dedicated file (`/var/log/slapd.log`). These logs provide valuable insights for performance monitoring and troubleshooting.
+
+### Log Configuration Details
+- **OpenLDAP Log Level**: Increased to `stats` for detailed operational statistics.
+- **Log File Creation**: Uses `slapdlog.ldif` to modify OpenLDAP configuration.
+- **rsyslog Configuration**: `10-slapd.conf` redirects OpenLDAP logs to `/var/log/slapd.log`.
 
 ## Platform Support
 - Linux (x86 and ARM64): Fully supported on both x86 and ARM64 architectures, making it suitable for a wide range of Linux distributions, including Ubuntu, CentOS, and others.
@@ -8,26 +16,34 @@ This OpenLDAP Sample App simplifies the deployment of an OpenLDAP server with in
 - Windows (x86): Supported on Windows with the help of virtualization tools Multipass and Docker.
 
 ## Prerequisites
-
 Before you begin, ensure you have the following installed:
 - [Multipass](https://multipass.run/)
-- Docker (for rendering the cloud-init configuration)
+- Docker (for rendering configurations)
 - Git (for cloning the repository)
+- Kubernetes Cluster (for Kubernetes setup)
+- Helm (for Kubernetes deployment)
+- kubectl (for interacting with Kubernetes)
 
-## Quick Start for New Users
+## Quick Start for VM Setup
+1. Clone the Repository: `git clone https://github.com/grafana/integration-sample-apps.git`.
+2. Navigate to Project Directory: `cd integration-sample-apps/openldap`.
+3. Set Up Default Config: `make defaultconfig`.
+4. Render Cloud-init Configuration: `make render-config`.
+5. Launch the VM: `make run`.
+6. Fetch Prometheus Metrics: `make fetch-prometheus-metrics`.
+7. Stop and Clean Up: `make stop` and `make clean`.
 
-To get started with the OpenLDAP server and monitoring tools, follow these steps:
-
-1. **Clone the Repository**: `git clone https://github.com/grafana/integration-sample-apps.git`.
-2. **Navigate to the Project Directory**: `cd integration-sample-apps/openldap`.
-3. **Set Up Default Config**: Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect to a Grafana agent.
-4. **Render Cloud-init Configuration**: Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
-5. **Launch the VM**: Use `make run` to start the VM with OpenLDAP and necessary monitoring tools.
-6. **Fetch Prometheus Metrics**: Verify that you are getting Prometheus metrics with `make fetch-prometheus-metrics`.
-7. **Stop and Clean Up**: Use `make stop` to clean up the VM and `make clean` to remove temporary files.
+## Quick Start for Kubernetes Setup
+1. Clone the Repository: `git clone https://github.com/grafana/integration-sample-apps.git`.
+2. Navigate to Project Directory: `cd integration-sample-apps/openldap`.
+3. Set Up Default Config: `make defaultconfig`.
+4. Render Kubernetes Configurations: `make render-k8s`.
+5. Deploy to Kubernetes: `make run-k8s`.
+6. Verify Deployment: Check status using `kubectl get pods` and `kubectl get services`.
+7. Stop and Clean Up: `make stop-k8s` and `make clean`.
 
 ## Make Commands
-
+- VM Setup: 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Launches the virtual machine and performs the entire setup for OpenLDAP.
@@ -35,9 +51,15 @@ To get started with the OpenLDAP server and monitoring tools, follow these steps
 - `make fetch-prometheus-metrics`: Retrieves Prometheus metrics from the exporter and saves them to a local file.
 - `make load-test`: Generates load on the OpenLDAP for testing purposes.
 - `make clean`: Removes generated files like `cloud-init.yaml`.
+  
+Kubernetes Setup: 
+- `make defaultconfig`: Initializes the configuration file with default values for Kubernetes templates.
+- `make render-k8s`: Generates Kubernetes deployment and service YAML files based on the defined configuration.
+- `make run-k8s`: Deploys the OpenLDAP application and associated services to the Kubernetes cluster.
+- `make stop-k8s`: Stops and removes the OpenLDAP deployment from Kubernetes, cleaning up all resources.
+- `make clean`: Removes generated files like Kubernetes YAML configurations.
 
 ## Default Configuration Variables
-
 - `exporter_repo`: Git repository URL for OpenLDAP Exporter.
 - `exporter_dir`: Directory name for cloning the OpenLDAP Exporter repository.
 - `prom_addr`: Address and port for the Prometheus metrics endpoint.
@@ -49,8 +71,9 @@ To get started with the OpenLDAP server and monitoring tools, follow these steps
 - `prom_url`, `prom_user`, `prom_pass`: Prometheus remote write endpoint and authentication details.
 - `prom_port`: Port for Prometheus metrics exposure.
 
-
 # Debugging Tips
+
+## VM Setup
 
 When deploying the OpenLDAP Sample App, you may encounter issues that require debugging. Here are some tips to validate the setup and troubleshoot common problems.
 
@@ -100,3 +123,30 @@ This command opens a shell session on the `ldap-server` VM, allowing you to run 
   ```bash
   journalctl -u grafana-agent
   ```
+
+### Kubernetes Setup
+
+When deploying the OpenLDAP Sample App in a Kubernetes environment, you might face some issues that require troubleshooting. Below are some tips to help you validate the setup and resolve common problems.
+
+## Checking Pod and Service Status
+
+To verify the status of pods and services in your Kubernetes environment, use these commands:
+
+- **Check Pods Status**:
+  ```bash
+  kubectl get pods
+  ```
+- **Check Services Status**:
+  ```bash
+  kubectl get services
+  ```
+
+These commands provide an overview of the running pods and services, including their current status and health.
+
+## Viewing Logs
+
+To view the logs of a specific pod, use the following command:
+
+```bash
+kubectl logs <pod-name>
+```
