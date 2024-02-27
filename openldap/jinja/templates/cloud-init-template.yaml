@@ -65,6 +65,21 @@ runcmd:
     systemctl enable openldap_exporter.service
     systemctl start openldap_exporter.service
 
+  # Configure OpenLDAP for additional logging
+  - |
+    echo "dn: cn=config
+    changeType: modify
+    replace: olcLogLevel
+    olcLogLevel: stats" > /tmp/slapdlog.ldif
+  - ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/slapdlog.ldif
+
+  # Configure rsyslog for OpenLDAP logging
+  - |
+    echo '$template slapdtmpl,"[%$DAY%-%$MONTH%-%$YEAR% %timegenerated:12:19:date-rfc3339%] %app-name% %syslogseverity-text% %msg%\\n"
+    local4.*    /var/log/slapd.log;slapdtmpl' > /etc/rsyslog.d/10-slapd.conf
+  - service rsyslog restart
+
+
   # Configure Grafana Agent
   - systemctl enable grafana-agent
   - systemctl start grafana-agent
@@ -108,11 +123,7 @@ write_files:
             - targets: [localhost]
               labels:
                 job: integrations/openldap
-                __path__: /var/log/kern.log
-            - targets: [localhost]
-              labels:
-                job: integrations/openldap
-                __path__: /var/log/auth.log
+                __path__: /var/log/slapd.log
     metrics:
       configs:
       - name: integrations/openldap
