@@ -14,6 +14,7 @@ openstack server create --flavor m1.medium --image cirros-0.6.2-x86_64-disk --ne
 # Create volumes
 openstack volume create --size 5 --image cirros-0.6.2-x86_64-disk test-volume-1
 openstack volume create --size 10 --image cirros-0.6.2-x86_64-disk test-volume-2
+sleep 15
 
 # Create snapshots
 openstack volume snapshot create test-snapshot-1 --volume test-volume-1
