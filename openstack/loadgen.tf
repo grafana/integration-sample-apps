@@ -60,7 +60,10 @@ while true; do
     for ((i=1; i<=SCALE; i++)); do
       openstack server create --flavor m1.tiny --image $DISK_IMAGE --network private test-server-scale-$i
       openstack volume create --size 3 --image $DISK_IMAGE test-volume-scale-$i
-      sleep 15
+      test $(openstack volume show test-volume-scale-$i -f value -c status) = "available"
+      while [ $? = 1 ]; do
+        test $(openstack volume show test-volume-scale-$i -f value -c status) = "available"
+      done
       openstack volume snapshot create test-snapshot-scale-$i --volume test-volume-scale-$i
       openstack server add volume test-server-scale-$i test-volume-scale-$i
       openstack volume backup create --name test-backup-scale-$i test-volume-scale-$i 
