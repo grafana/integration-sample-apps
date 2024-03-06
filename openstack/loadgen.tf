@@ -4,17 +4,27 @@ variable "loadgen_script" {
 
 SCALE=2
 SLEEP_DURATION=300 # 5 minutes
+DISK_IMAGE=cirros-0.6.2-x86_64-disk
 
 source openrc
 
 # Create instances
-openstack server create --flavor m1.small --image cirros-0.6.2-x86_64-disk --network private test-server-small
-openstack server create --flavor m1.medium --image cirros-0.6.2-x86_64-disk --network private test-server-medium
+openstack server create --flavor m1.small --image $DISK_IMAGE --network private test-server-small
+openstack server create --flavor m1.medium --image $DISK_IMAGE --network private test-server-medium
 
 # Create volumes
-openstack volume create --size 5 --image cirros-0.6.2-x86_64-disk test-volume-1
-openstack volume create --size 10 --image cirros-0.6.2-x86_64-disk test-volume-2
-sleep 15
+openstack volume create --size 5 --image $DISK_IMAGE test-volume-1
+openstack volume create --size 10 --image $DISK_IMAGE test-volume-2
+
+# Confirm volume status before continuing
+test $(openstack volume show test-volume-1 -f value -c status) = "available"
+while [ $? = 1 ]; do
+  test $(openstack volume show test-volume-1 -f value -c status) = "available"
+done
+test $(openstack volume show test-volume-2 -f value -c status) = "available"
+while [ $? = 1 ]; do
+  test $(openstack volume show test-volume-2 -f value -c status) = "available"
+done
 
 # Create snapshots
 openstack volume snapshot create test-snapshot-1 --volume test-volume-1
@@ -48,8 +58,8 @@ while true; do
   scale_resources() {
     echo "Scaling up the environment"
     for ((i=1; i<=SCALE; i++)); do
-      openstack server create --flavor m1.tiny --image cirros-0.6.2-x86_64-disk --network private test-server-scale-$i
-      openstack volume create --size 3 --image cirros-0.6.2-x86_64-disk test-volume-scale-$i
+      openstack server create --flavor m1.tiny --image $DISK_IMAGE --network private test-server-scale-$i
+      openstack volume create --size 3 --image $DISK_IMAGE test-volume-scale-$i
       sleep 15
       openstack volume snapshot create test-snapshot-scale-$i --volume test-volume-scale-$i
       openstack server add volume test-server-scale-$i test-volume-scale-$i
