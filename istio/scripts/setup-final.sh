@@ -16,7 +16,6 @@ sudo install $MINIKUBE_BIN /usr/local/bin/minikube
 minikube start --memory=12000 --cpus=4 --kubernetes-version=v1.23.17 # Last version that fully supported docker
 GATEWAY_IP="$(ip r | grep default | cut -d' ' -f3) grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost"
 echo "$GATEWAY_IP" | sudo tee -a /etc/hosts
-minikube ssh "sudo sh -c 'echo \"$GATEWAY_IP\" | sudo tee -a /etc/hosts'"
 
 # Setup metallb for Istio's gateway to work
 minikube addons enable metallb
