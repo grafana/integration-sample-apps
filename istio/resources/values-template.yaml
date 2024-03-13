@@ -129,7 +129,7 @@ logs:
     }
 
     loki.process "istio_proxy_system_logs" {
-      forward_to = [loki.write.grafana_cloud_loki.receiver]
+      forward_to = [loki.process.logs_service.receiver]
 
       stage.drop {
         expression = "^\\[.*"
@@ -153,7 +153,7 @@ logs:
     }
 
     loki.process "istio_proxy_access_logs" {
-      forward_to = [loki.write.grafana_cloud_loki.receiver]
+      forward_to = [loki.process.logs_service.receiver]
 
       stage.drop {
         expression = "^[^\\[].*"
