@@ -1,4 +1,3 @@
-# /jinja/templates/grafana-flow-k8s-template.yaml.j2
 cluster:
   name: "openldap_cluster"
 
@@ -14,6 +13,31 @@ externalServices:
       username: "{{ loki_user }}"
       password: "{{ loki_pass }}"
 
+
+extraConfig: |-
+  discovery.relabel "openldap" {
+    targets = discovery.kubernetes.endpoints.targets
+    rule {
+      action        = "keep"
+      source_labels = ["__meta_kubernetes_service_name"]
+      regex         = "openldap-exporter"
+    }
+    rule {
+      source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+      separator = "-"
+      target_label = "instance"
+    }
+    rule {
+      replacement = "integrations/openldap"
+      target_label = "job"
+    }
+  }
+
+  prometheus.scrape "openldap" {
+    targets      = discovery.relabel.openldap.output
+    forward_to   = [prometheus.relabel.metrics_service.receiver]
+  }
+
 logs:
   enabled: true
   extraConfig: |-
@@ -22,8 +46,8 @@ logs:
 
       rule {
         action        = "keep"
-        source_labels = ["__meta_kubernetes_pod_label_app"]
-        regex         = "{{ openldap_app_label }}"
+        source_labels = ["__meta_kubernetes_pod_name"]
+        regex         = "my-openldap-0"
       }
       rule {
         target_label = "job"
@@ -43,5 +67,9 @@ logs:
 
     loki.source.kubernetes "openldap_logs" {
       targets    = discovery.relabel.openldap_logs.output
-      forward_to = [loki.write.grafana_cloud_loki.receiver]
+      forward_to = [loki.process.openldap_logs.receiver]
+    }
+
+    loki.process "openldap_logs" {
+      forward_to = [loki.process.logs_service.receiver]
     }

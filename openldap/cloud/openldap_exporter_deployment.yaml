@@ -15,5 +15,4 @@ spec:
       containers:
       - name: openldap-exporter
         image: jonnywamsley/openldap_exporter:latest
-        args: ["/root/openldap_exporter", "--ldapAddr=my-openldap:389", "--ldapUser=cn=admin,dc=example,dc=org", "--ldapPass=Not@SecurePassw0rd"]
-        
+        args: ["/root/openldap_exporter", "--ldapAddr=my-openldap:389", "--ldapUser=cn=monitor,dc=example,dc=org", "--ldapPass=Not@SecurePassw0rd"]

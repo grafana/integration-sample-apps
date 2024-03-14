@@ -3,10 +3,12 @@ K8S_NAMESPACE := default
 CONFIG_FILE := jinja/variables/cloud-init.yaml
 TEMPLATE_DIR := jinja/templates
 OUTPUT_DIR := generated_configs
-GRAFANA_AGENT_VALUES := $(OUTPUT_DIR)/grafana-agent-k8s-template.yaml
 GRAFANA_FLOW_VALUES := $(OUTPUT_DIR)/grafana-flow-k8s-template.yaml
+GRAFANA_MULTIPASS_VALUES := $(OUTPUT_DIR)/grafana-cloud-init-template.yaml
 OPENLDAP_VALUES := cloud/my-openldap-values.yaml
 OPENLDAP_EXPORTER_DEPLOYMENT := cloud/openldap_exporter_deployment.yaml
+OPENLDAP_SERVICE := cloud/openldap_service.yaml
+OPENLDAP_EXPORTER_SERVICE := cloud/openldap_exporter_service.yaml
 GRAFANA_AGENT_DEPLOYMENT := cloud/grafana-agent-deployment.yaml
 
 .PHONY: run stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig run-k8s stop-k8s render-k8s install-grafana-agent install-grafana-flow install-openldap deploy-openldap-exporter deploy-grafana-agent clean-generated
@@ -20,17 +22,17 @@ stop:
 	@multipass purge
 
 load-test:
-	multipass transfer scripts/load_generation.sh $(VM_NAME):/generated_configs/load_generation.sh; \
-    multipass exec $(VM_NAME) -- bash -c "chmod +x /generated_configs/load_generation.sh && nohup /generated_configs/load_generation.sh > /generated_configs/load_gen.log 2>&1 &"
+	multipass transfer scripts/load_generation.sh $(VM_NAME):load_generation.sh; \
+    multipass exec $(VM_NAME) -- bash -c "chmod +x /load_generation.sh && nohup /load_generation.sh > /load_gen.log 2>&1 &"
 
 fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:8080/metrics > prometheus_metrics
 
-render-config:
+render-config2:
 	@docker run --rm -it -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --cloud-init cloud-init.yaml
+	@multipass launch -n $(VM_NAME) --cloud-init generated_configs/cloud-init-template.yaml
 
 clean:
 	@echo "Cleaning generated configs..."
@@ -54,15 +56,13 @@ defaultconfig:
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
 	@echo "prom_port: 8080" >> jinja/variables/cloud-init.yaml
 
-
-install-grafana-agent:
-	helm repo add grafana https://grafana.github.io/helm-charts
-	helm repo update
-
 install-grafana-flow:
 	helm repo add grafana https://grafana.github.io/helm-charts
 	helm repo update
 	helm install grafana-agent-flow grafana/k8s-monitoring -n $(K8S_NAMESPACE) --values $(GRAFANA_FLOW_VALUES)
+
+clean-grafana-flow:
+	helm uninstall grafana-agent-flow -n $(K8S_NAMESPACE)
 
 install-openldap:
 	helm repo add helm-openldap https://jp-gouin.github.io/helm-openldap/
@@ -71,23 +71,21 @@ install-openldap:
 
 deploy-openldap-exporter:
 	kubectl apply -f $(OPENLDAP_EXPORTER_DEPLOYMENT)
+	kubectl apply -f $(OPENLDAP_EXPORTER_SERVICE)
+	kubectl apply -f $(OPENLDAP_SERVICE)
 
-deploy-grafana-agent:
-	kubectl apply -f $(GRAFANA_AGENT_DEPLOYMENT)
-
-run-k8s: render-k8s install-grafana-agent install-grafana-flow install-openldap deploy-openldap-exporter deploy-grafana-agent
+run-k8s: render-k8s install-openldap install-grafana-flow deploy-openldap-exporter
 	@echo "Kubernetes deployments complete."
 
 stop-k8s:
-	kubectl delete -f $(GRAFANA_AGENT_DEPLOYMENT)
 	kubectl delete -f $(OPENLDAP_EXPORTER_DEPLOYMENT)
 	helm uninstall my-openldap -n $(K8S_NAMESPACE)
 	helm uninstall grafana-agent-flow -n $(K8S_NAMESPACE)
 
-render-k8s:
-	@echo "Rendering Kubernetes templates..."
+render-config:
+	@echo "Rendering Configs templates..."
 	python3 scripts/render_template.py --config_file $(CONFIG_FILE) --template_dir $(TEMPLATE_DIR) --output_dir $(OUTPUT_DIR)
-	@echo "Kubernetes templates rendered."
+	@echo "Config templates rendered."
 
 clean-generated:
 	@echo "Cleaning generated configs..."
