@@ -14,8 +14,8 @@ fi
 curl -LO "https://storage.googleapis.com/minikube/releases/latest/$MINIKUBE_BIN"
 sudo install $MINIKUBE_BIN /usr/local/bin/minikube
 minikube start --memory=12000 --cpus=4 --kubernetes-version=v1.23.17 # Last version that fully supported docker
-MINIKUBE_IP=$(minikube ip)
-echo $MINIKUBE_IP grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost | sudo tee -a /etc/hosts
+GATEWAY_IP="$(ip r | grep default | cut -d' ' -f3) grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost"
+echo "$GATEWAY_IP" | sudo tee -a /etc/hosts
 
 # Setup metallb for Istio's gateway to work
 minikube addons enable metallb
@@ -47,7 +47,6 @@ kubectl apply -f /istio/bookinfo/destination-rule-all.yaml
 # Install Grafana Agent Flow
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
-helm install grafana-agent-flow grafana/grafana-agent -n istio-system
 
 # Using user input, create values.yaml (for Grafana Agent Flow helm) from template
 sudo snap install yq
@@ -73,4 +72,4 @@ sed -i -e "s/\$LOKI_URL/$ESC_LOKI_URL/g" values.yaml
 sed -i -e "s/\$LOKI_USER/$ESC_LOKI_USER/g" values.yaml
 sed -i -e "s/\$LOKI_PASS/$ESC_LOKI_PASS/g" values.yaml
 
-helm upgrade grafana-agent-flow grafana/grafana-agent -f values.yaml -n istio-system
+helm install grafana-agent-flow grafana/k8s-monitoring -n istio-system --values values.yaml
