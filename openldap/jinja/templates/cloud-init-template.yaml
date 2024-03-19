@@ -1,0 +1,157 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up OpenLDAP, OpenLDAP Exporter, and Grafana Agent
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- slapd
+- ldap-utils
+- git
+- golang-go
+- grafana-agent
+
+runcmd:
+  # Install and configure OpenLDAP
+  - echo "slapd slapd/internal/generated_adminpw password pass" | debconf-set-selections
+  - echo "slapd slapd/internal/adminpw password pass" | debconf-set-selections
+  - echo "slapd slapd/password2 password pass" | debconf-set-selections
+  - echo "slapd slapd/password1 password pass" | debconf-set-selections
+  - echo "slapd slapd/domain string nodomain" | debconf-set-selections
+  - echo "slapd shared/organization string nodomain" | debconf-set-selections
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y slapd ldap-utils
+
+  # Generate a hashed password for the admin and monitor user
+  - |
+    slappasswd -s pass > /tmp/hashed_password.txt
+    HASHED_PASSWORD=$(cat /tmp/hashed_password.txt)
+
+  # Set up the LDAP admin user with the hashed password
+  - |
+    echo "dn: olcDatabase={1}mdb,cn=config\nchangetype: modify\nreplace: olcRootDN\nolcRootDN: cn=admin,dc=nodomain\n-\nreplace: olcRootPW\nolcRootPW: $HASHED_PASSWORD" > /tmp/set_admin_pw.ldif
+    ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/set_admin_pw.ldif
+
+  # Enable the monitoring module in OpenLDAP
+  - |
+    echo "dn: cn=module{0},cn=config\nchangetype: modify\nadd: olcModuleLoad\nolcModuleLoad: back_monitor" > /tmp/module_monitor.ldif
+    ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/module_monitor.ldif
+
+  # Set up the monitor user with the same hashed password
+  - |
+    echo "dn: cn=monitor,dc=nodomain\nobjectClass: simpleSecurityObject\nobjectClass: organizationalRole\ncn: monitor\ndescription: LDAP monitor\nuserPassword: $HASHED_PASSWORD" > /tmp/cn_monitor.ldif
+    ldapadd -x -D "cn=admin,dc=nodomain" -w pass -f /tmp/cn_monitor.ldif
+
+  # Setup the monitor database in OpenLDAP
+  - |
+    echo "dn: olcDatabase={2}Monitor,cn=config\nobjectClass: olcDatabaseConfig\nobjectClass: olcMonitorConfig\nolcDatabase: {2}Monitor\nolcAccess: to dn.subtree=\"cn=Monitor\" by dn.base=\"cn=monitor,dc=nodomain\" read by * none" > /tmp/database_monitor.ldif
+    ldapadd -Y EXTERNAL -H ldapi:/// -f /tmp/database_monitor.ldif
+
+  # Clone and build the OpenLDAP Exporter
+  - git clone "{{ exporter_repo }}" /home/ubuntu/{{ exporter_dir }}
+  - |
+    export HOME=/root
+    export GOCACHE="/tmp/go-build" # Set GOCACHE explicitly
+    cd /home/ubuntu/{{ exporter_dir }}/cmd/openldap_exporter
+    go build -buildvcs=false .
+
+  # Create systemd service for OpenLDAP Exporter
+  - |
+    echo "[Unit]\nDescription=OpenLDAP Exporter\nAfter=network.target\n\n[Service]\nType=simple\nUser=ubuntu\nExecStart=/home/ubuntu/{{ exporter_dir }}/cmd/openldap_exporter/openldap_exporter --promAddr \"{{ prom_addr }}\" --ldapAddr \"{{ ldap_addr }}\" --ldapUser \"{{ ldap_user }}\" --ldapPass \"{{ ldap_pass }}\" --interval \"{{ interval }}\"\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target" > /etc/systemd/system/openldap_exporter.service
+    systemctl daemon-reload
+    systemctl enable openldap_exporter.service
+    systemctl start openldap_exporter.service
+
+  # Configure OpenLDAP for additional logging
+  - |
+    echo "dn: cn=config
+    changeType: modify
+    replace: olcLogLevel
+    olcLogLevel: stats" > /tmp/slapdlog.ldif
+  - ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/slapdlog.ldif
+
+  # Configure rsyslog for OpenLDAP logging
+  - |
+    echo '$template slapdtmpl,"[%$DAY%-%$MONTH%-%$YEAR% %timegenerated:12:19:date-rfc3339%] %app-name% %syslogseverity-text% %msg%\\n"
+    local4.*    /var/log/slapd.log;slapdtmpl' > /etc/rsyslog.d/10-slapd.conf
+  - service rsyslog restart
+
+
+  # Configure Grafana Agent
+  - systemctl enable grafana-agent
+  - systemctl start grafana-agent
+
+
+write_files:
+# Grafana Agent configuration
+- owner: root:root
+  path: /etc/grafana-agent.yaml
+  content: |
+    integrations:
+      node_exporter:
+        enabled: true
+        relabel_configs:
+        - replacement: hostname
+          target_label: instance
+      prometheus_remote_write:
+      - url: "{{ prom_url }}"
+        {% if prom_user and prom_pass -%}
+        basic_auth:
+          password: "{{ prom_pass }}"
+          username: "{{ prom_user }}"
+        {%- endif %}
+    logs:
+      configs:
+      - name: integrations/openldap
+        clients:
+          - url: "{{ loki_url }}"
+            {% if loki_user and loki_pass -%}
+            basic_auth:
+              username: "{{ loki_user }}"
+              password: "{{ loki_pass }}"
+            {%- endif %}
+        positions:
+          filename: /tmp/positions.yaml
+        target_config:
+          sync_period: 10s
+        scrape_configs:
+        - job_name: integrations/openldap
+          static_configs:
+            - targets: [localhost]
+              labels:
+                job: integrations/openldap
+                __path__: /var/log/slapd.log
+                instance: "openldap-vm"
+                cluster: "openldap_cluster"
+          pipeline_stages:
+            - multiline:
+                firstline: '^\[\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}\]'
+            - regex:
+                expression: '^\[\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}\] (?P<component>\S+) (?P<level>\w+)'
+            - labels:
+                level:
+                component:
+    metrics:
+      configs:
+      - name: integrations/openldap
+        remote_write:
+        - url: "{{ prom_url }}"
+          {% if prom_user and prom_pass -%}
+          basic_auth:
+            password: "{{ prom_pass }}"
+            username: "{{ prom_user }}"
+          {%- endif %}
+        scrape_configs:
+        - job_name: integrations/openldap
+          metrics_path: /metrics
+          static_configs:
+          - targets: ["localhost:{{ prom_port }}"]
+            labels:
+              cluster: "openldap_cluster"
+
+      global:
+        scrape_interval: 60s
+      wal_directory: /tmp/grafana-agent-wal

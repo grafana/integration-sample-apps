@@ -1,0 +1,75 @@
+cluster:
+  name: "openldap_cluster"
+
+externalServices:
+  prometheus:
+    host: "https://prometheus-us-central1.grafana.net"
+    basicAuth:
+      username: "{{ prom_user }}"
+      password: "{{ prom_pass }}"
+  loki:
+    host: "https://logs-prod3.grafana.net"
+    basicAuth:
+      username: "{{ loki_user }}"
+      password: "{{ loki_pass }}"
+
+
+extraConfig: |-
+  discovery.relabel "openldap" {
+    targets = discovery.kubernetes.endpoints.targets
+    rule {
+      action        = "keep"
+      source_labels = ["__meta_kubernetes_service_name"]
+      regex         = "openldap-exporter"
+    }
+    rule {
+      source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+      separator = "-"
+      target_label = "instance"
+    }
+    rule {
+      replacement = "integrations/openldap"
+      target_label = "job"
+    }
+  }
+
+  prometheus.scrape "openldap" {
+    targets      = discovery.relabel.openldap.output
+    forward_to   = [prometheus.relabel.metrics_service.receiver]
+  }
+
+logs:
+  enabled: true
+  extraConfig: |-
+    discovery.relabel "openldap_logs" {
+      targets = discovery.kubernetes.pods.targets
+
+      rule {
+        action        = "keep"
+        source_labels = ["__meta_kubernetes_pod_name"]
+        regex         = "my-openldap-0"
+      }
+      rule {
+        target_label = "job"
+        replacement = "integrations/openldap"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+        separator = "-"
+        target_label = "instance"
+      }
+      rule {
+        action = "replace"
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+    }
+
+    loki.source.kubernetes "openldap_logs" {
+      targets    = discovery.relabel.openldap_logs.output
+      forward_to = [loki.process.openldap_logs.receiver]
+    }
+
+    loki.process "openldap_logs" {
+      forward_to = [loki.process.logs_service.receiver]
+    }
