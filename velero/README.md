@@ -8,6 +8,7 @@ The following provides a sample app for Velero. The sample app will run a linux 
     * Permission to create a storage bucket
 * Create a service account (Owner permissions are fine for a ***dev*** project, see VMWare docs for an LPU) and download its json key.
 * Create a storage bucket with the default parameters and the name `prometheus-velero`.
+    * You can use the `gsutil mb` command for this (https://cloud.google.com/storage/docs/gsutil/commands/mb).
 * Place the contents of the GCP service key into `gcp_credentials.json` which is in the `jinja/variables/` file path.
 * Insert the proper grafana agent credentials into `jinja/variables/cloud-init`
 
