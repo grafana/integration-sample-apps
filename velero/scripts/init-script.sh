@@ -45,6 +45,8 @@ velero create restore --from-backup demo-0
 
 velero create restore --from-backup demo-1
 
+kubectl port-forward -n velero $(kubectl get pods -n velero -l component=velero -o jsonpath='{.items[0].metadata.name}') 8085:8085 &
+
 helm repo add grafana https://grafana.github.io/helm-charts
 
 helm repo update
