@@ -42,15 +42,7 @@ helm install my-nginx bitnami/nginx --version 15.14.0 --create-namespace --names
 
 helm install my-nginx bitnami/nginx --version 15.14.0 --create-namespace --namespace demo-1
 
-velero backup create demo-0 --include-namespaces demo-0 
+sudo chmod +x /velero/scripts/load-gen.sh
 
-velero backup create demo-1 --include-namespaces demo-1 
-
-kubectl delete ns demo-0 
-
-kubectl delete ns demo-1
-
-velero create restore --from-backup demo-0
-
-velero create restore --from-backup demo-1
+(crontab -l 2>/dev/null; echo "*/10 * * * * /velero/scripts/load-gen.sh") | crontab -
 

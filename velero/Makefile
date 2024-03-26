@@ -4,23 +4,7 @@ VM_NAME := velero-sample-app
 
 # Load generation
 generate-load:
-	NAMESPACES := demo-0 demo-1
-# Deploy nginx to namespaces
-	@for ns in $(NAMESPACES); do \
-		multipass exec $(VM_NAME) -- sudo bash -c "helm install my-nginx bitnami/nginx --version 15.14.0 --create-namespace --namespace $$ns"; \
-	done
-	# Backup namespaces
-	@for ns in $(NAMESPACES); do \
-		multipass exec $(VM_NAME) -- sudo bash -c "velero backup create $$ns --include-namespaces $$ns"; \
-	done
-	# Delete namespaces
-	@for ns in $(NAMESPACES); do \
-		multipass exec $(VM_NAME) -- sudo bash -c "kubectl delete ns $$ns"; \
-	done
-	# Restore from backups
-	@for ns in $(NAMESPACES); do \
-		multipass exec $(VM_NAME) -- sudo bash -c "velero create restore --from-backup $$ns"; \
-	done
+	@multipass exec $(VM_NAME) -- bash /velero/scripts/load-gen.sh &
 
 run: launch-vm
 	@echo "VM $(VM_NAME) launched and configured."
