@@ -35,7 +35,6 @@ helm repo update
 
 helm install grafana-agent-flow grafana/k8s-monitoring -n velero --values grafana-agent-flow.yaml
 
-
 helm repo add bitnami https://charts.bitnami.com/bitnami
 
 helm install my-nginx bitnami/nginx --version 15.14.0 --create-namespace --namespace demo-0
@@ -46,3 +45,4 @@ sudo chmod +x /velero/scripts/load-gen.sh
 
 (crontab -l 2>/dev/null; echo "*/10 * * * * /velero/scripts/load-gen.sh") | crontab -
 
+sleep 20
