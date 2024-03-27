@@ -20,69 +20,6 @@ write_files:
 - owner: root:root
   path: /grafana-agent-flow.yaml
   content: |
-    integrations:
-      node_exporter:
-        enabled: true
-        relabel_configs:
-        - replacement: hostname
-          target_label: instance
-      prometheus_remote_write:
-      - url: "{{ prom_url }}"
-        {% if prom_user and prom_pass -%}
-        basic_auth:
-          password: "{{ prom_pass }}"
-          username: "{{ prom_user }}"
-        {%- endif %}
-    logs:
-      configs:
-      - name: integrations/pgbouncer
-        clients:
-          - url: "{{ loki_url }}"
-            {% if loki_user and loki_pass -%}
-            basic_auth:
-              username: "{{ loki_user }}"
-              password: "{{ loki_pass }}"
-            {%- endif %}
-        positions:
-          filename: /tmp/positions.yaml
-        target_config:
-          sync_period: 10s
-        scrape_configs:
-        - job_name: integrations/pgbouncer
-          static_configs:
-            - targets: [localhost]
-              labels:
-                job: integrations/pgbouncer
-                __path__: /var/log/postgresql/pgbouncer.log
-              pgbouncer_cluster: cluster-A
-          pipeline_stages:
-          - multiline:
-            firstline: '\d{4}-\d{2}-\d{2}\s\d{2}\:\d{2}\:\d{2}\.\d{3}'
-          - regex:
-            expression: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \[\d+\] (?P<level>LOG|ERROR|WARNING|INFO|DEBUG)'
-          - labels:
-            level:
-
-    metrics:
-      configs:
-      - name: integrations/pgbouncer
-        remote_write:
-        - url: "{{ prom_url }}"
-          {% if prom_user and prom_pass -%}
-          basic_auth:
-            password: "{{ prom_pass }}"
-            username: "{{ prom_user }}"
-          {%- endif %}
-        scrape_configs:
-        - job_name: integrations/pgbouncer
-          metrics_path: /metrics
-          static_configs:
-          - targets: ["localhost:9127"]
-
-      global:
-        scrape_interval: 60s
-      wal_directory: /tmp/grafana-agent-wal   
-
     cluster:
       name: "velero_cluster"
 
@@ -101,14 +38,19 @@ write_files:
 
     extraConfig: |-
       discovery.relabel "velero" {
-        targets = discovery.kubernetes.endpoints.targets
+        targets = discovery.kubernetes.pods.targets
         rule {
           action        = "keep"
-          source_labels = ["__meta_kubernetes_service_name"]
-          regex         = "velero-exporter"
+          source_labels = ["__meta_kubernetes_pod_label_component"]
+          regex         = "velero"
         }
         rule {
-          source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+          source_labels = ["__meta_kubernetes_pod_container_port_number"]
+          regex = "8085"
+          action = "keep"
+       }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
           separator = "-"
           target_label = "instance"
         }
@@ -120,28 +62,23 @@ write_files:
 
       prometheus.scrape "velero" {
         targets      = discovery.relabel.velero.output
+        metrics_path = "/metrics"
         forward_to   = [prometheus.relabel.metrics_service.receiver]
       }
-
     logs:
       enabled: true
       extraConfig: |-
-        discovery.relabel "velero_logs" {
-          targets = discovery.kubernetes.pods.targets
+        discovery.relabel "logs_velero" {
+          targets = discovery.relabel.pod_logs.output
 
           rule {
             action        = "keep"
-            source_labels = ["__meta_kubernetes_pod_name"]
-            regex         = "my-velero-0"
+            source_labels = ["__meta_kubernetes_pod_label_component"]
+            regex         = "velero"
           }
           rule {
             target_label = "job"
             replacement = "integrations/velero"
-          }
-          rule {
-            source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
-            separator = "-"
-            target_label = "instance"
           }
           rule {
             action = "replace"
@@ -150,11 +87,23 @@ write_files:
           }
         }
 
-        loki.source.kubernetes "velero_logs" {
-          targets    = discovery.relabel.velero_logs.output
-          forward_to = [loki.process.velero_logs.receiver]
-        }
+         loki.source.kubernetes "logs_velero" {
+          targets    = discovery.relabel.logs_velero.output
+          forward_to = [loki.process.logs_velero.receiver]
+         }
 
-        loki.process "velero_logs" {
+         loki.process "logs_velero" {
           forward_to = [loki.process.logs_service.receiver]
-        }
+          stage.cri {}
+          stage.multiline {
+            firstline = "time=\"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\""
+          }
+          stage.regex {
+            expression = "time=\"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\" level=(?P<level>\\w+)"
+          }
+          stage.labels {
+            values = {
+              level  = "",
+            }
+          }
+         }
