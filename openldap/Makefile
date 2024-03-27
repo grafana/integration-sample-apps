@@ -91,3 +91,22 @@ clean-generated:
 	@echo "Cleaning generated configs..."
 	@rm -rf $(OUTPUT_DIR)/*
 	@echo "Generated configs cleaned."
+
+.PHONY: run-openldap-multipass
+run-multipass:
+	@multipass launch -n $(VM_NAME) --memory 14G --disk 10G --cpus 4
+	@multipass mount ./generated_configs/ $(VM_NAME):/ldap-server/config
+	@multipass mount ./cloud $(VM_NAME):/ldap-server/cloud
+	@multipass mount ./scripts $(VM_NAME):/ldap-server/scripts
+	@multipass exec $(VM_NAME) -- bash /ldap-server/scripts/setup_docker.sh
+	@multipass stop $(VM_NAME)
+	@multipass start $(VM_NAME)
+	@multipass exec $(VM_NAME) -- bash /ldap-server/scripts/init_script.sh
+
+
+
+.PHONY: stop-openldap-multipass
+stop-openldap-multipass:
+	@multipass stop $(VM_NAME)
+	@multipass delete $(VM_NAME)
+	@multipass purge
