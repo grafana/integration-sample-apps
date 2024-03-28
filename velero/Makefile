@@ -32,11 +32,3 @@ launch-vm: render-config
 clean:
 	@rm -f cloud-init.yaml
 
-defaultconfig:
-	@echo "interval: \"10s\"" >> jinja/variables/cloud-init.yaml
-	@echo "loki_url: http://your-loki-instance:3100/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
-	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
-	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_url: http://your-prometheus-instance:9090/api/v1/push" >> jinja/variables/cloud-init.yaml
-	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
-	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
