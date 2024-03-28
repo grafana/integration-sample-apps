@@ -15,7 +15,7 @@ The following provides a sample app for Velero. The sample app will run a linux 
 * Insert the proper grafana agent credentials into `jinja/variables/cloud-init`
 
 #### Run
-Once the prerequisites have been met, run a `make defaultconfig` followed by a `make run` to create the sample app VM.
+Once the prerequisites have been met, use the command: `make run` to create the sample app VM.
 
 #### Loadgen
 The sample app starts with some simple loadgen, the user can prompt additional load gen by running `make generate-load`.
