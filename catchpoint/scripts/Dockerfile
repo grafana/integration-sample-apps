@@ -1,14 +1,18 @@
-# Use a Go image as the base image
 FROM --platform=linux/arm64 golang:latest as builder
 
-
 WORKDIR /app
-RUN git clone https://github.com/JonathanWamsley/catchpoint-prometheus-exporter.git .
+
+
+RUN apt-get update && apt-get install -y git curl jq
+RUN git clone https://github.com/grafana/catchpoint-prometheus-exporter.git .
+RUN git fetch origin +refs/pull/*/head:refs/remotes/origin/pr/*
+# undo the requirement for a PR number after pr is merged
+RUN PR_NUM=$(curl -s https://api.github.com/repos/grafana/catchpoint-prometheus-exporter/pulls | jq -r '.[0].number') \
+    && git checkout origin/pr/$PR_NUM
 
 # Set environment variable to build a static binary
 ENV CGO_ENABLED=0
 ENV GOOS=linux
-# ENV GOARCH=amd64
 ENV GOARCH=arm64
 
 # Download all dependencies
@@ -16,16 +20,12 @@ RUN go mod tidy
 
 # Build the application as a static binary
 RUN go build -ldflags '-extldflags "-static"' -o catchpoint-exporter ./cmd/catchpoint-exporter/main.go
-
-# Use a minimal base image from scratch
-# FROM scratch
 FROM --platform=linux/arm64 alpine:latest as final
 WORKDIR /root/
 
-# Install basic tools
-RUN apk add --no-cache bash
-
 COPY --from=builder /app/catchpoint-exporter .
-EXPOSE 8080
+EXPOSE 9090
+
+# Configure the container to run as an executable
 ENTRYPOINT ["./catchpoint-exporter"]
-CMD ["--bearer-token=yourtoken", "--node-ids=1,2"]
+CMD ["--port=9090", "--webhook-path=/webhook", "--verbose"]

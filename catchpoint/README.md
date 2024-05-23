@@ -11,6 +11,7 @@ Before you begin, ensure you have the following installed:
 - [Multipass](https://multipass.run/)
 - Docker (for building images and rendering cloud-init configurations)
 - Git (for version control and repository management)
+- Catchpoint setup to collect metrics from the [Prometheus exporter](https://github.com/grafana/catchpoint-prometheus-exporter/blob/main/README.md)
 
 ## Platform Support
 Currently, this sample app supports ARM64 and amd64 platforms.
@@ -54,10 +55,7 @@ The following are the default variables used in the `cloud-init.yaml` file:
 
 - `exporter_repo`: Repository URL for the Catchpoint Exporter.
 - `exporter_dir`: Directory name for the Catchpoint Exporter.
-- `prom_addr`: Prometheus address (e.g., `":8080"`).
-- `catchpoint_bearer_token`: Your Catchpoint bearer token.
-- `node_ids`: Node IDs for Catchpoint.
-- `interval`: Polling interval.
+- `prom_addr`: Prometheus address (e.g., `":9090"`).
 - `loki_url`: URL for Loki push endpoint.
 - `loki_user`: Your Loki username.
 - `loki_pass`: Your Loki password.
@@ -65,3 +63,4 @@ The following are the default variables used in the `cloud-init.yaml` file:
 - `prom_user`: Your Prometheus username.
 - `prom_pass`: Your Prometheus password.
 - `prom_port`: Prometheus port.
+

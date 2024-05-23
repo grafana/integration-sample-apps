@@ -1,51 +1,70 @@
-VM_NAME := catchpoint
-K8S_NAMESPACE := default
-CONFIG_FILE := jinja/variables/cloud-init.yaml
-TEMPLATE_DIR := jinja/templates
-OUTPUT_DIR := generated_configs
-GRAFANA_FLOW_VALUES := $(OUTPUT_DIR)/grafana-flow-k8s-template.yaml
+# Catchpoint Exporter with Multipass
 
-.PHONY: run-catchpoint-multipass
-run-catchpoint-multipass:
-	@multipass launch -n $(VM_NAME) --memory 14G --disk 10G --cpus 4
-	@multipass mount ./generated_configs/ $(VM_NAME):/catchpoint/config
-	@multipass mount ./scripts $(VM_NAME):/catchpoint/scripts
-	@multipass exec $(VM_NAME) -- bash /catchpoint/scripts/setup_docker.sh
-	@multipass stop $(VM_NAME)
-	@multipass start $(VM_NAME)
-	@multipass exec $(VM_NAME) -- bash /catchpoint/scripts/init_script.sh
+This sample application sets up a Catchpoint Exporter in a VM environment using Multipass, integrated with Grafana Flow/Alloy for metric collection. This setup uses cloud-init and Make commands to facilitate the configuration and monitoring of the Catchpoint Exporter instance.
 
-.PHONY: stop-catchpoint-multipass
-stop-catchpoint-multipass:
-	@multipass stop $(VM_NAME)
-	@multipass delete $(VM_NAME)
-	@sleep 10
-	@multipass purge
+*Note*: To ensure a working Catchpoint Exporter instance, sufficient memory and CPU resources are allocated to each VM.
 
-render-config:
-	python3 scripts/render_template.py --config_file $(CONFIG_FILE) --template_dir $(TEMPLATE_DIR) --output_dir $(OUTPUT_DIR)
-	@echo "Config templates rendered."
+## Prerequisites
 
-clean:
-	@echo "Cleaning generated configs..."
-	@rm -f cloud-init.yaml
-	@rm -rf $(OUTPUT_DIR)/*
-	@echo "Generated configs cleaned."
+Before you begin, ensure you have the following installed:
 
-defaultconfig:
-	@echo "exporter_repo: https://github.com/yourgithub/catchpoint-prometheus-exporter.git" > jinja/variables/cloud-init.yaml
-	@echo "exporter_dir: catchpoint-prometheus-exporter" >> jinja/variables/cloud-init.yaml
-	@echo "prom_addr: \":8080\"" >> jinja/variables/cloud-init.yaml
-	@echo "catchpoint_bearer_token: \"your_token\"" >> jinja/variables/cloud-init.yaml
-	@echo "node_ids: \"1,2\"" >> jinja/variables/cloud-init.yaml
-	@echo "interval: \"10s\"" >> jinja/variables/cloud-init.yaml
-	@echo "loki_url: http://your-loki-instance:3100/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
-	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
-	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_url: http://your-prometheus-instance:9090/api/v1/push" >> jinja/variables/cloud-init.yaml
-	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
-	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_port: 8080" >> jinja/variables/cloud-init.yaml
+- [Multipass](https://multipass.run/)
+- Docker (for building images and rendering cloud-init configurations)
+- Git (for version control and repository management)
+- Catchpoint setup to collect metrics from the [Prometheus exporter](https://github.com/grafana/catchpoint-prometheus-exporter/blob/main/README.md)
 
-fetch-prometheus-metrics:
-	@multipass exec $(VM_NAME) -- curl http://localhost:8080/metrics > prometheus_metrics
+## Platform Support
+Currently, this sample app supports ARM64 and amd64 platforms.
+
+## Quick Start for New Users
+
+To get started with the Catchpoint Exporter along with monitoring tools, follow these steps:
+
+1. **Clone the Repository**: 
+   ```sh
+   git clone https://github.com/grafana/integration-sample-apps.git
+   cd integration-sample-apps/catchpoint
+   ```
+
+2. **Set Up Default Config**: 
+   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to configure Grafana flow to connect to an external Prometheus instance.
+
+3. **Render Cloud-init Configuration**: 
+   Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
+
+4. **Create and Set Up VMs**: 
+   Use `make run-catchpoint-multipass` to start VMs with the Catchpoint Exporter.
+
+5. **Port-Forward and Run Load Generation**:
+   Start port-forwarding and generate load by running `make port-forward` followed by `make run-metrics`. This will forward the necessary ports and run the `post_metrics.py` script to generate load.
+
+6. **Fetch Prometheus Metrics**: 
+   Fetch metrics from the Prometheus exporter and save them with `make fetch-prometheus-metrics`.
+
+7. **Stop and Clean Up**: 
+   Use `make stop-catchpoint-multipass` to clean up the VM and `make clean` to remove temporary files.
+
+## Make Commands
+
+- `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
+- `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
+- `make run-catchpoint-multipass`: Creates VMs and sets up the Catchpoint Exporter.
+- `make port-forward`: Starts port-forwarding for the Prometheus exporter.
+- `make run-metrics`: Runs the `post_metrics.py` script to generate load.
+- `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
+- `make clean`: Deletes all created VMs and performs cleanup.
+
+## Default Configuration Variables
+
+The following are the default variables used in the `cloud-init.yaml` file:
+
+- `exporter_repo`: Repository URL for the Catchpoint Exporter.
+- `exporter_dir`: Directory name for the Catchpoint Exporter.
+- `prom_addr`: Prometheus address (e.g., `":9090"`).
+- `loki_url`: URL for Loki push endpoint.
+- `loki_user`: Your Loki username.
+- `loki_pass`: Your Loki password.
+- `prom_url`: URL for Prometheus push endpoint.
+- `prom_user`: Your Prometheus username.
+- `prom_pass`: Your Prometheus password.
+- `prom_port`: Prometheus port.
