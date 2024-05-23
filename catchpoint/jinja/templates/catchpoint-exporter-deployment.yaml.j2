@@ -16,6 +16,5 @@ spec:
       - name: catchpoint-exporter
         image: jonnywamsley/catchpoint-exporter:latest
         imagePullPolicy: Always
-        args: ["--bearer-token={{ catchpoint_bearer_token }}", "--node-ids={{ node_ids }}"]
         ports:
-        - containerPort: 8080
+        - containerPort: 9090
