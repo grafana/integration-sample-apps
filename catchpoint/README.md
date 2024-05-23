@@ -1,6 +1,6 @@
 # Catchpoint Exporter with Multipass
 
-This sample application sets up a Catchpoint Exporter in a VM environment using Multipass, integrated with Grafana Flow/Alloy for metric collection. This setup uses cloud-init and Make commands to facilitate the configuration and monitoring of the Catchpoint Exporter instance.
+This sample application sets up a Catchpoint Exporter in a VM environment using Multipass, integrated with Grafana Flow/Alloy for metric collection. This setup uses cloud-init and Make commands to facilitate the configuration and monitoring of the Catchpoint Exporter instance using mock generated load.
 
 *Note*: To ensure a working Catchpoint Exporter instance, sufficient memory and CPU resources are allocated to each VM.
 
@@ -35,10 +35,13 @@ To get started with the Catchpoint Exporter along with monitoring tools, follow 
 4. **Create and Set Up VMs**: 
    Use `make run-catchpoint-multipass` to start VMs with the Catchpoint Exporter.
 
-5. **Fetch Prometheus Metrics**: 
+5. **Port-Forward and Run Load Generation**:
+   Start port-forwarding and generate load by running `make port-forward` followed by `make run-metrics`. This will forward the necessary ports and run the `post_metrics.py` script to generate load.
+
+6. **Fetch Prometheus Metrics**: 
    Fetch metrics from the Prometheus exporter and save them with `make fetch-prometheus-metrics`.
 
-6. **Stop and Clean Up**: 
+7. **Stop and Clean Up**: 
    Use `make stop-catchpoint-multipass` to clean up the VM and `make clean` to remove temporary files.
 
 ## Make Commands
@@ -46,6 +49,8 @@ To get started with the Catchpoint Exporter along with monitoring tools, follow 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run-catchpoint-multipass`: Creates VMs and sets up the Catchpoint Exporter.
+- `make port-forward`: Starts port-forwarding for the Prometheus exporter.
+- `make run-metrics`: Runs the `post_metrics.py` script to generate load.
 - `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
@@ -63,4 +68,3 @@ The following are the default variables used in the `cloud-init.yaml` file:
 - `prom_user`: Your Prometheus username.
 - `prom_pass`: Your Prometheus password.
 - `prom_port`: Prometheus port.
-
