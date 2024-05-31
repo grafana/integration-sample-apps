@@ -51,6 +51,7 @@ clean:
 
 .PHONY: defaultconfig
 defaultconfig:
+	@echo "prom_host: https://prometheus-us-central1.grafana.net" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
 
