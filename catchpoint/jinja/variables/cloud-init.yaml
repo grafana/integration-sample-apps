@@ -1,0 +1,4 @@
+loki_user: your_loki_username
+loki_pass: your_loki_password
+prom_user: your_prometheus_username
+prom_pass: your_prometheus_password
