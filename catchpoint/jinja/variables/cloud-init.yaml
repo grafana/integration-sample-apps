@@ -1,2 +1,3 @@
+prom_host: https://prometheus-us-central1.grafana.net
 prom_user: your_prometheus_username
 prom_pass: your_prometheus_password
