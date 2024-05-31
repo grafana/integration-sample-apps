@@ -51,8 +51,6 @@ clean:
 
 .PHONY: defaultconfig
 defaultconfig:
-	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
-	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
 
