@@ -8,6 +8,11 @@ externalServices:
     basicAuth:
       username: "{{ prom_user }}"
       password: "{{ prom_pass }}"
+  loki:
+    host: "https://logs-prod3.grafana.net"
+    basicAuth:
+      username: "{{ loki_user }}"
+      password: "{{ loki_pass }}"
 
 extraConfig: |-
   discovery.relabel "catchpoint" {

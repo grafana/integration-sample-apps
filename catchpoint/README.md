@@ -55,6 +55,8 @@ To get started with the Catchpoint Exporter along with monitoring tools, follow 
 
 The following are the default variables used in the `cloud-init.yaml` file:
 
+- `loki_user`: Your Loki username.
+- `loki_pass`: Your Loki password.
 - `prom_host`: Your Prometheus host (Default https://prometheus-us-central1.grafana.net).
 - `prom_user`: Your Prometheus username.
 - `prom_pass`: Your Prometheus password.
