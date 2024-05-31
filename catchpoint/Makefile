@@ -27,7 +27,7 @@ port-forward:
 	@echo "Setting kubectl context to minikube"
 	@multipass exec $(VM_NAME) -- bash -c "kubectl config use-context minikube"
 	@echo "Starting port-forwarding for Prometheus exporter"
-	@multipass exec $(VM_NAME) -- bash -c "kubectl --context=minikube -n $(K8S_NAMESPACE) port-forward svc/catchpoint-exporter 9090:9090 &"
+	@multipass exec $(VM_NAME) -- bash -c "tmux new-session -d -s port-forward 'kubectl port-forward svc/catchpoint-exporter 9090:9090'"
 	@sleep 5 # Wait a few seconds to ensure port-forwarding is established
 	@echo "Port-forwarding enabled for Prometheus exporter."
 
@@ -51,16 +51,10 @@ clean:
 
 .PHONY: defaultconfig
 defaultconfig:
-	@echo "exporter_repo: https://github.com/grafana/catchpoint-prometheus-exporter.git" > jinja/variables/cloud-init.yaml
-	@echo "exporter_dir: catchpoint-prometheus-exporter" >> jinja/variables/cloud-init.yaml
-	@echo "prom_addr: \":9090\"" >> jinja/variables/cloud-init.yaml
-	@echo "loki_url: http://your-loki-instance:3100/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
 	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_url: http://your-prometheus-instance:9090/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_port: 9090" >> jinja/variables/cloud-init.yaml
 
 .PHONY: fetch-prometheus-metrics
 fetch-prometheus-metrics:
