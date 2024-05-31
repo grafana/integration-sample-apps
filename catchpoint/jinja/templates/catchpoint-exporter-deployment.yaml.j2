@@ -15,6 +15,7 @@ spec:
       containers:
       - name: catchpoint-exporter
         image: jonnywamsley/catchpoint-exporter:latest
+        args: ["--port=9090", "--webhook-path=/webhook", "--verbose"]
         imagePullPolicy: Always
         ports:
         - containerPort: 9090
