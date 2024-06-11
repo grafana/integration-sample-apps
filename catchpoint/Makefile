@@ -43,7 +43,7 @@ render-config:
 	@echo "Config templates rendered."
 
 .PHONY: clean
-clean:
+clean: stop-catchpoint-multipass
 	@echo "Cleaning generated configs..."
 	@rm -f cloud-init.yaml
 	@rm -rf $(OUTPUT_DIR)/*
