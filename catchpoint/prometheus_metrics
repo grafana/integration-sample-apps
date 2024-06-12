@@ -1,0 +1,251 @@
+# HELP catchpoint_any_error Indicates if any error occurred during the test.
+# TYPE catchpoint_any_error gauge
+catchpoint_any_error{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_cached_count Number of cached elements accessed during the test.
+# TYPE catchpoint_cached_count gauge
+catchpoint_cached_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_client_time Client processing time in milliseconds.
+# TYPE catchpoint_client_time gauge
+catchpoint_client_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 129
+# HELP catchpoint_connect_time Time taken to connect to the URL in milliseconds.
+# TYPE catchpoint_connect_time gauge
+catchpoint_connect_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 18
+# HELP catchpoint_connection_error Indicates if a connection error occurred during the test.
+# TYPE catchpoint_connection_error gauge
+catchpoint_connection_error{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_connections_count Total number of connections made during the test.
+# TYPE catchpoint_connections_count gauge
+catchpoint_connections_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 13
+# HELP catchpoint_content_load_time Time taken to load content in milliseconds.
+# TYPE catchpoint_content_load_time gauge
+catchpoint_content_load_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 4026
+# HELP catchpoint_css_content_type Size of CSS content loaded during the test in bytes.
+# TYPE catchpoint_css_content_type gauge
+catchpoint_css_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 234787
+# HELP catchpoint_css_count Number of CSS documents loaded during the test.
+# TYPE catchpoint_css_count gauge
+catchpoint_css_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 2
+# HELP catchpoint_dns_error Indicates if a DNS error occurred during the test.
+# TYPE catchpoint_dns_error gauge
+catchpoint_dns_error{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_dns_time Time taken to resolve the domain name in milliseconds.
+# TYPE catchpoint_dns_time gauge
+catchpoint_dns_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 21
+# HELP catchpoint_document_complete_time Time taken for the browser to fully render the page after all resources are downloaded in milliseconds.
+# TYPE catchpoint_document_complete_time gauge
+catchpoint_document_complete_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 237
+# HELP catchpoint_error_objects_loaded Indicates if error objects were loaded during the test.
+# TYPE catchpoint_error_objects_loaded gauge
+catchpoint_error_objects_loaded{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 1
+# HELP catchpoint_failed_requests_count Number of failed requests during the test.
+# TYPE catchpoint_failed_requests_count gauge
+catchpoint_failed_requests_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 4
+# HELP catchpoint_font_content_type Size of font content loaded during the test in bytes.
+# TYPE catchpoint_font_content_type gauge
+catchpoint_font_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 109707
+# HELP catchpoint_font_count Number of font resources loaded during the test.
+# TYPE catchpoint_font_count gauge
+catchpoint_font_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 5
+# HELP catchpoint_hosts_count Total number of hosts contacted during the test.
+# TYPE catchpoint_hosts_count gauge
+catchpoint_hosts_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 24
+# HELP catchpoint_html_content_type Size of HTML content loaded during the test in bytes.
+# TYPE catchpoint_html_content_type gauge
+catchpoint_html_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 114760
+# HELP catchpoint_html_count Number of HTML documents loaded during the test.
+# TYPE catchpoint_html_count gauge
+catchpoint_html_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 3
+# HELP catchpoint_image_content_type Size of image content loaded during the test in bytes.
+# TYPE catchpoint_image_content_type gauge
+catchpoint_image_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 580540
+# HELP catchpoint_image_count Number of image elements loaded during the test.
+# TYPE catchpoint_image_count gauge
+catchpoint_image_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 16
+# HELP catchpoint_load_error Indicates if a load error occurred during the test.
+# TYPE catchpoint_load_error gauge
+catchpoint_load_error{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 1
+# HELP catchpoint_load_time Time taken to load the first and last byte of the primary URL in milliseconds.
+# TYPE catchpoint_load_time gauge
+catchpoint_load_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 587
+# HELP catchpoint_media_content_type Size of media content loaded during the test in bytes.
+# TYPE catchpoint_media_content_type gauge
+catchpoint_media_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_media_count Number of media elements loaded during the test.
+# TYPE catchpoint_media_count gauge
+catchpoint_media_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_other_content_type Size of other content loaded during the test in bytes.
+# TYPE catchpoint_other_content_type gauge
+catchpoint_other_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_redirect_time Time taken for HTTP redirects in milliseconds.
+# TYPE catchpoint_redirect_time gauge
+catchpoint_redirect_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 202
+# HELP catchpoint_redirections_count Number of HTTP redirections encountered during the test.
+# TYPE catchpoint_redirections_count gauge
+catchpoint_redirections_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 2
+# HELP catchpoint_render_start_time Time taken to start rendering the webpage in milliseconds.
+# TYPE catchpoint_render_start_time gauge
+catchpoint_render_start_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 568
+# HELP catchpoint_requests_count Number of requests made during the test.
+# TYPE catchpoint_requests_count gauge
+catchpoint_requests_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 50
+# HELP catchpoint_response_content_size Size of the HTTP response content in bytes.
+# TYPE catchpoint_response_content_size gauge
+catchpoint_response_content_size{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 88884
+# HELP catchpoint_response_headers_size Size of the HTTP response headers in bytes.
+# TYPE catchpoint_response_headers_size gauge
+catchpoint_response_headers_size{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 2197
+# HELP catchpoint_script_content_type Size of script content loaded during the test in bytes.
+# TYPE catchpoint_script_content_type gauge
+catchpoint_script_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 534736
+# HELP catchpoint_script_count Number of script elements loaded during the test.
+# TYPE catchpoint_script_count gauge
+catchpoint_script_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 22
+# HELP catchpoint_ssl_time Time taken to establish SSL handshake in milliseconds.
+# TYPE catchpoint_ssl_time gauge
+catchpoint_ssl_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 16
+# HELP catchpoint_timeout_error Indicates if a timeout error occurred during the test.
+# TYPE catchpoint_timeout_error gauge
+catchpoint_timeout_error{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_total_content_size Total size of the HTTP response content and headers in bytes.
+# TYPE catchpoint_total_content_size gauge
+catchpoint_total_content_size{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 1.974769e+06
+# HELP catchpoint_total_headers_size Total size of the HTTP response headers in bytes.
+# TYPE catchpoint_total_headers_size gauge
+catchpoint_total_headers_size{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 58142
+# HELP catchpoint_total_time Total time it took to load the webpage in milliseconds.
+# TYPE catchpoint_total_time gauge
+catchpoint_total_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 1731
+# HELP catchpoint_tracepoints_count Number of tracepoints hit during the test.
+# TYPE catchpoint_tracepoints_count gauge
+catchpoint_tracepoints_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_transaction_error Indicates if a transaction error occurred during the test.
+# TYPE catchpoint_transaction_error gauge
+catchpoint_transaction_error{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 1
+# HELP catchpoint_up Catchpoint exporter is up and running.
+# TYPE catchpoint_up gauge
+catchpoint_up 1
+# HELP catchpoint_wait_time Time from successful connection to receiving the first byte in milliseconds.
+# TYPE catchpoint_wait_time gauge
+catchpoint_wait_time{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 552
+# HELP catchpoint_xml_content_type Size of XML content loaded during the test in bytes.
+# TYPE catchpoint_xml_content_type gauge
+catchpoint_xml_content_type{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP catchpoint_xml_count Number of XML documents loaded during the test.
+# TYPE catchpoint_xml_count gauge
+catchpoint_xml_count{asn="46678",client_id="832",division_id="2342",monitor_type_id="18",node_name="Chicago, US - AT&T",test_id="8104714",test_name="Homepage fast",type_id="0"} 0
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0.000105418
+go_gc_duration_seconds{quantile="0.25"} 0.000559549
+go_gc_duration_seconds{quantile="0.5"} 0.001569319
+go_gc_duration_seconds{quantile="0.75"} 0.001852841
+go_gc_duration_seconds{quantile="1"} 0.002233992
+go_gc_duration_seconds_sum 0.008854162
+go_gc_duration_seconds_count 7
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 10
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.22.2"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 2.142832e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 7.725304e+06
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 8139
+# HELP go_memstats_frees_total Total number of frees.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 15384
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 2.571496e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and still in use.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 2.142832e+06
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 4.186112e+06
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use.
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 3.547136e+06
+# HELP go_memstats_heap_objects Number of allocated objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 2855
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 3.432448e+06
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 7.733248e+06
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.7164289184480557e+09
+# HELP go_memstats_lookups_total Total number of pointer lookups.
+# TYPE go_memstats_lookups_total counter
+go_memstats_lookups_total 0
+# HELP go_memstats_mallocs_total Total number of mallocs.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 18239
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 4800
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 15600
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 80960
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 97920
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.194304e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 967661
+# HELP go_memstats_stack_inuse_bytes Number of bytes in use by the stack allocator.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 622592
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 622592
+# HELP go_memstats_sys_bytes Number of bytes obtained from system.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 1.2016656e+07
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 7
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.27
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 10
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1.406976e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.71642789193e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.264275456e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 1.8446744073709552e+19
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 17
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0
