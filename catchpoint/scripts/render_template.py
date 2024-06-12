@@ -33,3 +33,4 @@ os.makedirs(output_dir, exist_ok=True)
 
 # Run the rendering process
 render_templates(config_file, template_dir, output_dir)
+

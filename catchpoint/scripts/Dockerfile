@@ -6,9 +6,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y git curl jq
 RUN git clone https://github.com/grafana/catchpoint-prometheus-exporter.git .
 RUN git fetch origin +refs/pull/*/head:refs/remotes/origin/pr/*
-# undo the requirement for a PR number after pr is merged
-RUN PR_NUM=$(curl -s https://api.github.com/repos/grafana/catchpoint-prometheus-exporter/pulls | jq -r '.[0].number') \
-    && git checkout origin/pr/$PR_NUM
 
 # Set environment variable to build a static binary
 ENV CGO_ENABLED=0
