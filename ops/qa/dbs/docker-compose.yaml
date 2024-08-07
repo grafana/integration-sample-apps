@@ -1,0 +1,17 @@
+services:
+
+  mimir:
+    image: grafana/mimir:latest
+    volumes:
+      - ./configs/mimir:/etc/mimir-config
+    entrypoint:
+      - /bin/mimir
+      - -config.file=/etc/mimir-config/mimir.yaml
+    ports:
+      - "9009:9009"
+
+  loki:
+    image: grafana/loki:latest
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
