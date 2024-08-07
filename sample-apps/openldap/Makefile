@@ -1,6 +1,7 @@
 VM_NAME := ldap-server
 K8S_NAMESPACE := default
-CONFIG_FILE := jinja/variables/cloud-init.yaml
+CONFIG_FILE_DIR := jinja/variables
+CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 TEMPLATE_DIR := jinja/templates
 OUTPUT_DIR := generated_configs
 GRAFANA_FLOW_VALUES := $(OUTPUT_DIR)/grafana-flow-k8s-template.yaml
@@ -47,6 +48,7 @@ clean:
 	@echo "Generated configs cleaned."
 
 defaultconfig:
+	@mkdir $(CONFIG_FILE_DIR)
 	@echo "exporter_repo: https://github.com/grafana/openldap_exporter.git" >> jinja/variables/cloud-init.yaml
 	@echo "exporter_dir: openldap_exporter" >> jinja/variables/cloud-init.yaml
 	@echo "prom_addr: \":8080\"" >> jinja/variables/cloud-init.yaml
