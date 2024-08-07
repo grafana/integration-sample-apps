@@ -1,0 +1,129 @@
+name: "Sample Apps"
+
+permissions:
+  contents: read
+
+on:
+  # To conserve resources we only run tests against main in PRs
+  pull_request:
+    branches:
+      - main
+    
+jobs:
+  check-for-changed-sample-apps:
+    name: Check for changed sample apps
+    runs-on: ubuntu-latest
+    outputs:
+      changed-sample-apps: ${{ steps.changed-files.outputs.all_changed_files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed sample apps
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          path: sample-apps
+          dir_names: true
+          dir_names_max_depth: 1
+          matrix: true
+
+      - name: List all changed sample app dir_names
+        # NOTE: this is referred to as a file by the action, despite technically being a chunk of the directory in use
+        run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
+
+  sample-app-testing:
+    name: Test sample-app
+    runs-on: ubuntu-latest-8-cores
+    permissions:
+      issues: write
+      contents: write
+      pull-requests: write
+      repository-projects: write
+
+    timeout-minutes: 30
+    needs: [check-for-changed-sample-apps]
+    strategy:
+      matrix: 
+        sample-app: ${{ fromJSON(needs.check-for-changed-sample-apps.outputs.changed-sample-apps) }}
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check sample-app supports CI execution
+        id: check_ci_support
+        run: |
+          export "CI_BYPASS=$(./ops/scripts/check_sample_app_ci_bypass.sh ${{ matrix.sample-app }})"
+          echo "CI_BYPASS=$CI_BYPASS" >> $GITHUB_OUTPUT
+          export "SUPPORTS_CI=$(./ops/scripts/check_sample_app_ci_compatible.sh ${{ matrix.sample-app }})"
+          echo "SUPPORTS_CI=$SUPPORTS_CI" >> $GITHUB_OUTPUT
+
+
+          echo $CI_BYPASS
+          echo $SUPPORTS_CI
+
+      - name: Warn user - sample-app incorrectly configured for CI
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'false' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        run: |
+          echo "[FAIL] The ${{ matrix.sample-app }} sample-app is not CI compatible and does not have a CI bypass file"
+          exit 1
+
+      - name: Warn user - CI bypass enabled
+        if: steps.check_ci_support.outputs.CI_BYPASS == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const msg = `[WARNING] The ${{ matrix.sample-app }} sample-app has a .CI_BYPASS file and will **not** be tested in CI/CD.
+            
+            Please ensure it has been manually validated, and inform reviewers of such by ticking the below task and optionally informing users of the details.
+            - [ ] Manual testing of ${{ matrix.sample-app }} sample-app has been completed`
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: msg
+            })
+
+      - name: Install Multipass
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        run: sudo snap install multipass && sudo snap set system experimental.parallel-instances=true && sudo snap install multipass_socket
+      
+      - name: Configure Multipass
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        run: sudo chmod a+w /var/snap/multipass/common/multipass_socket
+
+      - name: Checkout repo
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        uses: actions/checkout@v4
+      
+      - name: Setup config & databases
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        run: |
+          ./ops/scripts/multipass_setup_qa_dbs.sh dbs
+          export "DB_IP=$(./ops/scripts/multipass_get_ips.sh dbs)"
+          echo "LOKI=$DB_IP:3100" >> $GITHUB_ENV
+          echo "MIMIR=$DB_IP:9009" >> $GITHUB_ENV
+          source ./ops/.defaultconfig
+          echo "SAMPLE_APP_SETUP_TIME=$SAMPLE_APP_SETUP_TIME" >> $GITHUB_ENV
+
+      - name: Run ${{ matrix.sample-app }} sample-app
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        working-directory: ./sample-apps/${{ matrix.sample-app }}
+        run: |
+          make LOKI_INSTANCE=${{ env.LOKI }} PROMETHEUS_INSTANCE=${{ env.MIMIR }} run-ci
+
+      - name: Wait for sample-app to generate metrics
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        run: sleep ${{ env.SAMPLE_APP_SETUP_TIME }}
+      
+      - name: Check Prom metrics in Mimir
+        if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        run: |
+          ./ops/scripts/check_metrics.sh ${{ matrix.sample-app }} $MIMIR
+          # test get link to this particular stage
+          echo "CHECK_METRICS_STEP_LINKL=https://github.com/${{ github.repository }}/commit/${{ github.sha }}/checks/${{ github.run_id }}"
