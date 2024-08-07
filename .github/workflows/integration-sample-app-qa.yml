@@ -37,13 +37,13 @@ jobs:
 
   sample-app-testing:
     name: Test sample-app
+    # Sample app testing requires a runner with support for nested virtualization
     runs-on: ubuntu-latest-8-cores
     permissions:
       issues: write
       contents: write
       pull-requests: write
       repository-projects: write
-
     timeout-minutes: 30
     needs: [check-for-changed-sample-apps]
     strategy:
@@ -61,10 +61,6 @@ jobs:
           echo "CI_BYPASS=$CI_BYPASS" >> $GITHUB_OUTPUT
           export "SUPPORTS_CI=$(./ops/scripts/check_sample_app_ci_compatible.sh ${{ matrix.sample-app }})"
           echo "SUPPORTS_CI=$SUPPORTS_CI" >> $GITHUB_OUTPUT
-
-
-          echo $CI_BYPASS
-          echo $SUPPORTS_CI
 
       - name: Warn user - sample-app incorrectly configured for CI
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'false' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
