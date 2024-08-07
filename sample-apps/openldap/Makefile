@@ -10,6 +10,8 @@ OPENLDAP_EXPORTER_DEPLOYMENT := cloud/openldap_exporter_deployment.yaml
 OPENLDAP_SERVICE := cloud/openldap_service.yaml
 OPENLDAP_EXPORTER_SERVICE := cloud/openldap_exporter_service.yaml
 GRAFANA_AGENT_DEPLOYMENT := cloud/grafana-agent-deployment.yaml
+LOKI_INSTANCE := your-loki-instance:3100
+PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
 .PHONY: run stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig run-k8s stop-k8s render-k8s install-grafana-agent install-grafana-flow install-openldap deploy-openldap-exporter deploy-grafana-agent clean-generated
 
@@ -22,8 +24,8 @@ stop:
 	@multipass purge
 
 load-test:
-	multipass transfer scripts/load_generation.sh $(VM_NAME):load_generation.sh; \
-    multipass exec $(VM_NAME) -- bash -c "chmod +x /load_generation.sh && nohup /load_generation.sh > /load_gen.log 2>&1 &"
+	multipass transfer ./scripts/load_generation.sh $(VM_NAME):/home/ubuntu/load_generation.sh; \
+    multipass exec $(VM_NAME) -- bash -c "chmod +x load_generation.sh && nohup load_generation.sh > load_gen.log 2>&1 &"
 
 fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:8080/metrics > prometheus_metrics
@@ -48,10 +50,10 @@ defaultconfig:
 	@echo "ldap_user: \"cn=monitor,dc=nodomain\"" >> jinja/variables/cloud-init.yaml
 	@echo "ldap_pass: \"pass\"" >> jinja/variables/cloud-init.yaml
 	@echo "interval: \"10s\"" >> jinja/variables/cloud-init.yaml
-	@echo "loki_url: http://your-loki-instance:3100/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
+	@echo "loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
 	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_url: http://your-prometheus-instance:9090/api/v1/push" >> jinja/variables/cloud-init.yaml
+	@echo "prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
 	@echo "prom_port: 8080" >> jinja/variables/cloud-init.yaml
