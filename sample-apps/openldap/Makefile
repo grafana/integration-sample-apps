@@ -13,10 +13,13 @@ GRAFANA_AGENT_DEPLOYMENT := cloud/grafana-agent-deployment.yaml
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
-.PHONY: run stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig run-k8s stop-k8s render-k8s install-grafana-agent install-grafana-flow install-openldap deploy-openldap-exporter deploy-grafana-agent clean-generated
+.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig run-k8s stop-k8s render-k8s install-grafana-agent install-grafana-flow install-openldap deploy-openldap-exporter deploy-grafana-agent clean-generated
 
 run: launch-vm load-test
 	@echo "VM $(VM_NAME) launched and configured."
+
+run-ci: clean defaultconfig launch-vm load-test
+	echo "Setting up sample-app"
 
 stop:
 	@multipass stop $(VM_NAME)
@@ -38,6 +41,7 @@ launch-vm: render-config
 
 clean:
 	@echo "Cleaning generated configs..."
+	@mkdir $(OUTPUT_DIR)
 	@rm -f cloud-init.yaml
 	@rm -rf $(OUTPUT_DIR)/*
 	@echo "Generated configs cleaned."
