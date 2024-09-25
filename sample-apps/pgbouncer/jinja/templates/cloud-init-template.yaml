@@ -89,14 +89,14 @@ write_files:
               labels:
                 job: integrations/pgbouncer
                 __path__: /var/log/postgresql/pgbouncer.log
-              pgbouncer_cluster: cluster-A
+                pgbouncer_cluster: pgbouncer-sample-app
           pipeline_stages:
           - multiline:
-            firstline: '\d{4}-\d{2}-\d{2}\s\d{2}\:\d{2}\:\d{2}\.\d{3}'
+              firstline: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}'
           - regex:
-            expression: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \[\d+\] (?P<level>LOG|ERROR|WARNING|INFO|DEBUG)'
+              expression: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \[\d+\] (?P<level>LOG|ERROR|WARNING|INFO|DEBUG) .*'
           - labels:
-            level:
+              level:
 
     metrics:
       configs:
@@ -113,6 +113,8 @@ write_files:
           metrics_path: /metrics
           static_configs:
           - targets: ["localhost:9127"]
+            labels:
+              pgbouncer_cluster: pgbouncer-sample-app
 
       global:
         scrape_interval: 60s
