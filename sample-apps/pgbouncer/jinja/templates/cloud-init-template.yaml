@@ -1,5 +1,5 @@
 # jinja/templates/cloud-init-template.yaml
-# Cloud-init configuration for setting up Postgres, PGbouncer, PGbouncer Exporter, and Grafana Agent
+# Cloud-init configuration for setting up Postgres, PGbouncer, PGbouncer Exporter, and Alloy
 
 apt:
   sources:
@@ -10,13 +10,15 @@ apt:
 
 packages:
 - git
-- grafana-agent
+- gpg
+- alloy
 
 runcmd:
   # Install and configure postgresql
   - sudo apt-get update
-  - sudo apt install postgresql
+  - sudo apt install postgresql -y
   - sudo apt-get install -y pgbouncer
+  - sudo apt-get install postgresql-contrib -y
 
   # Configure pgbouncer 
   - sudo truncate -s 0 /etc/pgbouncer/pgbouncer.ini
@@ -36,10 +38,9 @@ runcmd:
   - echo "ignore_startup_parameters = extra_float_digits" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
   - sudo systemctl restart pgbouncer
 
-  # Configure Grafana Agent
-  - systemctl enable grafana-agent
-  - systemctl start grafana-agent
-  - sudo apt-get install postgresql-contrib -y
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
   
   #Install Exporter
   - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
@@ -51,71 +52,114 @@ runcmd:
   - ./pgbouncer_exporter &
 
 write_files:
-# Grafana Agent configuration
+# Alloy configuration
 - owner: root:root
-  path: /etc/grafana-agent.yaml
+  path: /etc/alloy/config.alloy
   content: |
-    integrations:
-      node_exporter:
-        enabled: true
-        relabel_configs:
-        - replacement: hostname
-          target_label: instance
-      prometheus_remote_write:
-      - url: "{{ prom_url }}"
-        {% if prom_user and prom_pass -%}
-        basic_auth:
-          password: "{{ prom_pass }}"
-          username: "{{ prom_user }}"
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
         {%- endif %}
-    logs:
-      configs:
-      - name: integrations/pgbouncer
-        clients:
-          - url: "{{ loki_url }}"
-            {% if loki_user and loki_pass -%}
-            basic_auth:
-              username: "{{ loki_user }}"
-              password: "{{ loki_pass }}"
-            {%- endif %}
-        positions:
-          filename: /tmp/positions.yaml
-        target_config:
-          sync_period: 10s
-        scrape_configs:
-        - job_name: integrations/pgbouncer
-          static_configs:
-            - targets: [localhost]
-              labels:
-                job: integrations/pgbouncer
-                __path__: /var/log/postgresql/pgbouncer.log
-                pgbouncer_cluster: pgbouncer-sample-app
-          pipeline_stages:
-          - multiline:
-              firstline: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}'
-          - regex:
-              expression: '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \[\d+\] (?P<level>LOG|ERROR|WARNING|INFO|DEBUG) .*'
-          - labels:
-              level:
+      }
+    }
 
-    metrics:
-      configs:
-      - name: integrations/pgbouncer
-        remote_write:
-        - url: "{{ prom_url }}"
-          {% if prom_user and prom_pass -%}
-          basic_auth:
-            password: "{{ prom_pass }}"
-            username: "{{ prom_user }}"
-          {%- endif %}
-        scrape_configs:
-        - job_name: integrations/pgbouncer
-          metrics_path: /metrics
-          static_configs:
-          - targets: ["localhost:9127"]
-            labels:
-              pgbouncer_cluster: pgbouncer-sample-app
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
 
-      global:
-        scrape_interval: 60s
-      wal_directory: /tmp/grafana-agent-wal
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+    
+    local.file_match "logs_integrations_integrations_pgbouncer" {
+      path_targets = [{
+        __address__       = "localhost",
+        __path__          = "/var/log/postgresql/pgbouncer.log",
+        instance          = "pgbouncer-sample-app:9127",
+        job               = "integrations/pgbouncer",
+        pgbouncer_cluster = "pgbouncer-sample-app-cluster",
+      }]
+    }
+
+    prometheus.scrape "metrics_integrations_integrations_pgbouncer" {
+      targets = [{
+        __address__       = "pgbouncer-sample-app:9127",
+        pgbouncer_cluster = "pgbouncer-sample-app-cluster",
+      }]
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/pgbouncer"
+    }
+
+    loki.process "logs_integrations_integrations_pgbouncer" {
+      forward_to = []
+
+      stage.multiline {
+        firstline     = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}"
+        max_lines     = 0
+        max_wait_time = "3s"
+      }
+
+      stage.regex {
+        expression = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+ \\[\\d+\\] (?P<level>LOG|ERROR|WARNING|INFO|DEBUG) .*"
+      }
+
+      stage.labels {
+        values = {
+          level = null,
+        }
+      }
+    }
+
+    loki.source.file "logs_integrations_integrations_pgbouncer" {
+      targets    = local.file_match.logs_integrations_integrations_pgbouncer.targets
+      forward_to = [loki.process.logs_integrations_integrations_pgbouncer.receiver]
+    }

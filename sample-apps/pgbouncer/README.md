@@ -1,6 +1,6 @@
 # PgBouncer Sample App
 
-This sample application creates a VM with a PgBouncer instance, integrated with Grafana Agent for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of PgBouncer instances.
+This sample application creates a VM with a PgBouncer instance, integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of PgBouncer instances.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ To get started with the sample app, follow these steps:
    ```
 
 2. **Set Up Default Config**: 
-   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect the Grafana agent to an external Prometheus compatible TSDB and/or Loki server.
+   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect Alloy to an external Prometheus compatible TSDB and/or Loki server.
 
 3. **Render Cloud-init Configuration**: 
    Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
@@ -44,7 +44,6 @@ To get started with the sample app, follow these steps:
 - `make run`: Creates the PgBouncer sample app.
 - `make load-gen`: Sets up a load generation for the sample app.
 - `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
-- `make setup-grafana-agent`: Sets up Grafana Agent on each VM for forwarding metrics and logs.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
 ## Default Configuration Variables
@@ -68,13 +67,13 @@ To get started with the sample app, follow these steps:
   journalctl -u pgbouncer
   ```
 
-### Grafana Agent
-- **Check Service Status**: Confirm that the Grafana Agent is running.
+### Alloy
+- **Check Service Status**: Confirm that Alloy is running.
   ```bash
-  systemctl status grafana-agent
+  systemctl status alloy.service
   ```
-- **Review Configuration**: Verify the configuration in `/etc/grafana-agent.yaml` is correct.
-- **Check Logs**: Review Grafana Agent logs for any connectivity or configuration issues.
+- **Review Configuration**: Verify the configuration in `/etc/alloy/config.alloy` is correct.
+- **Check Logs**: Review Alloy logs for any connectivity or configuration issues.
   ```bash
-  journalctl -u grafana-agent
+  journalctl -u alloy.service
   ```
