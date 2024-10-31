@@ -1,0 +1,261 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+
+  # Install nginx
+  - sudo apt-get install nginx -y
+  - sudo cp /etc/nginx/sites-available/default.dpkg-new /etc/nginx/sites-enabled/default
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+  # Enable and start nginx just for good measure in case it stopped when the config got written
+  - sudo systemctl enabled nginx.service
+  - sudo systemctl start nginx.service
+
+  # Download and install the nginx-prometheus-exporter
+  - sudo wget https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v1.3.0/nginx-prometheus-exporter_1.3.0_linux_amd64.tar.gz
+  - sudo tar -xvf nginx-prometheus-exporter_1.3.0_linux_amd64.tar.gz -C /usr/local/bin
+
+  # Start the nginx-prometheus-exporter
+  - nginx-prometheus-exporter --nginx.scrape-uri=http://localhost:8080/stub_status &
+
+write_files:
+# NGINX server config
+- owner: root:root
+  path: /etc/nginx/nginx.conf
+  content: |
+    user www-data;
+    worker_processes auto;
+    pid /run/nginx.pid;
+    error_log /var/log/nginx/error.log;
+    include /etc/nginx/modules-enabled/*.conf;
+
+    events {
+    worker_connections 768;
+    # multi_accept on;
+    }
+
+    http {
+
+      ##
+      # Basic Settings
+      ##
+
+      sendfile on;
+      tcp_nopush on;
+      types_hash_max_size 2048;
+      # server_tokens off;
+
+      # server_names_hash_bucket_size 64;
+      # server_name_in_redirect off;
+
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+
+      ##
+      # SSL Settings
+      ##
+
+      ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3; # Dropping SSLv3, ref: POODLE
+      ssl_prefer_server_ciphers on;
+
+      ##
+      # Logging Settings
+      ##
+
+      log_format json_analytics escape=json '{'
+      '"msec": "$msec", ' # request unixtime in seconds with a milliseconds resolution
+      '"connection": "$connection", ' # connection serial number
+      '"connection_requests": "$connection_requests", ' # number of requests made in connection
+      '"pid": "$pid", ' # process pid
+      '"request_id": "$request_id", ' # the unique request id
+      '"request_length": "$request_length", ' # request length (including headers and body)
+      '"remote_addr": "$remote_addr", ' # client IP
+      '"remote_user": "$remote_user", ' # client HTTP username
+      '"remote_port": "$remote_port", ' # client port
+      '"time_local": "$time_local", '
+      '"time_iso8601": "$time_iso8601", ' # local time in the ISO 8601 standard format
+      '"request": "$request", ' # full path no arguments if the request
+      '"request_uri": "$request_uri", ' # full path and arguments if the request
+      '"args": "$args", ' # args
+      '"status": "$status", ' # response status code
+      '"body_bytes_sent": "$body_bytes_sent", ' # the number of body bytes exclude headers sent to a client
+      '"bytes_sent": "$bytes_sent", ' # the number of bytes sent to a client
+      '"http_referer": "$http_referer", ' # HTTP referer
+      '"http_user_agent": "$http_user_agent", ' # user agent
+      '"http_x_forwarded_for": "$http_x_forwarded_for", ' # http_x_forwarded_for
+      '"http_host": "$http_host", ' # the request Host: header
+      '"server_name": "$server_name", ' # the name of the vhost serving the request
+      '"request_time": "$request_time", ' # request processing time in seconds with msec resolution
+      '"upstream": "$upstream_addr", ' # upstream backend server for proxied requests
+      '"upstream_connect_time": "$upstream_connect_time", ' # upstream handshake time incl. TLS
+      '"upstream_header_time": "$upstream_header_time", ' # time spent receiving upstream headers
+      '"upstream_response_time": "$upstream_response_time", ' # time spent receiving upstream body
+      '"upstream_response_length": "$upstream_response_length", ' # upstream response length
+      '"upstream_cache_status": "$upstream_cache_status", ' # cache HIT/MISS where applicable
+      '"ssl_protocol": "$ssl_protocol", ' # TLS protocol
+      '"ssl_cipher": "$ssl_cipher", ' # TLS cipher
+      '"scheme": "$scheme", ' # http or https
+      '"request_method": "$request_method", ' # request method
+      '"server_protocol": "$server_protocol", ' # request protocol, like HTTP/1.1 or HTTP/2.0
+      '"pipe": "$pipe", ' # "p" if request was pipelined, "." otherwise
+      '"gzip_ratio": "$gzip_ratio"'
+      '}';
+
+      access_log /var/log/nginx/json_access.log json_analytics;
+
+
+      ##
+      # Gzip Settings
+      ##
+
+      gzip on;
+
+      # gzip_vary on;
+      # gzip_proxied any;
+      # gzip_comp_level 6;
+      # gzip_buffers 16 8k;
+      # gzip_http_version 1.1;
+      # gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+      ##
+      # Virtual Host Configs
+      ##
+
+      include /etc/nginx/conf.d/*.conf;
+      include /etc/nginx/sites-enabled/*;
+    }
+  
+# NGINX stub_status config
+- owner: root:root
+  path: /etc/nginx/sites-enabled/stub_status
+  content: |
+    server {
+        listen 127.0.0.1:8080; # Adjust the IP and port if necessary
+        server_name localhost; # You can use a different server_name if desired
+
+        location /stub_status {
+            stub_status on;
+            # Optionally restrict access to IP addresses if needed
+            # allow 127.0.0.1;
+            # deny all;
+        }
+    }
+
+
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    local.file_match "logs_integrations_integrations_nginx" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/nginx/json_access.log",
+        host= "localhost",
+        instance    = "nginx-sample-app",
+        job= "integrations/nginx",
+      }]
+    }
+
+    loki.source.file "logs_integrations_integrations_nginx" {
+      targets    = local.file_match.logs_integrations_integrations_nginx.targets
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+    }
+
+    discovery.relabel "metrics_integrations_integrations_nginx" {
+      targets = [{
+        __address__ = "localhost:9113",
+      }]
+
+      rule {
+        target_label = "instance"
+        replacement  = "nginx-sample-app"
+      }
+    }
+
+    prometheus.scrape "metrics_integrations_integrations_nginx" {
+      targets    = discovery.relabel.metrics_integrations_integrations_nginx.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/nginx"
+    }
