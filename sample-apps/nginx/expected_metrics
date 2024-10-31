@@ -1,0 +1,9 @@
+nginx_connections_accepted
+nginx_connections_active
+nginx_connections_handled
+nginx_connections_reading
+nginx_connections_waiting
+nginx_connections_writing
+nginx_http_requests_total
+nginx_up
+up
