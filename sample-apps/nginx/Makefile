@@ -1,4 +1,4 @@
-VM_NAME := pgbouncer-sample-app
+VM_NAME := nginx-sample-app
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE := your-loki-instance:3100
@@ -9,19 +9,13 @@ PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 run: launch-vm
 	@echo "VM $(VM_NAME) launched and configured."
 
-run-ci: clean defaultconfig launch-vm load-gen
+run-ci: clean defaultconfig launch-vm
 	@echo "Running in CI mode"
 
 stop:
 	@multipass stop $(VM_NAME)
 	@multipass delete $(VM_NAME)
 	@multipass purge
-
-fetch-prometheus-metrics:
-	@multipass exec $(VM_NAME) -- curl http://localhost:9127/metrics > prometheus_metrics
-
-load-gen:
-	@multipass exec $(VM_NAME) -- sudo bash -c "sudo su postgres -c 'pgbench -i -s 10; pgbench -c 50 -T 60; exit;'"
 
 render-config:
 	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
