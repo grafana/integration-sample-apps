@@ -1,4 +1,4 @@
-VM_NAME := pgbouncer-sample-app
+VM_NAME := postgres-sample-app
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE := your-loki-instance:3100
