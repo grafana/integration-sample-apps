@@ -1,0 +1,233 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  
+  # Install snmp daemon
+  - sudo apt install snmpd -y
+
+  # Copy the new snmpd config to the existing file to preserve the existing
+  # file's rather strange group ownership, which snmp is twitchy about
+  - sudo cat /etc/snmp/snmpd_sample_app.conf > /etc/snmp/snmpd.conf
+
+  # Configure firewall, just in case
+  - ufw allow 161/udp
+  - ufw allow 162/udp
+
+  - sudo systemctl restart snmpd
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+  # Small ping just to get some traffic on the interface
+  - sudo ping grafana.com > /dev/null & 
+
+
+write_files:
+# snmpd configuration
+- owner: root:root
+  path: /etc/snmp/snmpd_sample_app.conf
+  content: |
+    ###########################################################################
+    #
+    # snmpd.conf
+    # An example configuration file for configuring the Net-SNMP agent ('snmpd')
+    # See snmpd.conf(5) man page for details
+    #
+    ###########################################################################
+    # SECTION: System Information Setup
+    #
+
+    # syslocation: The [typically physical] location of the system.
+    #   Note that setting this value here means that when trying to
+    #   perform an snmp SET operation to the sysLocation.0 variable will make
+    #   the agent return the "notWritable" error code.  IE, including
+    #   this token in the snmpd.conf file will disable write access to
+    #   the variable.
+    #   arguments:  location_string
+    sysLocation    Sitting on the Dock of the Bay
+    sysContact     Me <me@example.org>
+
+    # sysservices: The proper value for the sysServices object.
+    #   arguments:  sysservices_number
+    sysServices    72
+
+
+
+    ###########################################################################
+    # SECTION: Agent Operating Mode
+    #
+    #   This section defines how the agent will operate when it
+    #   is running.
+
+    # master: Should the agent operate as a master agent or not.
+    #   Currently, the only supported master agent type for this token
+    #   is "agentx".
+    #   
+    #   arguments: (on|yes|agentx|all|off|no)
+
+    master  agentx
+
+    # agentaddress: The IP address and port number that the agent will listen on.
+    #   By default the agent listens to any and all traffic from any
+    #   interface on the default SNMP port (161).  This allows you to
+    #   specify which address, interface, transport type and port(s) that you
+    #   want the agent to listen on.  Multiple definitions of this token
+    #   are concatenated together (using ':'s).
+    #   arguments: [transport:]port[@interface/address],...
+
+    #agentaddress  127.0.0.1,[::1]
+    agentaddress udp:161
+
+
+    ###########################################################################
+    # SECTION: Access Control Setup
+    #
+    #   This section defines who is allowed to talk to your running
+    #   snmp agent.
+
+    # Views 
+    #   arguments viewname included [oid]
+
+    #  system + hrSystem groups only
+    view   systemonly  included   .1.3.6.1.2.1.1
+    view   systemonly  included   .1.3.6.1.2.1.25.1
+
+
+    # rocommunity: a SNMPv1/SNMPv2c read-only access community name
+    #   arguments:  community [default|hostname|network/bits] [oid | -V view]
+
+    # Read-only access to everyone to the systemonly view
+    # rocommunity  public default -V systemonly
+    # rocommunity6 public default -V systemonly
+    rocommunity public
+
+    # SNMPv3 doesn't use communities, but users with (optionally) an
+    # authentication and encryption string. This user needs to be created
+    # with what they can view with rouser/rwuser lines in this file.
+    #
+    # createUser username (MD5|SHA|SHA-512|SHA-384|SHA-256|SHA-224) authpassphrase [DES|AES] [privpassphrase]
+    # e.g.
+    # createuser authPrivUser SHA-512 myauthphrase AES myprivphrase
+    #
+    # This should be put into /var/lib/snmp/snmpd.conf 
+    #
+    # rouser: a SNMPv3 read-only access username
+    #    arguments: username [noauth|auth|priv [OID | -V VIEW [CONTEXT]]]
+    rouser authPrivUser authpriv -V systemonly
+
+    # include a all *.conf files in a directory
+    includeDir /etc/snmp/snmpd.conf.d
+
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.exporter.snmp "integrations_snmp" {
+      target "snmp_sample_app" {
+        address = "127.0.0.1"
+        module  = "if_mib"
+        auth    = "public_v2"
+      }
+    }
+    discovery.relabel "integrations_snmp" {
+      targets = prometheus.exporter.snmp.integrations_snmp.targets
+
+      rule {
+        source_labels = ["job"]
+        regex         = "(^.*snmp)\\/(.*)"
+        target_label  = "job_snmp"
+      }
+
+      rule {
+        source_labels = ["job"]
+        regex         = "(^.*snmp)\\/(.*)"
+        target_label  = "snmp_target"
+        replacement   = "$2"
+      }
+    }
+
+    prometheus.scrape "integrations_snmp" {
+      targets    = discovery.relabel.integrations_snmp.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/snmp"
+    }
