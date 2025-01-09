@@ -1,0 +1,183 @@
+# jinja/templates/main-node-cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and a local mongodb replicaset
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  # General setup
+  - sudo apt update
+
+  # Install mtools pre-requisites
+  - sudo apt install python3 python3-pip -y
+
+  # Install mlaunch to PATH the lazy way as this is a transient test system
+  - sudo pip3 install mtools[mlaunch] --break-system-packages
+
+  # MongoDB Community Edition specific prerequisites
+  # Public key
+  - sudo apt install gnupg curl -y
+  
+  - sudo curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+  # Create list file
+  - sudo echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+  # Reload & install
+  - sudo apt update
+  - sudo apt install mongodb-org -y
+
+  # Stop mongod service in case it auto-started
+  - sudo systemctl stop mongod
+  
+
+  # Spawn a three node replicaset with a config server and mongos
+  - sudo mlaunch --replicaset 
+  # - sudo mlaunch --replicaset --auth --auth-roles dbAdminAnyDatabase readWriteAnyDatabase userAdminAnyDatabase clusterAdmin clusterMonitor
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+write_files:
+# Alloy configuration
+
+# Note for mongodb config, there are three separate configs, namely:
+# Configs for mongos (27017) config server (27024) and shard (27018)
+# this is based on `mlaunch --replicaset --sharded 2`
+# which creates two shards for each of the three nodes in the replicaset,
+# plus a mongos and config server on 27017 and 27024 respectively
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs_primary" {
+      mongodb_uri    = "mongodb://localhost:27017"
+      direct_connect = true
+    }
+    discovery.relabel "integrations_mongodb_exporter_rs_primary" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs_primary.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Primary"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs_primary"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs_primary" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs_primary.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs_secondary" {
+      mongodb_uri    = "mongodb://localhost:27018"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs_secondary" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs_secondary.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Secondary"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs_secondary"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs_secondary" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs_secondary.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
