@@ -1,0 +1,170 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+- mysql-server
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+
+  # Setup mysql exporter user
+  - sudo mysql < /tmp/exporter-user.sql 
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+write_files:
+# Permission config for MySQL
+- owner: root:root
+  path: /tmp/exporter-user.sql
+  content: |
+    CREATE USER 'exporter'@'localhost' IDENTIFIED BY 'password' WITH MAX_USER_CONNECTIONS 3;
+    GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
+
+# MySQL auth config for Alloy
+- owner: root:root
+  path: /var/lib/alloy/mysql-secret
+  content: exporter:password@(localhost:3306)/
+  
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+    
+    local.file "mysql_secret" {
+      filename = "/var/lib/alloy/mysql-secret"
+      is_secret = true
+    }
+
+    prometheus.exporter.mysql "integrations_mysqld_exporter" {
+      data_source_name = local.file.mysql_secret.content
+    }
+
+    discovery.relabel "integrations_mysqld_exporter" {
+      targets = prometheus.exporter.mysql.integrations_mysqld_exporter.targets
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/mysql"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+    }
+
+    prometheus.scrape "integrations_mysqld_exporter" {
+      targets    = discovery.relabel.integrations_mysqld_exporter.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mysqld_exporter"
+    }
+    local.file_match "logs_integrations_mysql" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/mysql/*.log",
+        instance    = constants.hostname,
+        job         = "integrations/mysql",
+      }]
+    }
+
+    loki.process "logs_integrations_mysql" {
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+
+      stage.regex {
+        expression = "(?P<timestamp>.+) (?P<thread>[\\d]+) \\[(?P<label>.+?)\\]( \\[(?P<err_code>.+?)\\] \\[(?P<subsystem>.+?)\\])? (?P<msg>.+)"
+      }
+
+      stage.labels {
+        values = {
+          err_code  = null,
+          level     = "label",
+          subsystem = null,
+        }
+      }
+
+      stage.drop {
+        drop_counter_reason = "drop empty lines"
+        expression          = "^ *$"
+      }
+    }
+
+    loki.source.file "logs_integrations_mysql" {
+      targets    = local.file_match.logs_integrations_mysql.targets
+      forward_to = [loki.process.logs_integrations_mysql.receiver]
+    }
