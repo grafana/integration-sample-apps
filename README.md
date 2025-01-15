@@ -12,7 +12,7 @@ This repository contains various components used to test and validate Grafana Cl
 |[`ops/`](ops/) | Contains the scripts and configuration files required for CI workflows. |
 
 
-## Local Setup Instructions
+## Local setup instructions
 Sample apps can be run locally, as well as on Github with Github Actions.
 Currently, only Unix based systems are supported, and all scripts expect a bash shell.
 
