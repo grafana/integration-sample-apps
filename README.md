@@ -62,3 +62,15 @@ To do so, run the following command from the root of the repository, substitutin
 ```
 
 This will give you a metric by metric pass/fail, as well as an overall pass-fail based on the configured pass-rate for the given sample-app
+
+### Tearing down the test setup
+
+Tearing down the sample-app is as simple as running the following command from within the sample-app directory:
+```sh
+make stop
+```
+
+To destroy the database vm and ensure it's properly cleaned up, run the following command, substituting `dbs` if you changed the name of the database deployment:
+```sh
+multipass delete --purge dbs
+```
