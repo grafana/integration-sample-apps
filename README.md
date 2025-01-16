@@ -1,6 +1,6 @@
 # integration-sample-apps
 
-This repository contains various components used to test and validate Grafana Cloud Integrations](https://grafana.com/docs/grafana-cloud/what-are/integrations/).
+This repository contains various components used to test and validate [Grafana Cloud Integrations](https://grafana.com/docs/grafana-cloud/what-are/integrations/).
 
 **Please note, all components in this repository are meant for transient testing only, and are _not for production use!_**
 
