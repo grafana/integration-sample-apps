@@ -38,7 +38,7 @@ Then get the IP address of the deployed VM with the databases, either manually t
 ```sh
 ./ops/scripts/multipass_get_ips.sh dbs
 ``` 
-his command should result in a single IP being returned, and can be piped into further commands or used manually, e.g. `10.252.79.181` in this example and can be piped into further commands, env vars, or used manually, if you wish. Again, `dbs` is the name of the VM, and can be changed to whatever name you chose.
+This command should result in a single IP being returned, and can be piped into further commands or used manually, e.g. `10.252.79.181` in this example and can be piped into further commands, env vars, or used manually, if you wish. Again, `dbs` is the name of the VM, and can be changed to whatever name you chose.
 
 ### Run a sample-app
 Running sample apps can differ from sample-app to sample-app, but if they are CI compatible, e.g. if they do **not** have a `.CI_BYPASS` file in their directory, then they can be run locally as well.
