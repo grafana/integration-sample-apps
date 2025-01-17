@@ -9,9 +9,17 @@ services:
       - -config.file=/etc/mimir-config/mimir.yaml
     ports:
       - "9009:9009"
+    networks:
+      - dbs
 
   loki:
     image: grafana/loki:latest
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
+    networks:
+      - dbs
+
+networks:
+  dbs:
+    name: dbs
