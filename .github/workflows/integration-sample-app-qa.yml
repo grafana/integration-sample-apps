@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - main
-    
+
 jobs:
   check-for-changed-sample-apps:
     name: Check for changed sample apps
@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 30
     needs: [check-for-changed-sample-apps]
     strategy:
-      matrix: 
+      matrix:
         sample-app: ${{ fromJSON(needs.check-for-changed-sample-apps.outputs.changed-sample-apps) }}
       fail-fast: false
     steps:
@@ -75,7 +75,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const msg = `[WARNING] The ${{ matrix.sample-app }} sample-app has a .CI_BYPASS file and will **not** be tested in CI/CD.
-            
+
             Please ensure it has been manually validated, and inform reviewers of such by ticking the below task and optionally informing users of the details.
             - [ ] Manual testing of ${{ matrix.sample-app }} sample-app has been completed`
 
@@ -89,7 +89,7 @@ jobs:
       - name: Install Multipass
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: sudo snap install multipass && sudo snap set system experimental.parallel-instances=true && sudo snap install multipass_socket
-      
+
       - name: Configure Multipass
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: sudo chmod a+w /var/snap/multipass/common/multipass_socket
@@ -97,11 +97,11 @@ jobs:
       - name: Checkout repo
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         uses: actions/checkout@v4
-      
+
       - name: Setup config & databases
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: |
-          ./ops/scripts/multipass_setup_qa_dbs.sh dbs
+          ./ops/scripts/multipass_setup_qa_dbs.sh dbs qa
           export "DB_IP=$(./ops/scripts/multipass_get_ips.sh dbs)"
           echo "LOKI=$DB_IP:3100" >> $GITHUB_ENV
           echo "MIMIR=$DB_IP:9009" >> $GITHUB_ENV
@@ -117,7 +117,7 @@ jobs:
       - name: Wait for sample-app to generate metrics
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: sleep ${{ env.SAMPLE_APP_SETUP_TIME }}
-      
+
       - name: Check Prom metrics in Mimir
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: |
