@@ -9,3 +9,8 @@ multipass transfer ./ops/qa/dbs/* $1:/home/ubuntu -r
 
 # Spin up docker containers for loki and mimir within the multipass vm
 multipass exec $1 -- bash -c "docker-compose -f docker-compose.yaml up -d"
+
+# Spin up grafana (optional)
+if [[ $2 -eq "local" ]]; then
+   multipass exec $1 -- bash -c "docker-compose -f docker-compose.grafana.yaml up -d"
+fi
