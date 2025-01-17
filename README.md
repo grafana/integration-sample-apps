@@ -28,10 +28,10 @@ Before you begin, ensure you have the following installed:
 
 Ensure Multipass is running, then from the root of the repo execute:
 ```sh 
-./ops/scripts/multipass_setup_qa_dbs.sh dbs
+./ops/scripts/multipass_setup_qa_dbs.sh dbs local
 ```
 
-This will setup Mimir and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation
+This will setup Grafana, Mimir, and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation.
 
 Then get the IP address of the deployed VM with the databases, either manually through the Multipass GUI, or via the following script:
 
