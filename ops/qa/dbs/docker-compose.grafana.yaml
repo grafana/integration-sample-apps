@@ -1,0 +1,18 @@
+services:
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+     - '3000:3000'
+    # attach to dbs network
+    networks:
+      - dbs
+
+networks:
+  dbs:
+    name: dbs
+    external: true
