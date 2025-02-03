@@ -1,5 +1,5 @@
 # jinja/templates/cloud-init-template.yaml
-# Cloud-init configuration for setting up Alloy and required sample-app
+# Cloud-init configuration for the main node of the k3s cluster spun up for kubernetes based integrations
 
 apt:
   sources:
@@ -23,7 +23,7 @@ runcmd:
   - sudo chmod 644 /etc/rancher/k3s/k3s.yaml.lock
   - echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
 
-  # Setup Helm and install oft-used repos
+  # Setup Helm
   - sudo curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
   - sudo chmod 700 get_helm.sh
   - sudo ./get_helm.sh
