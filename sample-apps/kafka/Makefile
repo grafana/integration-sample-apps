@@ -6,17 +6,17 @@ CONFIG_FILE_VARS := $(CONFIG_FILE_DIR)/monitoring-config.yaml
 CONFIG_OUT_FILE := monitoring-config.yaml
 TEMPLATE_FILE_DIR := jinja/templates
 TEMPLATE_FILE := $(TEMPLATE_FILE_DIR)/monitoring-config-template.yaml
-RIVER_FILE := helm-configs/kafka.river
+RIVER_FILE := configs/kafka.river
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
-.PHONY: run-ci stop install-kafka default-monitoring-config render-config install-monitoring clean
+.PHONY: run-ci stop install-kafka default-monitoring-config render-config install-monitoring transfer-configs clean
 
 run-ci: clean k3s-setup install-kafka default-monitoring-config render-config install-monitoring
 
 stop: k3s-stop clean
 
-install-kafka:
+install-kafka: transfer-configs
 	@multipass transfer ./scripts/kafka_setup.sh $(VM_CLUSTER_MAIN):/home/ubuntu/kafka_setup.sh;
 	@multipass exec $(VM_CLUSTER_MAIN) -- bash -c "chmod +x kafka_setup.sh && ./kafka_setup.sh"
 
@@ -34,11 +34,11 @@ default-monitoring-config:
 	@echo "prom_user: your_prometheus_username" >> $(CONFIG_FILE_VARS)
 	@echo "prom_pass: your_prometheus_password" >> $(CONFIG_FILE_VARS)
 	
+transfer-configs: 
+	@multipass transfer --recursive configs/ $(VM_CLUSTER_MAIN):/home/ubuntu/
 
-install-monitoring:
-	@echo "Transfer + apply monitoring helm"
+install-monitoring: transfer-configs
 	@multipass transfer $(CONFIG_OUT_FILE) $(VM_CLUSTER_MAIN):/home/ubuntu/monitoring.yaml;
-	@multipass transfer $(RIVER_FILE) $(VM_CLUSTER_MAIN):/home/ubuntu/suo.river;
 	@multipass transfer ./scripts/install_monitoring.sh $(VM_CLUSTER_MAIN):/home/ubuntu/install_monitoring.sh;
 	@multipass exec $(VM_CLUSTER_MAIN) -- bash -c "chmod +x install_monitoring.sh && ./install_monitoring.sh"
 

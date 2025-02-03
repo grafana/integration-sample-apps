@@ -7,10 +7,11 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 helm repo add grafana https://grafana.github.io/helm-charts
 
 # Based on https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy
-git clone https://github.com/confluentinc/confluent-kubernetes-examples.git
+# git clone https://github.com/confluentinc/confluent-kubernetes-examples.git
 
 # Set CRD location
-export QUICKSTART_HOME="/home/ubuntu/confluent-kubernetes-examples/quickstart-deploy"
+# export QUICKSTART_HOME="/home/ubuntu/confluent-kubernetes-examples/quickstart-deploy"
+export CONFIG_HOME="/home/ubuntu/configs"
 
 # Create namespace
 kubectl create namespace confluent
@@ -22,10 +23,10 @@ helm repo update
 helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes --namespace confluent
 
 # Kafka components
-kubectl apply -f $QUICKSTART_HOME/confluent-platform.yaml
+kubectl apply -f $CONFIG_HOME/confluent-platform-jmx.yaml
 
 # Give the components a chance to get started
 sleep 1m 30s
 
 # producer app and topic
-kubectl apply -f $QUICKSTART_HOME/producer-app-data.yaml
+kubectl apply -f $CONFIG_HOME/producer-app-data.yaml
