@@ -3,9 +3,6 @@
 # Re-set the KUBECONFIG since multipass exec does not load .profile or .bashrc correctly
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-# Install Grafana helm repo
-helm repo add grafana https://grafana.github.io/helm-charts
-
 # Based on https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy
 # git clone https://github.com/confluentinc/confluent-kubernetes-examples.git
 

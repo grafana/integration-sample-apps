@@ -12,9 +12,9 @@ PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
 .PHONY: run-ci stop install-kafka default-monitoring-config render-config install-monitoring transfer-configs clean
 
-run-ci: clean k3s-setup install-kafka default-monitoring-config render-config install-monitoring
+run-ci: clean k3s-setup-cluster install-kafka default-monitoring-config render-config install-monitoring
 
-stop: k3s-stop clean
+stop: k3s-stop-cluster clean
 
 install-kafka: transfer-configs
 	@multipass transfer ./scripts/kafka_setup.sh $(VM_CLUSTER_MAIN):/home/ubuntu/kafka_setup.sh;
