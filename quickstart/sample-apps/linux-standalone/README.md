@@ -1,6 +1,7 @@
-# Jenkins sample app
+# <INTEGRATION_NAME> sample app
 
-This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of Jenkins. The [Jenkins Plugin Installation Manager](https://github.com/jenkinsci/plugin-installation-manager-tool) is used to install the [Jenkins Prometheus Plugin](https://github.com/jenkinsci/prometheus-plugin) to emit metrics.
+This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of <INTEGRATION_NAME> using the node-exporter.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
@@ -16,7 +17,7 @@ To get started with the sample app, follow these steps:
 1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
-   cd integration-sample-apps/jenkins
+   cd integration-sample-apps/<INTEGRATION_SLUG>
    ```
 
 2. **Set up default config**: 
@@ -26,7 +27,7 @@ To get started with the sample app, follow these steps:
    Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
 
 4. **Create and set up VMs**: 
-   Use `make run` to start the Jenkins sample app.
+   Use `make run` to start the <INTEGRATION_NAME> sample app.
 
 6. **Stop and clean Up**: 
    Use `make stop` to clean up the VM and `make clean` to remove temporary files.
@@ -35,7 +36,7 @@ To get started with the sample app, follow these steps:
 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
-- `make run`: Creates the Jenkins sample app.
+- `make run`: Creates the <INTEGRATION_NAME> sample app.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
 ## Default configuration variables
@@ -48,6 +49,7 @@ To get started with the sample app, follow these steps:
 - `loki_pass`: Your Loki password.
 
 ## Validating services
+
 ### Alloy
 - **Check service status**: Confirm that Alloy is running.
   ```bash

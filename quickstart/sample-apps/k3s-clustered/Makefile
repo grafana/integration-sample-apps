@@ -1,24 +1,24 @@
 include ../Makefile
-VM_NAME := kafka-sample-app
+VM_NAME := <INTEGRATION_SLUG>-sample-app
 VM_CLUSTER_MAIN := $(VM_NAME)-k3s-main
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE_VARS := $(CONFIG_FILE_DIR)/monitoring-config.yaml
 CONFIG_OUT_FILE := monitoring-config.yaml
 TEMPLATE_FILE_DIR := jinja/templates
 TEMPLATE_FILE := $(TEMPLATE_FILE_DIR)/monitoring-config-template.yaml
-ALLOY_FILE := configs/kafka.alloy
+ALLOY_FILE := configs/suo.alloy
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
-.PHONY: run-ci stop install-kafka default-monitoring-config render-config install-monitoring transfer-configs clean
+.PHONY: run-ci stop install-suo default-monitoring-config render-config install-monitoring transfer-configs clean
 
-run-ci: clean k3s-setup-cluster install-kafka default-monitoring-config render-config install-monitoring
+run-ci: clean k3s-setup-cluster install-suo default-monitoring-config render-config install-monitoring
 
 stop: k3s-stop-cluster clean
 
-install-kafka: transfer-configs
-	@multipass transfer ./scripts/kafka_setup.sh $(VM_CLUSTER_MAIN):/home/ubuntu/kafka_setup.sh;
-	@multipass exec $(VM_CLUSTER_MAIN) -- bash -c "chmod +x kafka_setup.sh && ./kafka_setup.sh"
+install-suo: transfer-configs
+	@multipass transfer ./scripts/suo_setup.sh $(VM_CLUSTER_MAIN):/home/ubuntu/suo_setup.sh;
+	@multipass exec $(VM_CLUSTER_MAIN) -- bash -c "chmod +x suo_setup.sh && ./suo_setup.sh"
 
 render-config:
 	@docker run --rm -v $(shell pwd)/$(TEMPLATE_FILE_DIR):/templates -v $(shell pwd)/$(CONFIG_FILE_DIR):/variables dinutac/jinja2docker:latest /templates/monitoring-config-template.yaml /variables/monitoring-config.yaml --format=yaml > monitoring-config.yaml

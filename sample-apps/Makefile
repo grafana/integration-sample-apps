@@ -14,3 +14,9 @@ k3s-setup:
 
 k3s-stop:
 	@bash $(OPS_SCRIPTS_DIR)/k3s_stop.sh $(VM_NAME)
+
+k3s-setup-cluster:
+	@bash $(OPS_SCRIPTS_DIR)/k3s_setup.sh $(VM_NAME) cluster
+
+k3s-stop-cluster:
+	@bash $(OPS_SCRIPTS_DIR)/k3s_stop.sh $(VM_NAME) cluster
