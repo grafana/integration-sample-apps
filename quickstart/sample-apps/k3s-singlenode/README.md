@@ -1,6 +1,6 @@
-# Kafka sample app
+# <INTEGRATION_NAME> sample app
 
-This sample application stands up a three node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full Kafka setup using [Confluent for Kafka (CFK)](https://github.com/confluentinc/confluent-kubernetes-examples/tree/master/quickstart-deploy). The sample app is capable of running both in a ubuntu-latest-8-core Github Actions runner, and locally.
+This sample application stands up a single-node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full <INTEGRATION_NAME> setup using <INSERT SETUP SUMMARY HERE> The sample app is capable of running both in a ubuntu-latest-8-core Github Actions runner, and locally.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ To get started with the sample app, follow these steps:
 1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
-   cd integration-sample-apps/sample-apps/kafka
+   cd integration-sample-apps/sample-apps/<INTEGRATION_SLUG>
    ```
 
 2. **Stand up the sample app**
@@ -29,10 +29,10 @@ To get started with the sample app, follow these steps:
 
 ## Make commands
 
-- `make default-monitoring-config`: Initializes the configuration file with default connection parameters used when applying the k8s-monitoring-helm chart.
+- `make default-monitoring-config`: Initializes the configuration file with default connection parameters used when applying the [k8s-monitoring-helm chart](https://github.com/grafana/k8s-monitoring-helm).
 - `make render-config`: Generates the `monitoring-config.yaml` configuration file using the defined variables.
-- `make run-ci`: Creates the Kafka sample app.
-- `make install-kafka`: Transfers required configs and installs kafka; useful for debugging.
+- `make run-ci`: Creates the <INTEGRATION_NAME> sample app.
+- `make install-suo`: Transfers required configs and installs <INTEGRATION_NAME>; useful for debugging.
 - `make stop`: Tears down the sample-app cluster
 - `make clean`: Deletes all created VMs and performs cleanup.
 
