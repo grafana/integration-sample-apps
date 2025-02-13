@@ -1,4 +1,4 @@
-# Jenkins Sample App
+# Jenkins sample app
 
 This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of Jenkins. The [Jenkins Plugin Installation Manager](https://github.com/jenkinsci/plugin-installation-manager-tool) is used to install the [Jenkins Prometheus Plugin](https://github.com/jenkinsci/prometheus-plugin) to emit metrics.
 ## Prerequisites
@@ -9,36 +9,36 @@ Before you begin, ensure you have the following installed:
 - Docker (for rendering the cloud-init configuration)
 - Git (for cloning the repository)
 
-## Quick Start for New Users
+## Quick Start for new users
 
 To get started with the sample app, follow these steps:
 
-1. **Clone the Repository**: 
+1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
    cd integration-sample-apps/jenkins
    ```
 
-2. **Set Up Default Config**: 
+2. **Set up default config**: 
    Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to connect Alloy to an external Prometheus compatible TSDB and/or Loki server.
 
-3. **Render Cloud-init Configuration**: 
+3. **Render cloud-init configuration**: 
    Run `make render-config` to generate the `cloud-init.yaml` file based on your configuration.
 
-4. **Create and Set Up VMs**: 
+4. **Create and set up VMs**: 
    Use `make run` to start the Jenkins sample app.
 
-6. **Stop and Clean Up**: 
+6. **Stop and clean Up**: 
    Use `make stop` to clean up the VM and `make clean` to remove temporary files.
 
-## Make Commands
+## Make commands
 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates the Jenkins sample app.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
-## Default Configuration Variables
+## Default configuration variables
 
 - `prom_pass`: Your Prometheus password.
 - `prom_user`: Your Prometheus username.
@@ -47,14 +47,14 @@ To get started with the sample app, follow these steps:
 - `loki_user`: Your Loki username.
 - `loki_pass`: Your Loki password.
 
-## Validating Services
+## Validating services
 ### Alloy
-- **Check Service Status**: Confirm that Alloy is running.
+- **Check service status**: Confirm that Alloy is running.
   ```bash
   systemctl status alloy.service
   ```
-- **Review Configuration**: Verify the configuration in `/etc/alloy/config.alloy` is correct.
-- **Check Logs**: Review Alloy logs for any connectivity or configuration issues.
+- **Review configuration**: Verify the configuration in `/etc/alloy/config.alloy` is correct.
+- **Check logs**: Review Alloy logs for any connectivity or configuration issues.
   ```bash
   journalctl -u alloy.service
   ```

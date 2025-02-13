@@ -1,6 +1,6 @@
-# OpenLDAP Sample App with VM and Kubernetes Support
+# OpenLDAP sample app with VM and Kubernetes Support
 
-This OpenLDAP Sample App simplifies the deployment of an OpenLDAP server with integrated monitoring through Prometheus and Grafana Loki. It now includes support for both traditional VM environments using cloud-init and Make commands, as well as Kubernetes environments.
+This OpenLDAP sample app simplifies the deployment of an OpenLDAP server with integrated monitoring through Prometheus and Grafana Loki. It now includes support for both traditional VM environments using cloud-init and Make commands, as well as Kubernetes environments.
 
 ## Enhanced Logging Feature
 The app includes detailed logging for the OpenLDAP server, configured to increase log level and capture logs in a dedicated file (`/var/log/slapd.log`). These logs provide valuable insights for performance monitoring and troubleshooting.
@@ -25,24 +25,24 @@ Before you begin, ensure you have the following installed:
 - kubectl (for interacting with Kubernetes)
 
 ## Quick Start for VM Setup
-1. Clone the Repository: `git clone https://github.com/grafana/integration-sample-apps.git`.
-2. Navigate to Project Directory: `cd integration-sample-apps/openldap`.
-3. Set Up Default Config: `make defaultconfig`.
-4. Render Cloud-init Configuration: `make render-config`.
+1. Clone the repository: `git clone https://github.com/grafana/integration-sample-apps.git`.
+2. Navigate to project directory: `cd integration-sample-apps/openldap`.
+3. Set up default config: `make defaultconfig`.
+4. Render cloud-init configuration: `make render-config`.
 5. Launch the VM: `make run`.
-6. Fetch Prometheus Metrics: `make fetch-prometheus-metrics`.
-7. Stop and Clean Up: `make stop` and `make clean`.
+6. Fetch Prometheus metrics: `make fetch-prometheus-metrics`.
+7. Stop and clean Up: `make stop` and `make clean`.
 
 ## Quick Start for Kubernetes Setup
-1. Clone the Repository: `git clone https://github.com/grafana/integration-sample-apps.git`.
-2. Navigate to Project Directory: `cd integration-sample-apps/openldap`.
-3. Set Up Default Config: `make defaultconfig`.
-4. Render Kubernetes Configurations: `make render-k8s`.
+1. Clone the repository: `git clone https://github.com/grafana/integration-sample-apps.git`.
+2. Navigate to project directory: `cd integration-sample-apps/openldap`.
+3. Set up default config: `make defaultconfig`.
+4. Render Kubernetes configurations: `make render-k8s`.
 5. Deploy to Kubernetes: `make run-k8s`.
-6. Verify Deployment: Check status using `kubectl get pods` and `kubectl get services`.
-7. Stop and Clean Up: `make stop-k8s` and `make clean`.
+6. Verify deployment: check status using `kubectl get pods` and `kubectl get services`.
+7. Stop and clean Up: `make stop-k8s` and `make clean`.
 
-## Make Commands
+## Make commands
 - VM Setup: 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
@@ -59,7 +59,7 @@ Kubernetes Setup:
 - `make stop-k8s`: Stops and removes the OpenLDAP deployment from Kubernetes, cleaning up all resources.
 - `make clean`: Removes generated files like Kubernetes YAML configurations.
 
-## Default Configuration Variables
+## Default configuration variables
 - `exporter_repo`: Git repository URL for OpenLDAP Exporter.
 - `exporter_dir`: Directory name for cloning the OpenLDAP Exporter repository.
 - `prom_addr`: Address and port for the Prometheus metrics endpoint.
@@ -75,7 +75,7 @@ Kubernetes Setup:
 
 ## VM Setup
 
-When deploying the OpenLDAP Sample App, you may encounter issues that require debugging. Here are some tips to validate the setup and troubleshoot common problems.
+When deploying the OpenLDAP sample app, you may encounter issues that require debugging. Here are some tips to validate the setup and troubleshoot common problems.
 
 ## Accessing the Multipass Instance
 
@@ -87,24 +87,24 @@ multipass shell ldap-server
 
 This command opens a shell session on the `ldap-server` VM, allowing you to run commands and check the status of various services directly.
 
-## Validating Services
+## Validating services
 
 ### OpenLDAP Service
-- **Check Service Status**: Ensure the OpenLDAP service (`slapd`) is active and running.
+- **Check service status**: Ensure the OpenLDAP service (`slapd`) is active and running.
   ```bash
   sudo systemctl status slapd
   ```
-- **Check Logs**: If the service isn't running, check the logs for errors.
+- **Check logs**: If the service isn't running, check the logs for errors.
   ```bash
   sudo journalctl -u slapd
   ```
 
 ### OpenLDAP Exporter
-- **Check Service Status**: Verify that the OpenLDAP Exporter service is active.
+- **Check service status**: Verify that the OpenLDAP Exporter service is active.
   ```bash
   sudo systemctl status openldap_exporter.service
   ```
-- **Check Logs**: Look for errors in the service logs if it's not running.
+- **Check logs**: Look for errors in the service logs if it's not running.
   ```bash
   journalctl -u openldap_exporter.service
   ```
@@ -114,19 +114,19 @@ This command opens a shell session on the `ldap-server` VM, allowing you to run 
   ```
 
 ### Grafana Agent
-- **Check Service Status**: Confirm that the Grafana Agent is running.
+- **Check service status**: Confirm that the Grafana Agent is running.
   ```bash
   sudo systemctl status grafana-agent
   ```
-- **Review Configuration**: Verify the configuration in `/etc/grafana-agent.yaml` is correct.
-- **Check Logs**: Review Grafana Agent logs for any connectivity or configuration issues.
+- **Review configuration**: Verify the configuration in `/etc/grafana-agent.yaml` is correct.
+- **Check logs**: Review Grafana Agent logs for any connectivity or configuration issues.
   ```bash
   journalctl -u grafana-agent
   ```
 
 ### Kubernetes Setup
 
-When deploying the OpenLDAP Sample App in a Kubernetes environment, you might face some issues that require troubleshooting. Below are some tips to help you validate the setup and resolve common problems.
+When deploying the OpenLDAP sample app in a Kubernetes environment, you might face some issues that require troubleshooting. Below are some tips to help you validate the setup and resolve common problems.
 
 ## Checking Pod and Service Status
 

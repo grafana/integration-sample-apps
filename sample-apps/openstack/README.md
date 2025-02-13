@@ -1,4 +1,4 @@
-## OpenStack Sample App
+## OpenStack sample app
 
 The following sample app uses Terraform to run an Ubuntu VM on GCP with an OpenStack environment.
 

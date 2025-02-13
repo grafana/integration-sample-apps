@@ -1,4 +1,4 @@
-# <INTEGRATION_NAME> Sample App
+# <INTEGRATION_NAME> sample app
 
 This sample application stands up a three node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full <INTEGRATION_NAME> setup using <INSERT SETUP SUMMARY HERE> The sample app is capable of running both in a ubuntu-latest-8-core Github Actions runner, and locally.
 
@@ -10,11 +10,11 @@ Before you begin, ensure you have the following installed:
 - Docker (for rendering the cloud-init configuration)
 - Git (for cloning the repository)
 
-## Quick Start for New Users
+## Quick Start for new users
 
 To get started with the sample app, follow these steps:
 
-1. **Clone the Repository**: 
+1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
    cd integration-sample-apps/sample-apps/<INTEGRATION_SLUG>
@@ -24,10 +24,10 @@ To get started with the sample app, follow these steps:
    Execute `make LOKI_INSTANCE=<loki_host>:<loki_port> PROMETHEUS_INSTANCE=<prom_host>:<prom_port> run-ci`, substituting the host and ports as required for your setup.
    This will take care of rendering the correct config and setup, as used in the Github Actions workflow on this repository.
 
-6. **Stop and Clean Up**: 
+6. **Stop and clean Up**: 
    Use `make stop` to clean up the k3s cluster and automatically clean up temporary files.
 
-## Make Commands
+## Make commands
 
 - `make default-monitoring-config`: Initializes the configuration file with default connection parameters used when applying the [k8s-monitoring-helm chart](https://github.com/grafana/k8s-monitoring-helm).
 - `make render-config`: Generates the `monitoring-config.yaml` configuration file using the defined variables.
@@ -36,7 +36,7 @@ To get started with the sample app, follow these steps:
 - `make stop`: Tears down the sample-app cluster
 - `make clean`: Deletes all created VMs and performs cleanup.
 
-## Default Configuration Variables
+## Default configuration variables
 
 - `prom_pass`: Your Prometheus password
 - `prom_user`: Your Prometheus username

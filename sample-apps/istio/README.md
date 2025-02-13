@@ -1,4 +1,4 @@
-# Istio Sample App
+# Istio sample app
 This will spin up Istio (using various helm charts) in a minikube environment on a Multipass VM.
 An Istio sample app (bookinfo) will be deployed as well.
 
@@ -10,7 +10,7 @@ Minimal load generation will also be carried after deployment is complete.
 * `make stop` - Used to teardown the sample app.
 * `make clean` - Used to cleanup the saved Prometheus and Loki server details.
 
-## Prometheus Metrics
+## Prometheus metrics
 
 The prometheus metrics endpoints exist on the bookinfo related pods in the default namespace at `http://localhost:15020/stats/prometheus`.
 
