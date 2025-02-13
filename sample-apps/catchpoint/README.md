@@ -16,31 +16,31 @@ Before you begin, ensure you have the following installed:
 ## Platform Support
 Currently, this sample app supports ARM64 and amd64 platforms.
 
-## Quick Start for New Users
+## Quick Start for new users
 
 To get started with the Catchpoint Exporter along with monitoring tools, follow these steps:
 
-1. **Clone the Repository**: 
+1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
    cd integration-sample-apps/catchpoint
    ```
-2. **Set Up Default Config**: 
+2. **Set up default config**: 
    Execute `make defaultconfig` to create a template file with default configuration variables. Modify `jinja/variables/cloud-init.yaml` to configure Grafana flow to connect to an external Prometheus instance.
 
-3. **Create and Set Up VMs**: 
+3. **Create and set up VMs**: 
    Use `make run-catchpoint-multipass` to start VMs with the Catchpoint Exporter. Optionally, instead use `make all` to port-forward and run the load generation together which is step 4.
 
-4. **Port-Forward and Run Load Generation**:
+4. **Port-forward and run load generation**:
    Start port-forwarding and generate load by running `make port-forward` followed by `make run-metrics`. This will forward the necessary ports and run the `post_metrics.py` script to generate load.
 
-5. **Fetch Prometheus Metrics**: 
+5. **Fetch Prometheus metrics**: 
    Fetch metrics from the Prometheus exporter and save them with `make fetch-prometheus-metrics`.
 
-6. **Stop and Clean Up**: 
+6. **Stop and clean Up**: 
    Use `make stop-catchpoint-multipass` to clean up the VM and `make clean` to remove temporary files.
 
-## Make Commands
+## Make commands
 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
@@ -51,7 +51,7 @@ To get started with the Catchpoint Exporter along with monitoring tools, follow 
 - `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
-## Default Configuration Variables
+## Default configuration variables
 
 The following are the default variables used in the `cloud-init.yaml` file:
 
