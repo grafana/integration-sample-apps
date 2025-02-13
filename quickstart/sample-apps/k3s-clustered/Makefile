@@ -6,7 +6,7 @@ CONFIG_FILE_VARS := $(CONFIG_FILE_DIR)/monitoring-config.yaml
 CONFIG_OUT_FILE := monitoring-config.yaml
 TEMPLATE_FILE_DIR := jinja/templates
 TEMPLATE_FILE := $(TEMPLATE_FILE_DIR)/monitoring-config-template.yaml
-RIVER_FILE := configs/suo.river
+ALLOY_FILE := configs/suo.alloy
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
