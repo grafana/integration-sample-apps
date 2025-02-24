@@ -9,7 +9,7 @@ declare -a EXPECTED_FILES=(".config")
 
 for i in "${EXPECTED_FILES[@]}"
 do
-  if ! test -f "sample-apps/$1/$i"; then
+  if ! test -f "sample-apps/$1/tests/config/$i"; then
     # File does not exist, exit
     echo false
     exit 0
