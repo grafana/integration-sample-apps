@@ -5,15 +5,13 @@
 SAMPLE_APP_NAME=$1
 
 # Expected files for a compatible sample app
-declare -a EXPECTED_FILES=(".config")
+EXPECTED_METRICS_LIST=`ls sample-apps/$1/tests/metrics/*`
 
-for i in "${EXPECTED_FILES[@]}"
-do
-  if ! test -f "sample-apps/$1/tests/config/$i"; then
-    # File does not exist, exit
-    echo false
-    exit 0
-  fi
-done
-
-echo true
+if [ -z "$EXPECTED_METRICS_LIST" ]; then
+  #[FAIL] Incompatible sample-app or no expected metrics files provided."
+  echo false
+  exit 1
+else
+  echo true
+  exit 0
+fi
