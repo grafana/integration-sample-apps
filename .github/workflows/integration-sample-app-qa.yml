@@ -61,7 +61,7 @@ jobs:
           echo "CI_BYPASS=$CI_BYPASS" >> $GITHUB_OUTPUT
           export "SUPPORTS_CI=$(./ops/scripts/check_sample_app_ci_compatible.sh ${{ matrix.sample-app }})"
           echo "SUPPORTS_CI=$SUPPORTS_CI" >> $GITHUB_OUTPUT
-
+          echo $SUPPORTS_CI
       - name: Warn user - sample-app incorrectly configured for CI
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'false' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: |
@@ -112,8 +112,6 @@ jobs:
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         working-directory: ./sample-apps/${{ matrix.sample-app }}
         run: |
-          # Source sample-app overrides in case it's needed for the last steps
-          source .config
           make LOKI_INSTANCE=${{ env.LOKI }} PROMETHEUS_INSTANCE=${{ env.MIMIR }} run-ci
 
       - name: Wait for sample-app to generate metrics
