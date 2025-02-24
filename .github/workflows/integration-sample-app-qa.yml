@@ -112,8 +112,6 @@ jobs:
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         working-directory: ./sample-apps/${{ matrix.sample-app }}
         run: |
-          # Source sample-app overrides in case it's needed for the last steps
-          source .config
           make LOKI_INSTANCE=${{ env.LOKI }} PROMETHEUS_INSTANCE=${{ env.MIMIR }} run-ci
 
       - name: Wait for sample-app to generate metrics
