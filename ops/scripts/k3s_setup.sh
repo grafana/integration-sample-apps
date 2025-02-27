@@ -26,4 +26,3 @@ if [[ "$2" = "cluster" ]]; then
         multipass exec $1-k3s-worker-$i -- bash -c "curl -sfL https://get.k3s.io | K3S_URL=\"https://$IP:6443\" K3S_TOKEN=\"$TOKEN\" sh -"
     done
 fi
-
