@@ -68,7 +68,7 @@ See snmpsim docs in order to find out how to capture data: https://docs.lextudio
 
 File should be in *.snmprec or *.snmpwalk formats.
 
-1. Name snapshot file as `<domain>.<vendor>.<devicename>.snmprec|snmpwalk`. example domains are: `net`,'os`,`server`,`ups`, `storage`.
+1. Name snapshot file as `<domain>.<vendor>.<devicename>.snmprec|snmpwalk`. example domains are: `net`,`os`,`server`,`ups`, `storage`.
 1. Sanitize snapshots from sensitive data: 
 It is recommended to at least change:
 - 1.3.6.1.2.1.1.1 - sysDescr
