@@ -9,8 +9,8 @@ apt:
       keyserver: https://apt.grafana.com/gpg.key
 
 packages:
-- git
-- gpg
+  - git
+  - gpg
 
 runcmd:
   # General setup
@@ -18,8 +18,8 @@ runcmd:
 
   # Install k3s
   - sudo curl -sfL https://get.k3s.io | sh -
-  # Set the k3s config to be readable by all users to kubectl and helm works properly 
-  - sudo chmod 644 /etc/rancher/k3s/k3s.yaml 
+  # Set the k3s config to be readable by all users to kubectl and helm works properly
+  - sudo chmod 644 /etc/rancher/k3s/k3s.yaml
   - sudo chmod 644 /etc/rancher/k3s/k3s.yaml.lock
   - echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
 
@@ -27,4 +27,3 @@ runcmd:
   - sudo curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
   - sudo chmod 700 get_helm.sh
   - sudo ./get_helm.sh
-
