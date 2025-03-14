@@ -37,6 +37,9 @@ runcmd:
   # Small ping just to get some traffic on the interface
   - sudo ping grafana.com > /dev/null & 
 
+  # for snmpsim
+  - sudo usermod -a -G docker ubuntu
+
 
 write_files:
 # snmpd configuration
@@ -138,6 +141,10 @@ write_files:
 - owner: root:root
   path: /etc/alloy/config.alloy
   content: |
+    logging {
+      level = "debug"
+    }
+
     prometheus.exporter.self "alloy_check" { }
 
     discovery.relabel "alloy_check" {
@@ -202,6 +209,48 @@ write_files:
       }
     }
 
+    discovery.file "network_devices" {
+      files = ["/home/ubuntu/snmpsim/targets.yml"]
+    }
+
+    // Rename hidden labels so they don't get dropped
+    discovery.relabel "network_devices" {
+      targets = discovery.file.network_devices.targets
+      rule {
+        action        = "replace"
+        source_labels = ["__param_target"]
+        target_label  = "address"
+      }
+      rule {
+        action        = "replace"
+        source_labels = ["__param_name"]
+        target_label  = "name"
+      }
+      rule {
+        action        = "replace"
+        source_labels = ["__param_auth"]
+        target_label  = "auth"
+      }
+      rule {
+        action        = "replace"
+        source_labels = ["__param_module"]
+        target_label  = "module"
+      }
+    }  
+
+    prometheus.exporter.snmp "integrations_snmpsim" {
+      config_merge_strategy = "merge"
+      targets = discovery.file.network_devices.targets
+      config_file = "/home/ubuntu/snmpsim/auths.yml"
+    }
+   
+    prometheus.scrape "integrations_snmpsim" {
+      targets    = prometheus.exporter.snmp.integrations_snmpsim.targets
+      forward_to = [prometheus.relabel.integrations_snmp.receiver]
+      job_name   = "integrations/snmpsim"
+    }
+    
+
     prometheus.exporter.snmp "integrations_snmp" {
       target "snmp_sample_app" {
         address = "127.0.0.1"
@@ -209,9 +258,15 @@ write_files:
         auth    = "public_v2"
       }
     }
-    discovery.relabel "integrations_snmp" {
-      targets = prometheus.exporter.snmp.integrations_snmp.targets
 
+    prometheus.scrape "integrations_snmp" {
+      targets    = prometheus.exporter.snmp.integrations_snmp.targets
+      forward_to = [prometheus.relabel.integrations_snmp.receiver]
+      job_name   = "integrations/snmp"
+    }
+
+    prometheus.relabel "integrations_snmp" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
       rule {
         source_labels = ["job"]
         regex         = "(^.*snmp)\\/(.*)"
@@ -224,10 +279,4 @@ write_files:
         target_label  = "snmp_target"
         replacement   = "$2"
       }
-    }
-
-    prometheus.scrape "integrations_snmp" {
-      targets    = discovery.relabel.integrations_snmp.output
-      forward_to = [prometheus.remote_write.metrics_service.receiver]
-      job_name   = "integrations/snmp"
     }

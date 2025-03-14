@@ -4,18 +4,17 @@ CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
-.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
+.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig snmpsim
 
-run: launch-vm
+run: launch-vm snmpsim
 	@echo "VM $(VM_NAME) launched and configured."
 
-run-ci: clean defaultconfig launch-vm
+run-ci: clean defaultconfig launch-vm snmpsim
 	@echo "Running in CI mode"
 
 stop:
 	@multipass stop $(VM_NAME)
-	@multipass delete $(VM_NAME)
-	@multipass purge
+	@multipass delete --purge $(VM_NAME)
 
 fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:9127/metrics > prometheus_metrics
@@ -23,8 +22,12 @@ fetch-prometheus-metrics:
 render-config:
 	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
+snmpsim:
+	@multipass transfer ./snmpsim $(VM_NAME):/home/ubuntu -r
+	@multipass exec $(VM_NAME) -- bash -c "cd ./snmpsim && docker-compose -f docker-compose.snmpsim.yml up -d"
+
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --cloud-init cloud-init.yaml
+	@multipass launch docker -n $(VM_NAME) --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml
