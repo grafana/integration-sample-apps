@@ -210,7 +210,7 @@ write_files:
     }
 
     discovery.file "network_devices" {
-      files = ["/home/ubuntu/snmpsim/targets.yml"]
+      files = ["/tmp/targets.yml"]
     }
 
     // Rename hidden labels so they don't get dropped
@@ -241,7 +241,7 @@ write_files:
     prometheus.exporter.snmp "integrations_snmpsim" {
       config_merge_strategy = "merge"
       targets = discovery.file.network_devices.targets
-      config_file = "/home/ubuntu/snmpsim/auths.yml"
+      config_file = "/tmp/auths.yml"
     }
    
     prometheus.scrape "integrations_snmpsim" {
