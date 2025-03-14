@@ -1,0 +1,35 @@
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib #TODO: add cisco_device module when v0.28.0 is merged into alloy: ,cisco_device
+    # name must match snmpsim file
+    name: net.cisco.c2911
+    auth: net.cisco.c2911
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib #,cisco_device
+    name: net.cisco.c7600
+    auth: net.cisco.c2911
+
+# Juniper
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib #,juniper
+    name: net.juniper.ex4200-24f
+    auth: net.juniper.ex4200-24f
+
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib #,juniper
+    name: net.juniper.mx240
+    auth: net.juniper.mx240
+
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib #,juniper
+    name: net.juniper.srx
+    auth: net.juniper.srx
