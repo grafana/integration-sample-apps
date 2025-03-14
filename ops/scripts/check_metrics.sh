@@ -37,7 +37,7 @@ check_metrics() {
     fi
     while read METRIC_NAME; do
       let TOTAL_COUNTER++
-      if curl -s http://$2/prometheus/api/v1/query?query=$METRIC_NAME%7Bjob=~\"$JOB_LABEL\"%7D | jq -e -r .data.result[0].metric > /dev/null; then
+      if curl -s http://$2/prometheus/api/v1/query?query=$METRIC_NAME%7Bjob=~\"$JOB_LABEL\"%7D | jq -r .data.result[0].metric | grep -q -E "$GREP_REGEX"; then
         let SUCCESS_COUNTER++
         echo "[PASS] '$METRIC_NAME' present"
       else
