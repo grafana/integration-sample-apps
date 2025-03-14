@@ -24,6 +24,8 @@ render-config:
 
 snmpsim:
 	@multipass transfer ./snmpsim $(VM_NAME):/home/ubuntu -r
+	@multipass transfer ./snmpsim/targets.yml $(VM_NAME):/tmp/targets.yml"
+	@multipass transfer ./snmpsim/auths.yml $(VM_NAME):/tmp/auths.yml"
 	@multipass exec $(VM_NAME) -- bash -c "cd ./snmpsim && docker-compose -f docker-compose.snmpsim.yml up -d"
 
 launch-vm: render-config
