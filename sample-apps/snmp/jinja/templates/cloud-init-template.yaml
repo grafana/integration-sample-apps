@@ -254,7 +254,7 @@ write_files:
     prometheus.exporter.snmp "integrations_snmp" {
       target "snmp_sample_app" {
         address = "127.0.0.1"
-        module  = "if_mib"
+        module  = "system,if_mib"
         auth    = "public_v2"
       }
     }
