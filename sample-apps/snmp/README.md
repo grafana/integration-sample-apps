@@ -1,6 +1,6 @@
 # SNMP sample app
 
-This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of SNMP using the node-exporter.
+This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of SNMP using snmpd as well as snmpsim snapshots.
 
 ## Prerequisites
 
@@ -61,3 +61,23 @@ To get started with the sample app, follow these steps:
   ```bash
   journalctl -u alloy.service
   ```
+
+## Add new snmpsim snapshots
+
+See snmpsim docs in order to find out how to capture data: https://docs.lextudio.com/snmpsim/
+
+File should be in *.snmprec or *.snmpwalk formats.
+
+1. Name snapshot file as `<domain>.<vendor>.<devicename>.snmprec|snmpwalk`. example domains are: `net`,'os`,`server`,`ups`, `storage`.
+1. Sanitize snapshots from sensitive data: 
+It is recommended to at least change:
+- 1.3.6.1.2.1.1.1 - sysDescr
+- 1.3.6.1.2.1.1.4 - sysContact
+- 1.3.6.1.2.1.1.5 - sysName
+- 1.3.6.1.2.1.1.6 - sysLocation
+- 1.3.6.1.2.1.31.1.1.1.18.* - ifAlias.
+1. Put snapshot file into ./snmpsim/data dir.
+1. Update targets.yml and auths.yml files.
+1. Add corresponding `./tests/configs` files to automatically check in CI.
+
+
