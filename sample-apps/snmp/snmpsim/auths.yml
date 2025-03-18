@@ -1,0 +1,619 @@
+auths:
+  # net.ZTE-5928E-FI:
+  #   community: net.ZTE-5928E-FI
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.ZTE-2952:
+  #   community: net.ZTE-2952
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.alcatel.sr7750:
+  #   community: net.alcatel.sr7750
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.arista.1:
+  #   community: net.arista.1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.bl:
+  #   community: net.brocade.bl
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.fc.300:
+  #   community: net.brocade.fc.300
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.fc.6520:
+  #   community: net.brocade.fc.6520
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.icx6610_enterprise_only:
+  #   community: net.brocade.icx6610_enterprise_only
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.icx7250-48:
+  #   community: net.brocade.icx7250-48
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.mlx:
+  #   community: net.brocade.mlx
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.stacked.icx7250-48:
+  #   community: net.brocade.stacked.icx7250-48
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.stacked.icx7450-48:
+  #   community: net.brocade.stacked.icx7450-48
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.brocade.stacked.icx7750-48F:
+  #   community: net.brocade.stacked.icx7750-48F
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.cisco-c2950-ios12.1:
+  #   community: net.cisco-c2950-ios12.1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  net.cisco.c2911:
+    community: net.cisco.c2911
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+  net.cisco.c7600:
+    community: net.cisco.c7600
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+  # net.dell.MXL-10:
+  #   community: net.dell.MXL-10
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.dell.force10:
+  #   community: net.dell.force10
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.dlink.DGS-3627G:
+  #   community: net.dlink.DGS-3627G
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.dlink.des3200:
+  #   community: net.dlink.des3200
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.dlink.des7206:
+  #   community: net.dlink.des7206
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.dlink.dgs-3420-26sc:
+  #   community: net.dlink.dgs-3420-26sc
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.extreme.x670-48x:
+  #   community: net.extreme.x670-48x
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.extreme.x670v-48x:
+  #   community: net.extreme.x670v-48x
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.f5.bigip-1:
+  #   community: net.f5.bigip-1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.foundry.fls648:
+  #   community: net.foundry.fls648
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.foundry.fwsx424:
+  #   community: net.foundry.fwsx424
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.hp.2920-48g:
+  #   community: net.hp.2920-48g
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.hp.comware.1910-48:
+  #   community: net.hp.comware.1910-48
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.hp.comware.HPE_5940:
+  #   community: net.hp.comware.HPE_5940
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.hp.comware.a5500-24g-4sfp:
+  #   community: net.hp.comware.a5500-24g-4sfp
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.hp.procurve2626_j4900B:
+  #   community: net.hp.procurve2626_j4900B
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.huawei.s6348-e1:
+  #   community: net.huawei.s6348-e1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.huawei.vrp.ME60-X8:
+  #   community: net.huawei.vrp.ME60-X8
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.huawei.vrp.S2352P-EI:
+  #   community: net.huawei.vrp.S2352P-EI
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  net.juniper.ex4200-24f:
+    community: net.juniper.ex4200-24f
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+  net.juniper.mx240:
+    community: net.juniper.mx240
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+  net.juniper.srx:
+    community: net.juniper.srx
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+  # net.mellanox.sx1036:
+  #   community: net.mellanox.sx1036
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.912UAG-5HPnD:
+  #   community: net.mikrotik.912UAG-5HPnD
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.941-2nD:
+  #   community: net.mikrotik.941-2nD
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.951G-2HnD:
+  #   community: net.mikrotik.951G-2HnD
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.1100ahx2:
+  #   community: net.mikrotik.1100ahx2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.CCR1016-12G:
+  #   community: net.mikrotik.CCR1016-12G
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.CCR1036-12G-4S:
+  #   community: net.mikrotik.CCR1036-12G-4S
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik.rb2011ua:
+  #   community: net.mikrotik.rb2011ua
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotik450g:
+  #   community: net.mikrotik450g
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.mikrotikrb1100ah:
+  #   community: net.mikrotikrb1100ah
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.netgear_M5300-28G:
+  #   community: net.netgear_M5300-28G
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.qlogic.12300:
+  #   community: net.qlogic.12300
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.qtech.qsw2800-28t:
+  #   community: net.qtech.qsw2800-28t
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.qtech.qsw2800-28t-m:
+  #   community: net.qtech.qsw2800-28t-m
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.tplink.jetstream24:
+  #   community: net.tplink.jetstream24
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.ubnt.nanobridge:
+  #   community: net.ubnt.nanobridge
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.ubnt.unifi-ap-lr1:
+  #   community: net.ubnt.unifi-ap-lr1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.ubnt.unifi-ap-lr2:
+  #   community: net.ubnt.unifi-ap-lr2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # net.ubnt.unifi-ap-lr3:
+  #   community: net.ubnt.unifi-ap-lr3
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.esxi.19:
+  #   community: os.esxi.19
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.esxi.21:
+  #   community: os.esxi.21
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.esxi.22:
+  #   community: os.esxi.22
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.linux.1:
+  #   community: os.linux.1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.linux.2:
+  #   community: os.linux.2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.linux.37:
+  #   community: os.linux.37
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.linux3:
+  #   community: os.linux3
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.win.2008r2-2:
+  #   community: os.win.2008r2-2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.win.2012r2:
+  #   community: os.win.2012r2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.win2008r2:
+  #   community: os.win2008r2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # os.winxp:
+  #   community: os.winxp
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # public_v1:
+  #   community: public
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 1
+  # public_v2:
+  #   community: public
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.cisco.ucs_c240:
+  #   community: server.cisco.ucs_c240
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.dell.idrac7:
+  #   community: server.dell.idrac7
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.dell.with-disks1:
+  #   community: server.dell.with-disks1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.dell.with-disks2:
+  #   community: server.dell.with-disks2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.dell.without-disks1:
+  #   community: server.dell.without-disks1
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.dell.without-disks2:
+  #   community: server.dell.without-disks2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.hp.ilo:
+  #   community: server.hp.ilo
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.hp.proliant-g9:
+  #   community: server.hp.proliant-g9
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibm.12:
+  #   community: server.ibm.12
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibm.13:
+  #   community: server.ibm.13
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibm.14:
+  #   community: server.ibm.14
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibm.15:
+  #   community: server.ibm.15
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibm.x3550m5:
+  #   community: server.ibm.x3550m5
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibm9:
+  #   community: server.ibm9
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.ibmx3250m3:
+  #   community: server.ibmx3250m3
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.supermicro.x10dri:
+  #   community: server.supermicro.x10dri
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # server.supermicro.x10dri-2:
+  #   community: server.supermicro.x10dri-2
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # storage.dell.Dell_EQL_PS6100_12HDD:
+  #   community: storage.dell.Dell_EQL_PS6100_12HDD
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # storage.dell.Dell_EQL_PS6100_24HDD:
+  #   community: storage.dell.Dell_EQL_PS6100_24HDD
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # storage.fujitsu.DX100:
+  #   community: storage.fujitsu.DX100
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # storage.hp.msa2040:
+  #   community: storage.hp.msa2040
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # storage.netapp:
+  #   community: storage.netapp
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.26:
+  #   community: ups.apc.26
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.27:
+  #   community: ups.apc.27
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.28:
+  #   community: ups.apc.28
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.29:
+  #   community: ups.apc.29
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.30:
+  #   community: ups.apc.30
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.31:
+  #   community: ups.apc.31
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.32:
+  #   community: ups.apc.32
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.33:
+  #   community: ups.apc.33
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.34:
+  #   community: ups.apc.34
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.35:
+  #   community: ups.apc.35
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
+  # ups.apc.36:
+  #   community: ups.apc.36
+  #   security_level: noAuthNoPriv
+  #   auth_protocol: MD5
+  #   priv_protocol: DES
+  #   version: 2
