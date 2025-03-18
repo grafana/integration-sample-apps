@@ -1,0 +1,12 @@
+ifHCInOctets
+ifHCOutOctets
+ifHighSpeed
+ifInErrors
+ifMtu
+ifOperStatus
+ifOutErrors
+ifPhysAddress
+ifType_info
+snmp_scrape_duration_seconds
+sysUpTime
+up

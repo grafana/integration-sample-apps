@@ -1,6 +1,6 @@
 # SNMP sample app
 
-This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of SNMP using the node-exporter.
+This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of SNMP using snmpd as well as snmpsim snapshots.
 
 ## Prerequisites
 
@@ -61,3 +61,41 @@ To get started with the sample app, follow these steps:
   ```bash
   journalctl -u alloy.service
   ```
+
+## Add new snmpsim snapshots
+
+
+### Capture SNMP snapshots
+
+Option 1:  
+Refer to snmpsim docs in order to find out how to capture data in snmpsim format: 
+https://docs.lextudio.com/snmpsim/documentation/building-simulation-data#walking-snmp-agent
+
+`snmpsim-record-commands --agent-udpv4-endpoint=192.168.1.1 \
+  --start-oid=1.3.6.1.2.1 --stop-oid=1.3.6.1.2.1.5 \
+  --output-file=snmpsim/data/recorded/linksys- \
+  system.snmprec`
+
+Option 2:  
+You can also request dumps recorded by snmpwalk command:
+`snmpwalk -v 2c -c  <SNMP community> -OfnetU  <IP address>   .1.3  > device1.snmpwalk`
+If you receive an error that "counters not increasing" then you can try to add `-Сс`:
+`snmpwalk -v 2c -Cc -c  <SNMP community> -OfnetU  <IP address>   .1.3 > device1.snmpwalk`
+
+Then you can try to use it directly as a snapshot or convert it to more reliable format:
+`datafile.py --input-file=device1.snmpwalk --source-record-type=snmpwalk --output-file=10.100.0.90.snmprec`
+
+### Poll SNMP snapshots
+File should be in *.snmprec or *.snmpwalk formats.
+
+1. Name snapshot file as `<domain>.<vendor>.<devicename>.snmprec|snmpwalk`. example domains are: `net`,`os`,`server`,`ups`, `storage`.
+1. Sanitize snapshots from sensitive data: 
+It is recommended to at least change:
+- 1.3.6.1.2.1.1.1 - sysDescr
+- 1.3.6.1.2.1.1.4 - sysContact
+- 1.3.6.1.2.1.1.5 - sysName
+- 1.3.6.1.2.1.1.6 - sysLocation
+- 1.3.6.1.2.1.31.1.1.1.18.* - ifAlias.
+1. Put snapshot file into ./snmpsim/data dir.
+1. Update targets.yml and auths.yml files.
+1. Add corresponding `./tests/configs` files to automatically check in CI.
