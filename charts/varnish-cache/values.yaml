@@ -1,0 +1,4 @@
+replicas: 1
+varnishImage: varnish:stable
+exporterImage: ghcr.io/observiq/varnish-exporter:9b20a5f@sha256:345b08ba5bd12e196413263542dfe3738d837c8901b0e77739f929f110fbd651
+nginxImage: nginx:1.25.1

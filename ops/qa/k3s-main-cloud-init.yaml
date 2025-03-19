@@ -1,0 +1,29 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for the main node of the k3s cluster spun up for kubernetes based integrations
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+  - git
+  - gpg
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+
+  # Install k3s
+  - sudo curl -sfL https://get.k3s.io | sh -
+  # Set the k3s config to be readable by all users to kubectl and helm works properly
+  - sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+  - sudo chmod 644 /etc/rancher/k3s/k3s.yaml.lock
+  - echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml" >> /home/ubuntu/.bashrc
+
+  # Setup Helm
+  - sudo curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+  - sudo chmod 700 get_helm.sh
+  - sudo ./get_helm.sh
