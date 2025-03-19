@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-scheduler-logs-config
+  labels:
+    alloy-config: worker-task-logs
+data:
+  config.alloy: |
+    logging {
+      level  = "info"
+      format = "logfmt"
+    }
+
+    loki.echo "example" { }
+
+    loki.write "logs_integrations" {
+      endpoint {
+        url = "http://loki.default.svc.cluster.local:3100/loki/api/v1/push"
+
+      }
+      external_labels = {"cluster" = "my-cluster"}
+    }
+
+    local.file_match "logs_integrations_integrations_apache_airflow" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/opt/airflow/logs/scheduler/latest/*.py.log",
+        instance    = constants.hostname,
+        job         = "integrations/apache-airflow",
+      }]
+    }
+
+    loki.process "logs_integrations_integrations_apache_airflow" {
+      forward_to = [loki.write.logs_integrations.receiver]
+
+      stage.match {
+        selector = format("{job=\"integrations/apache-airflow\",instance=\"%s\"}", constants.hostname)
+
+        stage.regex {
+          expression = "/opt/airflow/logs/dag_id=(?P<dag_id>\\S+?)/.*/task_id=(?P<task_id>\\S+?)/.*log"
+          source     = "filename"
+        }
+
+        stage.labels {
+          values = {
+            dag_id  = null,
+            task_id = null,
+          }
+        }
+      }
+
+      stage.match {
+        selector = format("{job=\"integrations/apache-airflow\",instance=\"%s\"}", constants.hostname)
+
+        stage.regex {
+          expression = "/opt/airflow/logs/scheduler/latest/(?P<dag_file>\\S+?)\\.log"
+          source     = "filename"
+        }
+
+        stage.labels {
+          values = {
+            dag_file = null,
+          }
+        }
+      }
+
+      stage.multiline {
+        firstline     = "\\[\\d+-\\d+-\\d+T\\d+:\\d+:\\d+\\.\\d+\\+\\d+\\]"
+        max_lines     = 0
+        max_wait_time = "3s"
+      }
+    }
+
+    loki.source.file "logs_integrations_integrations_apache_airflow" {
+      targets    = local.file_match.logs_integrations_integrations_apache_airflow.targets
+      forward_to = [loki.process.logs_integrations_integrations_apache_airflow.receiver]
+    }
+

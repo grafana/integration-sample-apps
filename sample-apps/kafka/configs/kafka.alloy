@@ -1,0 +1,161 @@
+discovery.relabel "kafka_broker" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app"]
+    regex = "kafka"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_number"]
+    regex = "7778"
+    action = "keep"
+  }
+  rule {
+    replacement = "kafka-instance"
+    target_label = "instance"
+  }
+  rule {
+    replacement = "kafka-sample-app-cluster"
+    target_label = "kafka_cluster"
+  }
+}
+
+prometheus.scrape "kafka_broker" {
+  job_name     = "integrations/kafka"
+  targets      = discovery.relabel.kafka_broker.output
+  honor_labels = true
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
+
+discovery.relabel "kafka_zookeeper" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app"]
+    regex = "zookeeper"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_number"]
+    regex = "7778"
+    action = "keep"
+  }
+  rule {
+    replacement = "zookeeper"
+    target_label = "instance"
+  }
+  rule {
+    replacement = "kafka-sample-app-cluster"
+    target_label = "kafka_cluster"
+  }
+}
+
+prometheus.scrape "kafka_zookeeper" {
+  job_name     = "integrations/kafka"
+  targets      = discovery.relabel.kafka_zookeeper.output
+  honor_labels = true
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
+
+discovery.relabel "kafka_connect" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app"]
+    regex = "connect"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_number"]
+    regex = "7778"
+    action = "keep"
+  }
+  rule {
+    replacement = "kafka-connect"
+    target_label = "instance"
+  }
+  rule {
+    replacement = "kafka-sample-app-cluster"
+    target_label = "kafka_cluster"
+  }
+}
+
+prometheus.scrape "kafka_connect" {
+  job_name     = "integrations/kafka"
+  targets      = discovery.relabel.kafka_connect.output
+  honor_labels = true
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
+
+discovery.relabel "kafka_schemaregistry" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app"]
+    regex = "schemaregistry"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_number"]
+    regex = "7778"
+    action = "keep"
+  }
+  rule {
+    replacement = "schema-registry"
+    target_label = "instance"
+  }
+  rule {
+    replacement = "kafka-sample-app-cluster"
+    target_label = "kafka_cluster"
+  }
+}
+
+prometheus.scrape "kafka_schemaregistry" {
+  job_name     = "integrations/kafka"
+  targets      = discovery.relabel.kafka_schemaregistry.output
+  honor_labels = true
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
+
+discovery.relabel "kafka_ksqldb" {
+  targets = discovery.kubernetes.pods.targets
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app"]
+    regex = "ksqldb"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_number"]
+    regex = "7778"
+    action = "keep"
+  }
+  rule {
+    replacement = "ksql-server"
+    target_label = "instance"
+  }
+}
+
+prometheus.scrape "kafka_ksqldb" {
+  job_name     = "integrations/kafka"
+  targets      = discovery.relabel.kafka_ksqldb.output
+  honor_labels = true
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
+
+//instantiate one exporter per kafka broker
+//for detailed configuration options, please check https://grafana.com/docs/agent/latest/flow/reference/components/prometheus.exporter.kafka/
+prometheus.exporter.kafka "kafka_exporter" {
+  kafka_uris = ["kafka-0-internal.confluent.svc.cluster.local:9092", "kafka-1-internal.confluent.svc.cluster.local:9092", "kafka-2-internal.confluent.svc.cluster.local:9092"]
+  instance = "kafka-broker"
+}
+
+prometheus.scrape "kafka_exporter" {
+  targets      = prometheus.exporter.kafka.kafka_exporter.targets
+  job_name     = "integrations/kafka"
+  forward_to   = [prometheus.relabel.kafka_exporter.receiver]
+}
+
+prometheus.relabel "kafka_exporter" {
+  rule {
+    replacement = "kafka-sample-app-cluster"
+    target_label = "kafka_cluster"
+  }  
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}

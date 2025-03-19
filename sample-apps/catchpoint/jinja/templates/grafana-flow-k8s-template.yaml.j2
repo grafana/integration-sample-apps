@@ -1,0 +1,40 @@
+# jinja/templates/grafana-flow-k8s-template.yaml.j2:
+cluster:
+  name: "catchpoint-cluster"
+
+externalServices:
+  prometheus:
+    host: "{{ prom_host }}"
+    basicAuth:
+      username: "{{ prom_user }}"
+      password: "{{ prom_pass }}"
+  loki:
+    host: "https://logs-prod3.grafana.net"
+    basicAuth:
+      username: "{{ loki_user }}"
+      password: "{{ loki_pass }}"
+
+extraConfig: |-
+  discovery.relabel "catchpoint" {
+    targets = discovery.kubernetes.endpoints.targets
+    rule {
+      action        = "keep"
+      source_labels = ["__meta_kubernetes_service_name"]
+      regex         = "catchpoint-exporter"
+    }
+    rule {
+      source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+      separator = "-"
+      target_label = "instance"
+    }
+    rule {
+      replacement = "integrations/catchpoint"
+      target_label = "job"
+    }
+  }
+
+  prometheus.scrape "catchpoint" {
+    targets      = discovery.relabel.catchpoint.output
+    forward_to   = [prometheus.relabel.metrics_service.receiver]
+  }
+

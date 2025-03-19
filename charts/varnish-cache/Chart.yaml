@@ -1,0 +1,14 @@
+apiVersion: v2
+appVersion: 6.0.13
+engine: gotpl
+home: https://github.com/observiq/application-helm-charts/tree/main/charts/varnish
+keywords:
+  - community
+  - forum
+maintainers:
+  - name: observIQ
+name: varnish
+sources:
+  - https://varnish-cache.org/
+  - https://artifacthub.io/packages/helm/varnish/varnish-cache
+version: 1.0.4
