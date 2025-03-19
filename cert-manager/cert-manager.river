@@ -1,0 +1,24 @@
+discovery.relabel "cert_manager" {
+  targets = discovery.kubernetes.services.targets
+  rule {
+    source_labels = ["__meta_kubernetes_service_label_app_kubernetes_io_name"]
+    regex = "cert-manager"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_service_port_number"]
+    regex = "9402"
+    action = "keep"
+  }
+  rule {
+      source_labels = ["__meta_kubernetes_pod_name"]
+      target_label = "instance"
+  }
+}
+
+prometheus.scrape "cert_manager" {
+  job_name     = "integrations/cert-manager"
+  targets      = discovery.relabel.cert_manager.output
+  honor_labels = true
+  forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
