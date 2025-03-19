@@ -1,0 +1,2 @@
+# do not use snmpsim 0.4.7, it is broken( permissions issue)
+snmpsim==0.4.5

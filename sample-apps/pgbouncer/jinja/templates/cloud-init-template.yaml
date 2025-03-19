@@ -1,0 +1,165 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Postgres, PGbouncer, PGbouncer Exporter, and Alloy
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  # Install and configure postgresql
+  - sudo apt-get update
+  - sudo apt install postgresql -y
+  - sudo apt-get install -y pgbouncer
+  - sudo apt-get install postgresql-contrib -y
+
+  # Configure pgbouncer 
+  - sudo truncate -s 0 /etc/pgbouncer/pgbouncer.ini
+  - echo "[databases]" | sudo tee /etc/pgbouncer/pgbouncer.ini
+  - echo "test_db= dbname=postgres host=localhost port=5432 user=postgres" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "[users]" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "[pgbouncer]" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "user = postgres" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "logfile = /var/log/postgresql/pgbouncer.log" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "pidfile = /var/run/postgresql/pgbouncer.pid" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "listen_addr = localhost" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "listen_port = 6543" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "unix_socket_dir = /var/run/postgresql" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "auth_type = any" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "pool_mode = transaction" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "log_pooler_errors = 1" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - echo "ignore_startup_parameters = extra_float_digits" | sudo tee -a /etc/pgbouncer/pgbouncer.ini
+  - sudo systemctl restart pgbouncer
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+  
+  #Install Exporter
+  - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
+  - cd /pgbouncer_exporter/
+  - git config --global --add safe.directory /pgbouncer_exporter
+  - sudo apt install make -y
+  - sudo snap install go --classic
+  - sudo make build
+  - ./pgbouncer_exporter &
+
+write_files:
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+    
+    local.file_match "logs_integrations_integrations_pgbouncer" {
+      path_targets = [{
+        __address__       = "localhost",
+        __path__          = "/var/log/postgresql/pgbouncer.log",
+        instance          = "pgbouncer-sample-app:9127",
+        job               = "integrations/pgbouncer",
+        pgbouncer_cluster = "pgbouncer-sample-app-cluster",
+      }]
+    }
+
+    prometheus.scrape "metrics_integrations_integrations_pgbouncer" {
+      targets = [{
+        __address__       = "pgbouncer-sample-app:9127",
+        pgbouncer_cluster = "pgbouncer-sample-app-cluster",
+      }]
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/pgbouncer"
+    }
+
+    loki.process "logs_integrations_integrations_pgbouncer" {
+      forward_to = []
+
+      stage.multiline {
+        firstline     = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}"
+        max_lines     = 0
+        max_wait_time = "3s"
+      }
+
+      stage.regex {
+        expression = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+ \\[\\d+\\] (?P<level>LOG|ERROR|WARNING|INFO|DEBUG) .*"
+      }
+
+      stage.labels {
+        values = {
+          level = null,
+        }
+      }
+    }
+
+    loki.source.file "logs_integrations_integrations_pgbouncer" {
+      targets    = local.file_match.logs_integrations_integrations_pgbouncer.targets
+      forward_to = [loki.process.logs_integrations_integrations_pgbouncer.receiver]
+    }
