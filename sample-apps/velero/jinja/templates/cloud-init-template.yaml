@@ -1,0 +1,109 @@
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- grafana-agent-flow
+- dpkg-dev
+
+runcmd:
+  - sed -e s/CUSTOM_ARGS=.*/CUSTOM_ARGS="--server.http.listen-addr=0.0.0.0:8080"/g -i /etc/default/grafana-agent-flow 
+  - systemctl enable grafana-agent-flow 
+  - systemctl start --no-block grafana-agent-flow 
+  - echo $(ip r | grep default | cut -d' ' -f3) grafana.k3d.localhost loki.k3d.localhost mimir.k3d.localhost >> /etc/hosts
+
+write_files:
+# Grafana Agent configuration
+- owner: root:root
+  path: /grafana-agent-flow.yaml
+  content: |
+    cluster:
+      name: "velero_cluster"
+
+    externalServices:
+      prometheus:
+        host: "https://prometheus-us-central1.grafana.net"
+        basicAuth:
+          username: "{{ prom_user }}"
+          password: "{{ prom_pass }}"
+      loki:
+        host: "https://logs-prod3.grafana.net"
+        basicAuth:
+          username: "{{ loki_user }}"
+          password: "{{ loki_pass }}"
+
+
+    extraConfig: |-
+      discovery.relabel "velero" {
+        targets = discovery.kubernetes.pods.targets
+        rule {
+          action        = "keep"
+          source_labels = ["__meta_kubernetes_pod_label_component"]
+          regex         = "velero"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_port_number"]
+          regex = "8085"
+          action = "keep"
+       }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          separator = "-"
+          target_label = "instance"
+        }
+        rule {
+          replacement = "integrations/velero"
+          target_label = "job"
+        }
+      }
+
+      prometheus.scrape "velero" {
+        targets      = discovery.relabel.velero.output
+        metrics_path = "/metrics"
+        forward_to   = [prometheus.relabel.metrics_service.receiver]
+      }
+    logs:
+      enabled: true
+      extraConfig: |-
+        discovery.relabel "logs_velero" {
+          targets = discovery.relabel.pod_logs.output
+
+          rule {
+            action        = "keep"
+            source_labels = ["__meta_kubernetes_pod_label_component"]
+            regex         = "velero"
+          }
+          rule {
+            target_label = "job"
+            replacement = "integrations/velero"
+          }
+          rule {
+            action = "replace"
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+        }
+
+         loki.source.kubernetes "logs_velero" {
+          targets    = discovery.relabel.logs_velero.output
+          forward_to = [loki.process.logs_velero.receiver]
+         }
+
+         loki.process "logs_velero" {
+          forward_to = [loki.process.logs_service.receiver]
+          stage.cri {}
+          stage.multiline {
+            firstline = "time=\"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\""
+          }
+          stage.regex {
+            expression = "time=\"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\" level=(?P<level>\\w+)"
+          }
+          stage.labels {
+            values = {
+              level  = "",
+            }
+          }
+         }

@@ -1,0 +1,14 @@
+interval: "10s"
+loki_url: http://your-loki-instance:3100/loki/api/v1/push
+loki_user: your_loki_username
+loki_pass: your_loki_password
+prom_url: http://your-prometheus-instance:9090/api/v1/push
+prom_user: your_prometheus_username
+prom_pass: your_prometheus_password
+interval: "10s"
+loki_url: http://your-loki-instance:3100/loki/api/v1/push
+loki_user: your_loki_username
+loki_pass: your_loki_password
+prom_url: http://your-prometheus-instance:9090/api/v1/push
+prom_user: your_prometheus_username
+prom_pass: your_prometheus_password

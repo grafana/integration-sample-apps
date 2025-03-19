@@ -1,0 +1,138 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  
+  # Jenkins setup based on https://www.jenkins.io/doc/book/installing/linux/
+  # Install Jenkins prerequisites
+  - sudo apt install fontconfig openjdk-17-jre -y
+
+  # Jenkins signing key & install
+  - sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+  - echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+  - sudo apt-get update
+  - sudo apt-get install jenkins -y
+
+  # Get and run jenkins-plugin-manager to install the required prometheus plugin & dependencies
+  # Hardcoded to release 2.13.2 as they include version in the artifact name
+  - sudo wget -O /root/jenkins-plugin-manager.jar https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.13.2/jenkins-plugin-manager-2.13.2.jar
+
+  # Install prometheus plugin
+  - sudo java -jar /root/jenkins-plugin-manager.jar -d /var/lib/jenkins/plugins --plugins prometheus:latest
+
+  # Restart Jenkins to pick up Prometheus plugin
+  - systemctl restart jenkins
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+write_files:
+# Jenkins systemd override to bypass UI-based setup requirement
+# This also disables any authentication requirements, and is *very* insecure for production setups
+# Good thing this is just for a test setup
+- owner: root:root
+  path: /etc/systemd/system/jenkins.service.d/override.conf
+  content: |
+    [Service]
+    Environment="JAVA_OPTS=-Djenkins.install.runSetupWizard=false"
+
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    discovery.relabel "jenkins_metrics" {
+      targets = [{
+        __address__ = "localhost:8080",
+      }]
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+    }
+
+    prometheus.scrape "jenkins_metrics" {
+      targets      = discovery.relabel.jenkins_metrics.output
+      forward_to   = [prometheus.remote_write.metrics_service.receiver]
+      job_name     = "integrations/jenkins"
+      metrics_path = "/prometheus/"
+    }

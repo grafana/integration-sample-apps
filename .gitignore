@@ -1,0 +1,11 @@
+/.rpmdb/
+/.idea
+/.published
+/.pkg
+/.cache
+/.vscode
+/.eventcache
+
+# Integration QA specifics
+missing_metrics
+

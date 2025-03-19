@@ -1,0 +1,381 @@
+# jinja/templates/main-node-cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and a local mongodb replicaset
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  # General setup
+  - sudo apt update
+
+  # MongoDB Community Edition specific prerequisites
+  # Public key
+  - sudo apt install gnupg curl -y
+  
+  - sudo curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+  # Create list file
+  - sudo echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+  # Reload & install
+  - sudo apt update
+  - sudo apt install mongodb-org -y
+
+  # Stop mongod service in case it auto-started
+  - sudo systemctl stop mongod
+
+  # Create required directories for each replica set
+  - sudo mkdir -p /srv/mongodb/rs0-0  /srv/mongodb/rs0-1 /srv/mongodb/rs0-2 /srv/mongodb/rs1-0  /srv/mongodb/rs1-1 /srv/mongodb/rs1-2 /srv/mongodb/confrs-0 
+
+  # Single member config server replica set
+  - sudo mongod --configsvr --replSet confrs --port 27017 --bind_ip localhost --dbpath /srv/mongodb/confrs-0  --oplogSize 128 &> /root/confrs-0.log &
+
+  # Spawn two shards, each a three-member replicaset
+  - sudo mongod --shardsvr --replSet rs0 --port 27018 --bind_ip localhost --dbpath /srv/mongodb/rs0-0  --oplogSize 128 &> /root/rs0-0.log &
+  - sudo mongod --shardsvr --replSet rs0 --port 27019 --bind_ip localhost --dbpath /srv/mongodb/rs0-1  --oplogSize 128 &> /root/rs0-1.log &
+  - sudo mongod --shardsvr --replSet rs0 --port 27020 --bind_ip localhost --dbpath /srv/mongodb/rs0-2 --oplogSize 128 &> /root/rs0-2.log &
+  - sudo mongod --shardsvr --replSet rs1 --port 27021 --bind_ip localhost --dbpath /srv/mongodb/rs1-0  --oplogSize 128 &> /root/rs1-0.log &
+  - sudo mongod --shardsvr --replSet rs1 --port 27022 --bind_ip localhost --dbpath /srv/mongodb/rs1-1  --oplogSize 128 &> /root/rs1-1.log &
+  - sudo mongod --shardsvr --replSet rs1 --port 27023 --bind_ip localhost --dbpath /srv/mongodb/rs1-2 --oplogSize 128 &> /root/rs1-2.log &
+
+  # mongos instance tbd
+  - sudo mongos --configdb confrs/localhost:27017 --port 27024 --bind_ip localhost &> /root/mongos.log &
+  
+  # Initiate replicasets
+  ## Config server RS
+  - "sudo mongosh localhost:27017 --eval \"rs.initiate({_id: 'confrs', configsvr: true, members: [{_id: 0, host: 'localhost:27017'}]})\""
+  ## rs0
+  - "sudo mongosh localhost:27018 --eval \"rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27018'}, {_id: 1, host: 'localhost:27019'}, {_id: 2, host: 'localhost:27020'}]})\""
+  ## rs1
+  - "sudo mongosh localhost:27021 --eval \"rs.initiate({_id: 'rs1', members: [{_id: 0, host: 'localhost:27021'}, {_id: 1, host: 'localhost:27022'}, {_id: 2, host: 'localhost:27023'}]})\""
+  
+  # Add shards via mongos
+  - "sudo mongosh localhost:27024 --eval \"sh.addShard('rs0/localhost:27018,localhost:27019,localhost:27020')\""
+  - "sudo mongosh localhost:27024 --eval \"sh.addShard('rs1/localhost:27021,localhost:27022,localhost:27023')\""
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+write_files:
+# Alloy configuration
+
+# Note for mongodb config, there are three separate configs, namely:
+# Configs for mongos (27017) config server (27024) and shard (27018)
+# this is based on `mlaunch --replicaset --sharded 2`
+# which creates two shards for each of the three nodes in the replicaset,
+# plus a mongos and config server on 27017 and 27024 respectively
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_mongos" {
+      mongodb_uri    = "mongodb://localhost:27024"
+      direct_connect = true
+    }
+    discovery.relabel "integrations_mongodb_exporter_mongos" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_mongos.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Mongos"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_mongos"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_mongos" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_mongos.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_configserv" {
+      mongodb_uri    = "mongodb://localhost:27017"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_configserv" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_configserv.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "ConfigServer"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_configserv"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_configserv" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_configserv.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs0_shard0" {
+      mongodb_uri    = "mongodb://localhost:27018"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs0_shard0" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs0_shard0.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Shard"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs0_shard0"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs0_shard0" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard0.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs0_shard1" {
+      mongodb_uri    = "mongodb://localhost:27019"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs0_shard1" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs0_shard1.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Shard"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs0_shard1"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs0_shard1" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard1.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs0_shard2" {
+      mongodb_uri    = "mongodb://localhost:27020"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs0_shard2" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs0_shard2.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Shard"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs0_shard2"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs0_shard2" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard2.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs1_shard0" {
+      mongodb_uri    = "mongodb://localhost:27021"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs1_shard0" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs1_shard0.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Shard"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs1_shard0"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs1_shard0" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard0.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs1_shard1" {
+      mongodb_uri    = "mongodb://localhost:27022"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs1_shard1" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs1_shard1.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Shard"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs1_shard1"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs1_shard1" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs1_shard1.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }
+
+    prometheus.exporter.mongodb "integrations_mongodb_exporter_rs1_shard2" {
+      mongodb_uri    = "mongodb://localhost:27023"
+      direct_connect = true
+    }
+
+    discovery.relabel "integrations_mongodb_exporter_rs1_shard2" {
+      targets = prometheus.exporter.mongodb.integrations_mongodb_exporter_rs1_shard2.targets
+
+      rule {
+        target_label = "service_name"
+        replacement  = "Shard"
+      }
+
+      rule {
+        target_label = "mongodb_cluster"
+        replacement  = "mongodb_sample_app_cluster"
+      }
+
+      rule {
+        target_label = "instance"
+        replacement  = "mongodb_sample_app_rs1_shard2"
+      }
+    }
+
+    prometheus.scrape "integrations_mongodb_exporter_rs1_shard2" {
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard2.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/mongodb_exporter"
+    }

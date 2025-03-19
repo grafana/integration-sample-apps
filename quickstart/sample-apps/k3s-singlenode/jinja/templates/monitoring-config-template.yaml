@@ -1,0 +1,30 @@
+cluster:
+  name: <INTEGRATION_SLUG>-sample-app-cluster
+
+externalServices:
+  prometheus:
+    host: "{{prom_host}}"
+    basicAuth:
+      username: "{{prom_user}}"
+      password: "{{prom_pass}}"
+    {% if prom_path -%}
+    writeEndpoint: "{{prom_path}}"
+    {%- endif %}
+    {% if prom_query_path -%}
+    queryEndpoint: "{{prom_query_path}}"
+    {%- endif %}
+  loki:
+    host: "{{loki_host}}"
+    basicAuth:
+      username: "{{loki_user}}"
+      password: "{{loki_pass}}"
+    {% if loki_path -%}
+    writeEndpoint: "{{loki_path}}"
+    {%- endif %}
+
+metrics:
+  cost:
+    enabled: false
+
+opencost:
+  enabled: false

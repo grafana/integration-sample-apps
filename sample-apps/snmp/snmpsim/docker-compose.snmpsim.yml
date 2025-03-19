@@ -1,0 +1,16 @@
+version: '2'
+services:
+  snmpsim:
+    build: ./build
+    ports: 
+      - 162:161/udp
+    volumes: 
+      - ./data:/usr/local/snmpsim/data
+      #- ./cache:/tmp/snmpsim:rw
+    restart: always
+    environment: 
+      - EXTRA_FLAGS=--agent-udpv4-endpoint=0.0.0.0 --v2c-arch --variation-module-options=writecache:file:/tmp/snmpsim/snmpsim.db
+    logging: 
+        options:
+          max-size: '10m'
+          max-file: '5'
