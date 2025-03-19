@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catchpoint-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catchpoint-exporter
+  template:
+    metadata:
+      labels:
+        app: catchpoint-exporter
+    spec:
+      containers:
+      - name: catchpoint-exporter
+        image: jonnywamsley/catchpoint-exporter:latest
+        args: ["--port=9090", "--webhook-path=/webhook", "--verbose"]
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9090
