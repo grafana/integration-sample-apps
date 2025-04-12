@@ -28,7 +28,7 @@ runcmd:
   - ufw allow 161/udp
   - ufw allow 162/udp
 
-  - sudo systemctl restart snmpd
+  - sudo systemctl restart snmpd rsyslog
 
   # Configure Alloy
   - sudo systemctl enable alloy.service
