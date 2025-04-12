@@ -139,6 +139,25 @@ write_files:
 
 # Alloy configuration
 - owner: root:root
+  path: /etc/default/alloy
+  content: |
+    ## Path:
+    ## Description: Grafana Alloy settings
+    ## Type:        string
+    ## Default:     ""
+    ## ServiceRestart: alloy
+    #
+    # Command line options for Alloy.
+    #
+    # The configuration file holding the Alloy config.
+    CONFIG_FILE="/etc/alloy/config.alloy"
+
+    # User-defined arguments to pass to the run command.
+    CUSTOM_ARGS="--stability.level=experimental"
+
+    # Restart on system upgrade. Defaults to true.
+    RESTART_ON_UPGRADE=true
+- owner: root:root
   path: /etc/alloy/config.alloy
   content: |
     logging {
@@ -213,35 +232,10 @@ write_files:
       files = ["/tmp/targets.yml"]
     }
 
-    // Rename hidden labels so they don't get dropped
-    discovery.relabel "network_devices" {
-      targets = discovery.file.network_devices.targets
-      rule {
-        action        = "replace"
-        source_labels = ["__param_target"]
-        target_label  = "address"
-      }
-      rule {
-        action        = "replace"
-        source_labels = ["__param_name"]
-        target_label  = "name"
-      }
-      rule {
-        action        = "replace"
-        source_labels = ["__param_auth"]
-        target_label  = "auth"
-      }
-      rule {
-        action        = "replace"
-        source_labels = ["__param_module"]
-        target_label  = "module"
-      }
-    }  
-
     prometheus.exporter.snmp "integrations_snmpsim" {
       config_merge_strategy = "merge"
-      targets = discovery.file.network_devices.targets
       config_file = "/tmp/auths.yml"
+      targets = discovery.file.network_devices.targets
     }
    
     prometheus.scrape "integrations_snmpsim" {
@@ -279,4 +273,92 @@ write_files:
         target_label  = "snmp_target"
         replacement   = "$2"
       }
+      rule {
+        source_labels = ["job"]
+        regex         = "(^.*snmp)\\/(.*)"
+        target_label  = "instance"
+        replacement   = "$2"
+      }
+    }
+    // Receive syslog messages
+    loki.source.syslog "incoming" {
+        listener {
+            address = ":10514"
+            syslog_format = "rfc3164"
+            protocol = "udp"
+            labels = {
+                job = "syslog",
+            }
+        }
+        forward_to = [loki.enrich.default.receiver]
+        relabel_rules = loki.relabel.syslog.rules
+    }
+    loki.source.syslog "incoming_10515" {
+        listener {
+            address = ":10515"
+            syslog_format = "rfc5424"
+            protocol = "udp"
+            labels = {
+                job = "syslog",
+            } 
+      }
+        forward_to = [loki.enrich.integrations_snmp.receiver]
+        relabel_rules = loki.relabel.integrations_snmp.rules
+    }
+
+    loki.relabel "integrations_snmp" {
+      forward_to = []
+
+      rule {
+        source_labels = ["__syslog_message_hostname"]
+        target_label         = "hostname"
+      }
+      rule {
+        source_labels = ["__syslog_message_severity"]
+        target_label         = "level"
+      }
+      rule {
+        source_labels = ["__syslog_message_facility"]
+        target_label         = "facility"
+      }
+      rule {
+        source_labels = ["__syslog_message_msg_id"]
+        target_label         = "syslog_msg_id"
+      }
+      rule {
+        source_labels = ["__syslog_message_app_name"]
+        target_label         = "syslog_app_name"
+      }
+    }
+
+
+    // Enrich logs with device metadata
+    loki.enrich "integrations_snmp" {
+
+      targets = discovery.file.network_devices.targets
+      // List of labels to copy from discovered targets to logs
+      labels_to_copy = [
+        "datacenter",
+        "rack",
+      ]
+      // Match on hostname/IP from logs
+      target_match_label = "name"
+      logs_match_label = "hostname"
+
+      forward_to = [loki.relabel.integrations_snmp.receiver]
+    }
+    loki.relabel "integrations_snmp" {
+      rule {
+        replacement   = "integrations/snmp"
+        target_label  = "job_snmp"
+      }
+      rule {
+        source_labels = ["hostname"]
+        target_label  = "snmp_target"
+      }
+      rule {
+        source_labels = ["hostname"]
+        target_label  = "instance"
+      }
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
     }
