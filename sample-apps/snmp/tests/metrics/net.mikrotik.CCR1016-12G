@@ -11,4 +11,7 @@ snmp_scrape_duration_seconds
 sysUpTime
 hrProcessorLoad
 hrStorageUsed
+mtxrHlPower
+mtxrHlTemperature
+mtxrHlVoltage
 up
