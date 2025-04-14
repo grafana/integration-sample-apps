@@ -42,6 +42,45 @@ runcmd:
 
 
 write_files:
+- owner: root:root
+  path: /etc/rsyslog.d/100-cisco.conf
+  content: |
+    module(load="imudp")
+    #https://www.rsyslog.com/doc/master/configuration/modules/pmciscoios.html
+    module(load="pmciscoios")
+
+    input(type="imudp" port="10516" ruleset="withOrigin")
+    input(type="imudp" port="10517" ruleset="withoutOrigin")
+
+    timezone(id="GMT" offset="+00:00")
+    # instead of -x
+    global(net.enableDNS="off")
+
+    $template raw,"%msg:2:2048%\n"
+
+    ruleset(name="alloy") {
+          action(
+          type="omfwd"
+          protocol="udp" target="127.0.0.1" port="10515"
+          Template="RSYSLOG_SyslogProtocol23Format"
+          )
+          *.*    /dev/stdout; raw
+    }
+
+    ruleset(name="withoutOrigin" parser="rsyslog.ciscoios") {
+          /* this ruleset uses the default parser which was
+          * created during module load
+          */
+          call alloy
+    }
+
+    parser(name="custom.ciscoios.withOrigin" type="pmciscoios"
+          present.origin="on")
+    ruleset(name="withOrigin" parser="custom.ciscoios.withOrigin") {
+          /* this ruleset uses the parser defined immediately above */
+          call alloy
+    }
+
 # snmpd configuration
 - owner: root:root
   path: /etc/snmp/snmpd_sample_app.conf
@@ -290,8 +329,8 @@ write_files:
                 job = "syslog",
             }
         }
-        forward_to = [loki.enrich.default.receiver]
-        relabel_rules = loki.relabel.syslog.rules
+        forward_to = [loki.enrich.integrations_snmp.receiver]
+        relabel_rules = loki.relabel.integrations_snmp.rules
     }
     loki.source.syslog "incoming_10515" {
         listener {
@@ -345,9 +384,9 @@ write_files:
       target_match_label = "name"
       logs_match_label = "hostname"
 
-      forward_to = [loki.relabel.integrations_snmp.receiver]
+      forward_to = [loki.relabel.integrations_snmp_final.receiver]
     }
-    loki.relabel "integrations_snmp" {
+    loki.relabel "integrations_snmp_final" {
       rule {
         replacement   = "integrations/snmp"
         target_label  = "job_snmp"
