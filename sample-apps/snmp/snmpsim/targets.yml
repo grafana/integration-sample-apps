@@ -10,7 +10,7 @@
 - targets:
     - 127.0.0.1:162
   labels:
-    module: system,if_mib #,cisco_device
+    module: system,if_mib,cisco_device
     name: net.cisco.c7600
     auth: net.cisco.c7600
     rack: rack1
