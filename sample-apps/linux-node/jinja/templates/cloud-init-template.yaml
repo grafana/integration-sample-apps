@@ -136,47 +136,76 @@ write_files:
         action        = "keep"
       }
     }
-
-    loki.source.journal "logs_integrations_integrations_node_exporter_journal_scrape" {
-      max_age       = "24h0m0s"
-      relabel_rules = discovery.relabel.logs_integrations_integrations_node_exporter_journal_scrape.rules
-      forward_to    = [loki.write.grafana_cloud_loki.receiver]
-    }
-
-    local.file_match "logs_integrations_integrations_node_exporter_direct_scrape" {
-      path_targets = [{
-        __address__ = "localhost",
-        __path__    = "/var/log/{syslog,messages,*.log}",
-        instance    = constants.hostname,
-        job         = "integrations/node_exporter",
-      }]
-    }
-
-    discovery.relabel "logs_integrations_integrations_node_exporter_journal_scrape" {
-      targets = []
-
-      rule {
-        source_labels = ["__journal__systemd_unit"]
-        target_label  = "unit"
-      }
-
-      rule {
-        source_labels = ["__journal__boot_id"]
-        target_label  = "boot_id"
-      }
-
-      rule {
-        source_labels = ["__journal__transport"]
-        target_label  = "transport"
-      }
-
-      rule {
-        source_labels = ["__journal_priority_keyword"]
-        target_label  = "level"
-      }
-    }
-
-    loki.source.file "logs_integrations_integrations_node_exporter_direct_scrape" {
-      targets    = local.file_match.logs_integrations_integrations_node_exporter_direct_scrape.targets
+    loki.relabel "integrations_node_exporter" {
       forward_to = [loki.write.grafana_cloud_loki.receiver]
+      rule {
+        target_label = "job"
+        replacement  = "integrations/node_exporter"
+      }
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+    }
+
+    journal_module "integrations_node_exporter" {
+      forward_to = [loki.relabel.integrations_node_exporter.receiver]
+    }
+    // Enable to scrape logs from /var/log. Disabled by default in favor of systemd journal collection.
+    //filelogs_module "integrations_node_exporter" {
+    //  forward_to = [loki.relabel.integrations_node_exporter.receiver] 
+    //}
+
+    //FILELOGS
+    declare "filelogs_module" {
+      argument "forward_to" {
+          optional = false
+      }
+      local.file_match "default" {
+        path_targets = [{
+          __address__ = "localhost",
+          __path__    = "/var/log/{syslog,messages,*.log}",
+        }]
+      }
+
+      loki.source.file "default" {
+        targets    = local.file_match.default.targets
+        forward_to = argument.forward_to.value
+      }
+    }
+
+    //JOURNAL
+    declare "journal_module" {
+      argument "forward_to" {
+          optional = false
+      }
+
+      loki.source.journal "default"  {
+          max_age       = "12h0m0s"
+          forward_to    = [loki.process.default.receiver]
+          relabel_rules = loki.relabel.default.rules
+      }
+
+      loki.relabel "default" {
+          rule {
+              source_labels = ["__journal__systemd_unit"]
+              target_label  = "unit"
+          }
+          rule {
+              source_labels = ["__journal__boot_id"]
+              target_label  = "boot_id"
+          }
+          rule {
+              source_labels = ["__journal__transport"]
+              target_label  = "transport"
+          }
+          rule {
+              source_labels = ["__journal_priority_keyword"]
+              target_label  = "level"
+          }
+          forward_to    = []
+      }
+      loki.process "default" {
+          forward_to    = argument.forward_to.value
+      }
     }
