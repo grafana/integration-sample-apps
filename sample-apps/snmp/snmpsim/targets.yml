@@ -43,3 +43,28 @@
     auth: net.juniper.srx
     rack: rack4
     datacenter: dc1
+# Miktorik
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib,mikrotik,hrStorage,hrDevice
+    name: net.mikrotik.941-2nD
+    auth: net.mikrotik.941-2nD
+    rack: rack5
+    datacenter: dc2
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib,mikrotik,hrStorage,hrDevice
+    name: net.mikrotik.951G-2HnD
+    auth: net.mikrotik.951G-2HnD
+    rack: rack5
+    datacenter: dc2
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib,mikrotik,hrStorage,hrDevice
+    name: net.mikrotik.CCR1016-12G
+    auth: net.mikrotik.CCR1016-12G
+    rack: rack5
+    datacenter: dc2
