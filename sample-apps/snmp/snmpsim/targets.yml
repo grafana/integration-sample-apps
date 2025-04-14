@@ -38,7 +38,7 @@
 - targets:
     - 127.0.0.1:162
   labels:
-    module: system,if_mib #,juniper
+    module: system,if_mib,juniper
     name: net.juniper.srx
     auth: net.juniper.srx
     rack: rack4
