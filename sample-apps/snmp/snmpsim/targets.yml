@@ -1,8 +1,7 @@
 - targets:
     - 127.0.0.1:162
   labels:
-    module: system,if_mib #TODO: add cisco_device module when v0.28.0 is merged into alloy: ,cisco_device
-    # name must match snmpsim file
+    module: system,if_mib,cisco_device
     name: net.cisco.c2911
     auth: net.cisco.c2911
     rack: rack1
