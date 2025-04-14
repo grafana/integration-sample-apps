@@ -9,6 +9,7 @@ ifPhysAddress
 ifType_info
 snmp_scrape_duration_seconds
 sysUpTime
+ciscoImageString
 cpmCPUTotal1minRev
 ciscoMemoryPoolUsed
 ciscoMemoryPoolFree
