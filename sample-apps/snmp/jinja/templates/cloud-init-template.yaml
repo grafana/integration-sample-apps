@@ -27,7 +27,8 @@ runcmd:
   # Configure firewall, just in case
   - ufw allow 161/udp
   - ufw allow 162/udp
-
+  
+  - systemctl daemon-reload
   - sudo systemctl restart snmpd rsyslog
 
   # Configure Alloy
