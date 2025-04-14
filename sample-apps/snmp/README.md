@@ -99,3 +99,27 @@ It is recommended to at least change:
 1. Put snapshot file into ./snmpsim/data dir.
 1. Update targets.yml and auths.yml files.
 1. Add corresponding `./tests/configs` files to automatically check in CI.
+
+## Testing syslog
+
+Alloy and rsyslog are setup to receive logs.
+To manually test it you can run the following from the sample app shell:
+
+Cisco IOS, with origin: (to rsyslog):
+```
+echo  '485: net.cisco.c2911: *Feb 14 09:40:10.326: %LINEPROTO-2-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to up1' | nc -v -w0 -u localhost 10516
+```
+
+Syslog  (RFC3164):
+```
+echo '<34>Oct 11 22:14:15 net.juniper.srx su: 'su root' failed for user1 on /dev/pts/8' | nc -v -w0 -u localhost 10514
+```
+
+Syslog (RFC5424):
+
+```
+echo '<165>1 2003-10-11T22:14:15.003Z net.juniper.mx240 evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"] application event log entry...' | nc -v -w0 -u localhost 10515
+```
+
+In Grafana, you should see logs messages enriched with `rack` and `datacenter` labels.
+
