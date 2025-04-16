@@ -1,0 +1,418 @@
+#cloud-config
+# Cloud-init configuration for setting up Alloy and ClickHouse sample-app
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - git
+  - gpg
+  - curl
+  - wget
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets         = discovery.relabel.alloy_check.output
+        forward_to      = [prometheus.relabel.alloy_check.receiver]
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      discovery.relabel "metrics_integrations_integrations_clickhouse" {
+        targets = [{
+          __address__ = "localhost:9363",
+        }]
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_integrations_clickhouse" {
+        targets    = discovery.relabel.metrics_integrations_integrations_clickhouse.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name   = "integrations/clickhouse"
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      local.file_match "logs_clickhouse" {
+        path_targets = [{
+          __address__ = "localhost",
+          __path__    = "/var/log/clickhouse-server/clickhouse-server.log",
+          instance    = constants.hostname,
+          job         = "integrations/clickhouse",
+          }]
+      }
+
+      loki.process "logs_clickhouse" {
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+
+        stage.multiline {
+          firstline     = "^([\\d]{4}).([\\d]{1,2}).([\\d]{1,2}) (([\\d]+):([\\d]+):([\\d]+).([\\d]+))"
+          max_lines     = 0
+          max_wait_time = "3s"
+        }
+
+        stage.regex {
+          expression = "(?P<timestamp>([\\d]{4}).([\\d]{1,2}).([\\d]{1,2}) (([\\d]+):([\\d]+):([\\d]+).([\\d]+))) \\[ \\d+ \\] \\{.*\\} <(?P<level>.+)> (?P<message>(?s:.*))$"
+        }
+
+        stage.labels {
+          values = {
+            level = null,
+          }
+        }
+      }
+
+      loki.source.file "logs_clickhouse" {
+        targets    = local.file_match.logs_clickhouse.targets
+        forward_to = [loki.process.logs_clickhouse.receiver]
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+  # Proper handling of dpkg configuration to prevent interactive prompts
+  - path: /etc/apt/apt.conf.d/99noninteractive
+    content: |
+      Dpkg::Options {
+        "--force-confdef";
+        "--force-confold";
+      }
+      
+  # File 1 for the home directory - Written to /tmp first
+  - path: /tmp/user.xml
+    permissions: '0644'
+    content: |
+      <?xml version="1.0"?>
+      <yandex>
+          <!-- Profiles of settings. -->
+          <profiles>
+              <!-- Default settings. -->
+              <default>
+                  <!-- Maximum memory usage for processing single query, in bytes. -->
+                  <max_memory_usage>10000000000</max_memory_usage>
+
+                  <!-- Use cache of uncompressed blocks of data. Meaningful only for processing many of very short queries. -->
+                  <use_uncompressed_cache>0</use_uncompressed_cache>
+
+                  <!-- How to choose between replicas during distributed query processing.
+                      random - choose random replica from set of replicas with minimum number of errors
+                      nearest_hostname - from set of replicas with minimum number of errors, choose replica
+                        with minumum number of different symbols between replica's hostname and local hostname
+                        (Hamming distance).
+                      in_order - first live replica is choosen in specified order.
+                  -->
+                  <load_balancing>random</load_balancing>
+              </default>
+
+              <!-- Profile that allows only read queries. -->
+              <readonly>
+                  <readonly>1</readonly>
+              </readonly>
+          </profiles>
+
+          <!-- Users and ACL. -->
+          <users>
+              <!-- If user name was not specified, 'default' user is used. -->
+              <default>
+                  <!-- Password could be specified in plaintext or in SHA256 (in hex format).
+
+                      If you want to specify password in plaintext (not recommended), place it in 'password' element.
+                      Example: <password>qwerty</password>.
+                      Password could be empty.
+
+                      If you want to specify SHA256, place it in 'password_sha256_hex' element.
+                      Example: <password_sha256_hex>65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5</password_sha256_hex>
+
+                      How to generate decent password:
+                      Execute: PASSWORD=$(base64 < /dev/urandom | head -c8); echo "$PASSWORD"; echo -n "$PASSWORD" | sha256sum | tr -d '-'
+                      In first line will be password and in second - corresponding SHA256.
+                  -->
+                  <password></password>
+
+                  <!-- List of networks with open access.
+
+                      To open access from everywhere, specify:
+                          <ip>::/0</ip>
+
+                      To open access only from localhost, specify:
+                          <ip>::1</ip>
+                          <ip>127.0.0.1</ip>
+
+                      Each element of list has one of the following forms:
+                      <ip> IP-address or network mask. Examples: 213.180.204.3 or 10.0.0.1/8 or 10.0.0.1/255.255.255.0
+                          2a02:6b8::3 or 2a02:6b8::3/64 or 2a02:6b8::3/ffff:ffff:ffff:ffff::.
+                      <host> Hostname. Example: server01.yandex.ru.
+                          To check access, DNS query is performed, and all received addresses compared to peer address.
+                      <host_regexp> Regular expression for host names. Example, ^server\d\d-\d\d-\d\.yandex\.ru$
+                          To check access, DNS PTR query is performed for peer address and then regexp is applied.
+                          Then, for result of PTR query, another DNS query is performed and all received addresses compared to peer address.
+                          Strongly recommended that regexp is ends with $
+                      All results of DNS requests are cached till server restart.
+                  -->
+                  <networks incl="networks" replace="replace">
+                      <ip>::/0</ip>
+                  </networks>
+
+                  <!-- Settings profile for user. -->
+                  <profile>default</profile>
+
+                  <!-- Quota for user. -->
+                  <quota>default</quota>
+              </default>
+
+              <!-- Example of user with readonly access. -->
+              <readonly>
+                  <password></password>
+                  <networks incl="networks" replace="replace">
+                      <ip>::1</ip>
+                      <ip>127.0.0.1</ip>
+                  </networks>
+                  <profile>readonly</profile>
+                  <quota>default</quota>
+              </readonly>
+          </users>
+
+          <!-- Quotas. -->
+          <quotas>
+              <!-- Name of quota. -->
+              <default>
+                  <!-- Limits for time interval. You could specify many intervals with different limits. -->
+                  <interval>
+                      <!-- Length of interval. -->
+                      <duration>3600</duration>
+
+                      <!-- No limits. Just calculate resource usage for time interval. -->
+                      <queries>0</queries>
+                      <errors>0</errors>
+                      <result_rows>0</result_rows>
+                      <read_rows>0</read_rows>
+                      <execution_time>0</execution_time>
+                  </interval>
+              </default>
+          </quotas>
+      </yandex>
+      
+  # File 2 for the home directory - Written to /tmp first
+  - path: /tmp/config.xml
+    permissions: '0644'
+    content: |
+      <clickhouse>
+          <!-- Port for HTTP API (Default: 8123) -->
+          <http_port>8123</http_port>
+
+          <!-- Port for Native Client (Default: 9000) -->
+          <tcp_port>9000</tcp_port>
+
+          <!-- Enable Prometheus Endpoint -->
+          <prometheus>
+              <endpoint>/metrics</endpoint>
+              <port>9363</port> <!-- Or another port if 9363 is busy -->
+              <metrics>true</metrics>
+              <events>true</events>
+              <asynchronous_metrics>true</asynchronous_metrics>
+          </prometheus>
+
+          <!-- Define where users/profiles/quotas are -->
+          <!-- This tells ClickHouse to load users/profiles/quotas from minimal_users.xml -->
+          <user_directories>
+              <users_xml>
+                  <!-- Path is relative to this main config file (minimal_config.xml) -->
+                  <path>/home/ubuntu/user.xml</path>
+              </users_xml>
+              <!-- If you want SQL-defined users persisted later, you could add: -->
+              <!-- <local_directory>
+                  <path>./access/</path>
+              </local_directory> -->
+          </user_directories>
+
+          <!-- Specify the default profile name (must match one in minimal_users.xml) -->
+          <default_profile>default</default_profile>
+
+          <!--
+              Let the server use defaults for data path, tmp_path, logs etc.,
+              which will be relative to the current directory since we don't specify them.
+          -->
+          <logger>
+            <level>debug</level>  <!-- Set the desired log level -->
+            <log>/var/log/clickhouse-server/clickhouse-server.log</log> <!-- Path to the main log file -->
+            <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog> <!-- Path to the error log file -->
+            <size>1000M</size>  <!-- Maximum log file size (MB) -->
+            <count>10</count>   <!-- Number of archived log files -->
+          </logger>
+      </clickhouse>
+      
+  # Load generation script - Written to /tmp first
+  - path: /tmp/generate_load.sh
+    permissions: '0644' # Will set execute perm later in runcmd
+    content: |
+      #!/bin/bash
+      # Create the table with a TTL to automatically remove old data
+      ./clickhouse client -q "DROP TABLE IF EXISTS loadtest.events;"
+      ./clickhouse client -q "CREATE TABLE loadtest.events (
+        timestamp DateTime,
+        user_id UInt32,
+        event_type String,
+        duration_ms UInt32
+      ) ENGINE = MergeTree()
+      ORDER BY timestamp
+      TTL timestamp + INTERVAL 10 MINUTE DELETE;"
+      
+      # Counter to track when to perform cleanup
+      COUNTER=0
+      
+      while true; do
+        # Generate random data and insert into ClickHouse
+        for i in {1..50}; do
+          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+          USER_ID=$((RANDOM % 1000))
+          EVENT_TYPES=("click" "view" "purchase" "login" "logout")
+          EVENT_TYPE=${EVENT_TYPES[$((RANDOM % 5))]}
+          DURATION=$((RANDOM % 1000))
+          
+          ./clickhouse client -q "INSERT INTO loadtest.events VALUES ('$TIMESTAMP', $USER_ID, '$EVENT_TYPE', $DURATION);"
+        done
+        
+        # Run some analytical queries to generate CPU and IO load
+        ./clickhouse client -q "SELECT event_type, count(*) as count, avg(duration_ms) as avg_duration FROM loadtest.events GROUP BY event_type;"
+        ./clickhouse client -q "SELECT toHour(timestamp) as hour, count(*) FROM loadtest.events GROUP BY hour ORDER BY hour;"
+        
+        # Increment counter
+        COUNTER=$((COUNTER + 1))
+        
+        # Every 10 iterations, force cleanup old data to prevent disk space issues
+        if [ $((COUNTER % 10)) -eq 0 ]; then
+          echo "Running cleanup at $(date)" >> /home/ubuntu/cleanup.log
+          # Force cleanup of old data (older than 5 minutes)
+          ./clickhouse client -q "DELETE FROM loadtest.events WHERE timestamp < now() - INTERVAL 5 MINUTE;"
+          # Optimize table to reclaim disk space
+          ./clickhouse client -q "OPTIMIZE TABLE loadtest.events FINAL;"
+          # Check table size
+          ./clickhouse client -q "SELECT formatReadableSize(sum(bytes)) FROM system.parts WHERE table = 'events' AND database = 'loadtest';" >> /home/ubuntu/cleanup.log
+        fi
+        
+        # Sleep for a short period to avoid overwhelming the system
+        sleep 10
+      done
+      
+runcmd:
+  # --- Ensure home dir exists, move files, set owner/perms ---
+  - mkdir -p /home/ubuntu
+  - mv /tmp/user.xml /home/ubuntu/user.xml
+  - mv /tmp/config.xml /home/ubuntu/config.xml
+  - mv /tmp/generate_load.sh /home/ubuntu/generate_load.sh
+  - chown ubuntu:ubuntu /home/ubuntu/user.xml /home/ubuntu/config.xml /home/ubuntu/generate_load.sh
+  - chmod 0755 /home/ubuntu/generate_load.sh
+  
+  # Create keyring directory
+  - mkdir -p /etc/apt/keyrings/
+  
+  # Download and install Grafana GPG key
+  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+  
+  # Add Grafana repository
+  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+  
+  # Update package lists
+  - apt-get update
+
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
+
+  - cd /home/ubuntu
+
+  - curl https://clickhouse.com/ | sh
+
+
+  - mkdir -p /var/lib/clickhouse
+  - mkdir -p /var/log/clickhouse-server
+  - touch /var/log/clickhouse-server/clickhouse-server.log
+  - touch /var/log/clickhouse-server/clickhouse-server.err.log
+  - chown -R ubuntu:ubuntu /var/lib/clickhouse
+  - chown -R ubuntu:ubuntu /var/log/clickhouse-server
+  - chown -R ubuntu:ubuntu /var/log/clickhouse-server/clickhouse-server.log
+ 
+  # Start ClickHouse server in the background using nohup, running as the ubuntu user
+  - nohup sudo -u ubuntu /home/ubuntu/clickhouse server --config-file=/home/ubuntu/config.xml > /var/log/clickhouse-server/clickhouse-stdout.log 2> /var/log/clickhouse-server/clickhouse-stderr.log &
+
+  # Wait for ClickHouse to start 
+  - sleep 10
+
+  # Create database and tables for load generation
+  - ./clickhouse client -q "CREATE DATABASE IF NOT EXISTS loadtest;"
+  - ./clickhouse client -q "CREATE TABLE IF NOT EXISTS loadtest.events (timestamp DateTime, user_id UInt32, event_type String, duration_ms UInt32) ENGINE = MergeTree() ORDER BY timestamp;"
+  
+  
+  # Start the load generator in the background
+  - nohup /home/ubuntu/generate_load.sh > /home/ubuntu/load_generator.log 2>&1 &
+  
+  # --- Configure Alloy to run as root ---
+  # Modify the service file to remove User and Group lines
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
+  # Also try modifying in /etc/systemd/system just in case
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
+  
+  # Reload systemd daemon to apply changes
+  - sudo systemctl daemon-reload
+  
+  # Configure and restart Alloy
+  - sudo systemctl enable alloy
+  - sudo systemctl restart alloy
+
