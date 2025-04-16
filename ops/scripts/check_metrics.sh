@@ -90,7 +90,7 @@ else
     if [ -f $CONFIG_FILE_PATH ]; then
       # Given a matching pair is found, we can execute the tests
       check_metrics $SAMPLE_APP_NAME $PROMETHEUS_INSTANCE $METRICS_FILE_PATH $CONFIG_FILE_PATH
-      if [ $? == 1 ]; then
+      if [ $? > 0 ]; then
         echo "Test failed for $METRICS_FILE"
         OVERALL_STATUS=1
       fi
