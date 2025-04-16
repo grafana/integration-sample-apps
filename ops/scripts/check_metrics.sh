@@ -13,6 +13,9 @@ PROMETHEUS_INSTANCE=$2
 # - METRICS_SUCCESS_RATE_REQUIRED
 source ./ops/.defaultconfig
 
+# Track overall test status
+OVERALL_STATUS=0
+
 check_metrics() {
   # Expects two parameters, expected_metrics file and .config file
   # Existence should already be confirmed by the time this function is invoked
@@ -23,6 +26,8 @@ check_metrics() {
   source $4
   SUCCESS_COUNTER=0
   TOTAL_COUNTER=0
+  local status=0
+  
   # Group the commands for the counter to work as intended
   cat $3 | 
   {
@@ -49,10 +54,12 @@ check_metrics() {
     if (($SUCCESS_COUNTER == $TOTAL_COUNTER)); then
       echo "--- [ TEST SUCCESS ] ---"
       echo "All expected metrics were present in Prometheus/Mimir ($2)"
+      exit 0
     elif (( $(echo "$SUCCESS_COUNTER >= ($TOTAL_COUNTER*$METRICS_SUCCESS_RATE_REQUIRED)" | bc -l) )); then
       echo "--- [ TEST SUCCESS (with warnings) ] ---"
       echo "$SUCCESS_COUNTER out of $TOTAL_COUNTER expected metrics were present in Prometheus/Mimir ($PROMETHEUS_INSTANCE)"
       echo "This is considered a PASS as it exceeds a success rate of $METRICS_SUCCESS_RATE_REQUIRED"
+      exit 0
     elif (($SUCCESS_COUNTER == 0)); then
       echo "--- [ TEST FAIL ] ---"
       echo "None of the expected metrics were detected in Prometheus/Mimir ($2)"
@@ -64,6 +71,8 @@ check_metrics() {
       exit 1
     fi
   }
+  status=${PIPESTATUS[0]}
+  return $status
 }
 
 TESTS_PATH="$SAMPLE_APP_PATH/$SAMPLE_APP_NAME/tests"
@@ -82,12 +91,21 @@ else
       # Given a matching pair is found, we can execute the tests
       check_metrics $SAMPLE_APP_NAME $PROMETHEUS_INSTANCE $METRICS_FILE_PATH $CONFIG_FILE_PATH
       if [ $? == 1 ]; then
-        echo "Previous test pair failed, exiting"
-        exit 1
+        echo "Test failed for $METRICS_FILE"
+        OVERALL_STATUS=1
       fi
     else
       echo "[FAIL] Matching config file for $METRICS_FILE not found in $TESTS_PATH/configs/"
-      exit 1
+      OVERALL_STATUS=1
     fi
   done
 fi
+
+echo "--- [ FINAL TEST RESULTS ] ---"
+if [ $OVERALL_STATUS == 0 ]; then
+  echo "All test cases completed successfully"
+else
+  echo "Some test cases failed"
+fi
+
+exit $OVERALL_STATUS
