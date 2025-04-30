@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Get changed sample apps
         id: changed-files
@@ -33,7 +34,9 @@ jobs:
 
       - name: List all changed sample app dir_names
         # NOTE: this is referred to as a file by the action, despite technically being a chunk of the directory in use
-        run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: echo "${ALL_CHANGED_FILES}"
 
   sample-app-testing:
     name: Test sample-app
@@ -53,31 +56,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Check sample-app supports CI execution
         id: check_ci_support
+        env:
+          SAMPLE_APP: ${{ matrix.sample-app }}
         run: |
-          export "CI_BYPASS=$(./ops/scripts/check_sample_app_ci_bypass.sh ${{ matrix.sample-app }})"
+          export "CI_BYPASS=$(./ops/scripts/check_sample_app_ci_bypass.sh ${SAMPLE_APP})"
           echo "CI_BYPASS=$CI_BYPASS" >> $GITHUB_OUTPUT
-          export "SUPPORTS_CI=$(./ops/scripts/check_sample_app_ci_compatible.sh ${{ matrix.sample-app }})"
+          export "SUPPORTS_CI=$(./ops/scripts/check_sample_app_ci_compatible.sh ${SAMPLE_APP})"
           echo "SUPPORTS_CI=$SUPPORTS_CI" >> $GITHUB_OUTPUT
           echo $SUPPORTS_CI
       - name: Warn user - sample-app incorrectly configured for CI
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'false' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: |
-          echo "[FAIL] The ${{ matrix.sample-app }} sample-app is not CI compatible and does not have a CI bypass file"
+          echo "[FAIL] The ${SAMPLE_APP} sample-app is not CI compatible and does not have a CI bypass file"
           exit 1
 
       - name: Warn user - CI bypass enabled
         if: steps.check_ci_support.outputs.CI_BYPASS == 'true'
         uses: actions/github-script@v7
+        env:
+          SAMPLE_APP: ${{ matrix.sample-app }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const msg = `[WARNING] The ${{ matrix.sample-app }} sample-app has a .CI_BYPASS file and will **not** be tested in CI/CD.
+            const msg = `[WARNING] The ${SAMPLE_APP} sample-app has a .CI_BYPASS file and will **not** be tested in CI/CD.
 
             Please ensure it has been manually validated, and inform reviewers of such by ticking the below task and optionally informing users of the details.
-            - [ ] Manual testing of ${{ matrix.sample-app }} sample-app has been completed`
+            - [ ] Manual testing of ${SAMPLE_APP} sample-app has been completed`
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -97,6 +106,8 @@ jobs:
       - name: Checkout repo
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup config & databases
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
@@ -120,7 +131,9 @@ jobs:
 
       - name: Check Prom metrics in Mimir
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
+        env:
+          SAMPLE_APP: ${{ matrix.sample-app }}
         run: |
-          ./ops/scripts/check_metrics.sh ${{ matrix.sample-app }} $MIMIR
+          ./ops/scripts/check_metrics.sh ${SAMPLE_APP} $MIMIR
           # test get link to this particular stage
           echo "CHECK_METRICS_STEP_LINKL=https://github.com/${{ github.repository }}/commit/${{ github.sha }}/checks/${{ github.run_id }}"
