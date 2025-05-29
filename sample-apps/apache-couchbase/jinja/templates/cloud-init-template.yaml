@@ -99,7 +99,7 @@ write_files:
       {%- endif %}
 
       {% if loki_url -%}
-      loki.write "grafana_cloud_loki" {
+      loki.write "grafana_loki" {
         endpoint {
           url = "{{ loki_url }}"
 
@@ -110,6 +110,35 @@ write_files:
           }
           {%- endif %}
         }
+      }
+
+      local.file_match "logs_integrations_integrations_couchbase" {
+        path_targets = [{
+          __address__       = "localhost",
+          __path__         = "/opt/couchbase/var/lib/couchbase/logs/*.log",
+          couchbase_cluster = "{{ couchbase_cluster }}",
+          instance         = constants.hostname,
+          job             = "integrations/couchbase",
+        }]
+      }
+
+      loki.process "logs_integrations_integrations_couchbase" {
+        forward_to = [loki.write.grafana_loki.receiver]
+
+        stage.drop {
+          expression = "---"
+        }
+
+        stage.multiline {
+          firstline     = "\\[(ns_server|couchdb):(error|info),.*\\]"
+          max_lines     = 0
+          max_wait_time = "3s"
+        }
+      }
+
+      loki.source.file "logs_integrations_integrations_couchbase" {
+        targets    = local.file_match.logs_integrations_integrations_couchbase.targets
+        forward_to = [loki.process.logs_integrations_integrations_couchbase.receiver]
       }
       {%- endif %}
 

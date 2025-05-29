@@ -35,14 +35,13 @@ To get started with the sample app, follow these steps:
    Fetch metrics from the Prometheus exporter and save them with `make fetch-prometheus-metrics`.
 
 6. **Stop and clean Up**: 
-   Use `make stop` to clean up the VM and `make clean` to remove temporary files.
+   Use `make stop` to clean up the VM and `make clean` to remove temporary files including your `cloud-init.yaml`.
 
 ## Make commands
 
-- `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
+- `make defaultconfig`: Initializes the configuration file with default values for cloud-init template.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates the Couchbase sample app.
-- `make load-gen`: Sets up a load generation for the sample app.
 - `make fetch-prometheus-metrics`: Fetches metrics from the Prometheus exporter and saves them to a local file.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
