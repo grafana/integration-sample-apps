@@ -1,5 +1,3 @@
-backup_data_size
-cbas_direct_memory_used_bytes
 cm_http_requests_total
 couch_docs_actual_disk_size
 index_avg_scan_latency
