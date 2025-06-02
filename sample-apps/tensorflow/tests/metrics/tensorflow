@@ -1,0 +1,2 @@
+:tensorflow:serving:request_count
+:tensorflow:serving:request_latency_sum
