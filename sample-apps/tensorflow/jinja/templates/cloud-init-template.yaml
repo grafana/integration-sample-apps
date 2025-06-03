@@ -31,22 +31,6 @@ write_files:
       # Restart on system upgrade. Defaults to true.
       RESTART_ON_UPGRADE=true
 
-  # Create model directory and copy model files
-  - owner: root:root
-    path: /home/ubuntu/models/half_plus_two/1/saved_model.pb
-    encoding: b64
-    content: |
-      {% filter indent(6) %}
-      {%- include 'scripts/models/half_plus_two/saved_model.pb.b64' -%}
-      {% endfilter %}
-
-  - owner: root:root
-    path: /home/ubuntu/models/half_plus_two/1/assets/foo.txt
-    content: |
-      {% filter indent(6) %}
-      {%- include 'scripts/models/half_plus_two/assets/foo.txt' -%}
-      {% endfilter %}
-
   # Copy configuration files
   - owner: root:root
     path: /home/ubuntu/config/batching_config.txt
@@ -253,12 +237,12 @@ runcmd:
   - systemctl enable docker
   - systemctl start docker
 
-  # Configure Docker for QEMU emulation
+  # Configure Docker for QEMU
   - docker run --privileged --rm tonistiigi/binfmt --install all
   - systemctl restart docker
 
   # Run init.sh
-  - MODEL_NAME={{ model_name }} /home/ubuntu/init.sh
+  - /home/ubuntu/init.sh
 
   # Run loadgen.sh in background
   - /home/ubuntu/loadgen.sh &
