@@ -2,6 +2,8 @@
 
 This sample application creates an Ubuntu VM running a docker container with [Tensorflow Serving](https://www.tensorflow.org/tfx/serving/setup) installed and integrated with Alloy for metric and log collection. The app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of Tensorflow Serving using Alloy.
 
+This sample app also ships with a simple `loadgen.sh` script to generate server metrics which are the metrics prefixed with: `:tensorflow:serving:` if you are not receiving these metrics that is likely the issue.
+
 > Note: This application utilizes a pre-built docker image which includes a pre-built sample model for Tensorflow Serving to expose.
 
 ## Prerequisites
