@@ -39,4 +39,3 @@ defaultconfig:
 	@echo "prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
-	@echo "model_name: half_plus_two" >> jinja/variables/cloud-init.yaml
