@@ -1,0 +1,85 @@
+otelcol.receiver.otlp "default" {
+  // configures the default grpc endpoint "0.0.0.0:4317"
+  grpc { }
+  output {
+    metrics = [otelcol.processor.transform.preprocessing.input]
+    logs = [otelcol.processor.resourcedetection.default.input]
+    traces = [otelcol.processor.resourcedetection.default.input]
+  }
+}
+
+otelcol.processor.transform "preprocessing" {
+  error_mode = "ignore"
+
+  log_statements {
+    context = "resource"
+    statements = [
+      `set(attributes["service.name"], "integrations/ktranslate-netflow") where attributes["service.name"] == "ktranslate"`,
+    ]
+  }
+
+  metric_statements {
+    context = "metric"
+    statements = [
+      `set(metric.name,"network.io.by_flow") where metric.name == "kentik.rollup.bytes_by_flow"`,
+      `set(resource.attributes["service.name"],"integrations/ktranslate-netflow") where metric.name == "network.io.by_flow"`,
+      `set(metric.unit,"By") where metric.name == "network.io.by_flow"`,
+    ]
+  }
+
+  metric_statements {
+    context    = "datapoint"
+    statements = [
+      `set(datapoint.attributes["network.protocol.name"], datapoint.attributes["application"]) where metric.name == "network.io.by_flow"`,
+      `delete_key(datapoint.attributes,"application") where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.transport"], datapoint.attributes["protocol"]) where metric.name == "network.io.by_flow"`,
+      `delete_key(datapoint.attributes,"protocol") where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.local.country"], datapoint.attributes["src_country"]) where metric.name == "network.io.by_flow"`,
+      `delete_key(datapoint.attributes,"src_country") where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.peer.country"],datapoint.attributes["dst_country"]) where metric.name == "network.io.by_flow"`,
+      `delete_key(datapoint.attributes,"dst_country") where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.local.address"],datapoint.attributes["src_addr"]) where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.local.port"],datapoint.attributes["src_port"]) where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.peer.address"],datapoint.attributes["dst_addr"]) where metric.name == "network.io.by_flow"`,
+      `set(datapoint.attributes["network.peer.port"],datapoint.attributes["dst_port"]) where metric.name == "network.io.by_flow"`,
+    ]
+  }
+
+  output {
+    metrics = [otelcol.processor.resourcedetection.default.input]
+  }
+}
+
+otelcol.processor.resourcedetection "default" {
+  detectors = ["env", "system"] // add "gcp", "ec2", "ecs", "elastic_beanstalk", "eks", "lambda", "azure", "aks", "consul", "heroku"  if you want to use cloud resource detection
+
+  system {
+    hostname_sources = ["os"]
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    metrics = [otelcol.exporter.otlphttp.grafana_cloud.input]
+    logs    = [otelcol.exporter.otlphttp.grafana_cloud.input]
+    traces  = [otelcol.exporter.otlphttp.grafana_cloud.input]
+  }
+}
+
+otelcol.exporter.otlphttp "grafana_cloud" {
+  client {
+    endpoint = "<your-cloud-otlp-endpoint>"
+    auth     = otelcol.auth.basic.grafana_cloud.handler
+  }
+}
+
+otelcol.auth.basic "grafana_cloud" {
+  username = "<your-cloud-instance-id>"
+  password = "<your-access-token>"
+}
