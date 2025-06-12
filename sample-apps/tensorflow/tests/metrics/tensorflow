@@ -1,0 +1,13 @@
+:tensorflow:core:graph_build_calls
+:tensorflow:serving:request_count
+:tensorflow:core:graph_build_time_usecs
+:tensorflow:core:graph_run_time_usecs
+:tensorflow:core:graph_runs
+:tensorflow:serving:batching_session:queuing_latency_count
+:tensorflow:serving:batching_session:queuing_latency_sum
+:tensorflow:serving:request_count
+:tensorflow:serving:request_latency_count
+:tensorflow:serving:request_latency_sum
+:tensorflow:serving:runtime_latency_count
+:tensorflow:serving:runtime_latency_sum
+up
