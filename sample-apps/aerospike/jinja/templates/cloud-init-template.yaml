@@ -223,6 +223,4 @@ runcmd:
   # Start and enable services
   - systemctl daemon-reload
   - systemctl enable alloy
-  - systemctl enable aerospike
   - systemctl restart alloy
-  - systemctl restart aerospike
