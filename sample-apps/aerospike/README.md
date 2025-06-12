@@ -1,6 +1,6 @@
 # Aerospike Community edition sample app
 
-This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of `Aerospike Community Edition` using the `aerospike-prometheus-exporter`.
+This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of [Aerospike Community Edition](https://aerospike.com/products/database/) using the [aerospike-prometheus-exporter](https://github.com/aerospike/aerospike-prometheus-exporter/).
 
 ## Prerequisites
 
