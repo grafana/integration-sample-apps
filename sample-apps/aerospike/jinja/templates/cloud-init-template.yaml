@@ -1,0 +1,228 @@
+#cloud-config
+# Cloud-init configuration for setting up Alloy and Aerospike sample-app
+
+package_update: true
+package_upgrade: false
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+# Define required packages
+packages:
+  - git
+  - gpg
+  - curl
+
+write_files:
+  - owner: root:root
+    path: /etc/default/alloy
+    content: |
+      ## Path:
+      ## Description: Grafana Alloy settings
+      ## Type:        string
+      ## Default:     ""
+      ## ServiceRestart: alloy
+      #
+      # Command line options for Alloy.
+      #
+      # The configuration file holding the Alloy config.
+      CONFIG_FILE="/etc/alloy/config.alloy"
+
+      # User-defined arguments to pass to the run command.
+      CUSTOM_ARGS="--stability.level=experimental"
+
+      # Restart on system upgrade. Defaults to true.
+      RESTART_ON_UPGRADE=true
+
+  # Aerospike configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      logging {
+        level = "debug"
+      }
+      
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      loki.write "grafana_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      local.file_match "logs_integrations_integrations_aerospike" {
+        path_targets = [{
+          __address__       = "localhost",
+          __path__          = "/var/log/aerospike/aerospike.log",
+          aerospike_cluster = "",
+          instance          = constants.hostname,
+          job               = "integrations/aerospike",
+        }]
+      }
+
+      loki.process "logs_integrations_integrations_aerospike" {
+        forward_to = [loki.write.grafana_loki.receiver]
+
+        stage.multiline {
+          firstline     = "\\w{3} \\d{2} \\d{4}"
+          max_lines     = 0
+          max_wait_time = "3s"
+        }
+
+        stage.regex {
+          expression = "\\w{3} \\d{2} \\d{4} \\d{2}:\\d{2}:\\d{2} \\w{3}: (?P<level>\\w+) \\((?P<context>\\w+)\\): (?P<trace>\\(\\S+\\))\\s+(?P<message>(?s:.*))$"
+        }
+
+        stage.labels {
+          values = {
+            context = null,
+            level   = null,
+          }
+        }
+      }
+
+      loki.source.file "logs_integrations_integrations_aerospike" {
+        targets    = local.file_match.logs_integrations_integrations_aerospike.targets
+        forward_to = [loki.process.logs_integrations_integrations_aerospike.receiver]
+      }
+
+      prometheus.scrape "aerospike" {
+        targets = [{ __address__ = "localhost:9145", aerospike_cluster = "" }]
+        job_name = "integrations/aerospike"
+        forward_to = [prometheus.relabel.aerospike.receiver]
+        scrape_interval = "10s"
+        metrics_path = "/metrics"
+      }
+
+      prometheus.relabel "aerospike" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        
+        rule {
+          target_label = "instance"
+          replacement = constants.hostname
+        }
+        
+        rule {
+          target_label = "aerospike_cluster"
+          replacement = ""
+        }
+      }
+
+  - owner: root:root
+    path: /home/ubuntu/install-prometheus-exporter.sh
+    content: | 
+      {% filter indent(6) %}
+      {%- include 'scripts/install-prometheus-exporter.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/install.sh
+    content: | 
+      {% filter indent(6) %}
+      {%- include 'scripts/install.sh' -%}
+      {% endfilter %}
+  
+  - owner: root:root
+    path: /home/ubuntu/aerospike.conf
+    content: | 
+      {% filter indent(6) %}
+      {%- include 'config/aerospike.conf' -%}
+      {% endfilter %}
+
+runcmd:
+  # Create keyring directory
+  - mkdir -p /etc/apt/keyrings/
+  # Create data directory for alloy
+  - mkdir -p /var/lib/alloy/data
+  # Set script permissions for ubuntu user
+  - chmod +x /home/ubuntu/install.sh
+  - chmod +x /home/ubuntu/install-prometheus-exporter.sh
+  - chown -R ubuntu:ubuntu /home/ubuntu/install.sh
+  - chown -R ubuntu:ubuntu /home/ubuntu/install-prometheus-exporter.sh
+  
+  # Download and install Grafana GPG key
+  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+  
+  # Add Grafana repository
+  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+  
+  # Update package lists
+  - apt-get update
+
+  # Install Alloy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
+
+  # --- Configuring Alloy to run as root ---
+  # Modify the service file to remove User and Group lines
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
+  # Also try modifying in /etc/systemd/system just in case
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
+
+  # Install the prometheus exporter
+  - /home/ubuntu/install.sh && /home/ubuntu/install-prometheus-exporter.sh
+
+  # Start and enable services
+  - systemctl daemon-reload
+  - systemctl enable alloy
+  - systemctl enable aerospike
+  - systemctl restart alloy
+  - systemctl restart aerospike
