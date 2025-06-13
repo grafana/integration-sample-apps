@@ -1,0 +1,215 @@
+#cloud-config
+# Cloud-init configuration for setting up Alloy and ClickHouse sample-app
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - git
+  - gpg
+  - curl
+  - wget
+  - qemu-user-static
+  - binfmt-support
+
+write_files:
+  # Alloy profile
+  - owner: root:root
+    path: /etc/default/alloy
+    content: |
+      ## Path:
+      ## Description: Grafana Alloy settings
+      ## Type:        string
+      ## Default:     ""
+      ## ServiceRestart: alloy
+      #
+      # Command line options for Alloy.
+      #
+      # The configuration file holding the Alloy config.
+      CONFIG_FILE="/etc/alloy/config.alloy"
+      # User-defined arguments to pass to the run command.
+      CUSTOM_ARGS="--stability.level=experimental"
+      # Restart on system upgrade. Defaults to true.
+      RESTART_ON_UPGRADE=true
+
+
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets         = discovery.relabel.alloy_check.output
+        forward_to      = [prometheus.relabel.alloy_check.receiver]
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+     
+      prometheus.exporter.mssql "integrations_mssql" {
+        connection_string = "sqlserver://SA:reallyStrongPwd123@localhost:1433?TrustServerCertificate=true"
+      }
+
+      discovery.relabel "integrations_mssql" {
+        targets = prometheus.exporter.mssql.integrations_mssql.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/mssql"
+        }
+      }
+
+
+      prometheus.scrape "integrations_mssql" {
+        targets    = discovery.relabel.integrations_mssql.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name   = "integrations/mssql"
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      discovery.docker "mssql_sample_app" {
+        host = "unix:///var/run/docker.sock"
+        refresh_interval = "5s"
+        filter {
+          name = "name"
+          values = ["mssql-sample-app"]
+        }
+      }
+      discovery.relabel "mssql_sample_app" {
+        targets = discovery.docker.mssql_sample_app.targets
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          target_label  = "name"
+          replacement   = "mssql-sample-app"
+        }
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          target_label  = "job"
+          replacement   = "integrations/mssql"
+        }
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          target_label  = "instance"
+          replacement   = constants.hostname
+        }
+      }
+
+      loki.source.docker "mssql_sample_app" {
+        host = "unix:///var/run/docker.sock"
+        targets = discovery.docker.mssql_sample_app.targets
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+        relabel_rules = discovery.relabel.mssql_sample_app.rules
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+      
+runcmd:
+  - mkdir -p /home/ubuntu
+  - mkdir -p /etc/apt/keyrings/
+  # Create required directory for alloy
+  - mkdir -p /var/lib/alloy
+  - chown -R root:root /var/lib/alloy
+
+
+  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  - apt-get update
+
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy docker-ce docker-ce-cli containerd.io
+  
+  # Add ubuntu user to docker group and ensure permissions are set correctly as to easier debug
+  - groupadd -f docker
+  - usermod -aG docker ubuntu
+  - chmod 666 /var/run/docker.sock || true
+  - systemctl restart docker
+
+  - systemctl enable docker
+  - systemctl start docker
+  
+  - docker run --privileged --rm tonistiigi/binfmt --install all
+  - systemctl restart docker
+
+  - docker run -e "ACCEPT_EULA=1" -e "MSSQL_SA_PASSWORD=reallyStrongPwd123" -e "MSSQL_PID=Developer" -e "MSSQL_USER=SA" -p 1433:1433 -d --name=mssql-sample-app mcr.microsoft.com/azure-sql-edge
+
+  # Wait for SQL Server to be ready and set up monitoring user
+  - |
+    # Wait for SQL Server to be ready (up to 60 seconds)
+    for i in {1..60}; do
+      if docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "SELECT 1" &> /dev/null; then
+        break
+      fi
+      sleep 1
+    done
+
+    # Create monitoring user and grant permissions
+    docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "
+    IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'monitor')
+    BEGIN
+      CREATE LOGIN [monitor] WITH PASSWORD = 'reallyStrongPwd123';
+      ALTER SERVER ROLE [sysadmin] ADD MEMBER [monitor];
+      GRANT VIEW ANY DEFINITION TO [monitor];
+      GRANT VIEW SERVER STATE TO [monitor];
+    END"
+
+  # --- Configure Alloy to run as root ---
+  # Modify the service file to remove User and Group lines
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
+  # Also try modifying in /etc/systemd/system just in case
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
+
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable alloy
+  - sudo systemctl restart alloy
+
