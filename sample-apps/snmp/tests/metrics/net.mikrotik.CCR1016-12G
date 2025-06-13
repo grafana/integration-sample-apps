@@ -9,6 +9,9 @@ ifPhysAddress
 ifType_info
 snmp_scrape_duration_seconds
 sysUpTime
-jnxOperatingCPU
-jnxOperatingBuffer
+hrProcessorLoad
+hrStorageUsed
+mtxrHlPower
+mtxrHlTemperature
+mtxrHlVoltage
 up

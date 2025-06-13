@@ -27,7 +27,8 @@ runcmd:
   # Configure firewall, just in case
   - ufw allow 161/udp
   - ufw allow 162/udp
-
+  
+  - systemctl daemon-reload
   - sudo systemctl restart snmpd rsyslog
 
   # Configure Alloy
@@ -281,13 +282,14 @@ write_files:
       targets    = prometheus.exporter.snmp.integrations_snmpsim.targets
       forward_to = [prometheus.relabel.integrations_snmp.receiver]
       job_name   = "integrations/snmpsim"
+      scrape_timeout = "30s"
     }
     
 
     prometheus.exporter.snmp "integrations_snmp" {
       target "snmp_sample_app" {
         address = "127.0.0.1"
-        module  = "system,if_mib"
+        module  = "system,if_mib,hrDevice,hrStorage"
         auth    = "public_v2"
       }
     }
