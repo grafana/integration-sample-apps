@@ -9,4 +9,13 @@ ifPhysAddress
 ifType_info
 snmp_scrape_duration_seconds
 sysUpTime
+ciscoImageString
+cempMemPoolUsed
+cempMemPoolFree
+cempMemPoolType
+cpmCPUTotal1minRev
+ciscoMemoryPoolUsed
+ciscoMemoryPoolFree
+entSensorStatus
+entSensorValue
 up
