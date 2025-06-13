@@ -1,0 +1,302 @@
+#cloud-config
+# Cloud-init configuration for setting up Alloy and Apache Couchbase sample-app
+
+package_update: true
+package_upgrade: false
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+# Define required packages
+packages:
+  - git
+  - gpg
+  - curl
+
+write_files:
+  - owner: root:root
+    path: /etc/default/alloy
+    content: |
+      ## Path:
+      ## Description: Grafana Alloy settings
+      ## Type:        string
+      ## Default:     ""
+      ## ServiceRestart: alloy
+      #
+      # Command line options for Alloy.
+      #
+      # The configuration file holding the Alloy config.
+      CONFIG_FILE="/etc/alloy/config.alloy"
+
+      # User-defined arguments to pass to the run command.
+      CUSTOM_ARGS="--stability.level=experimental"
+
+      # Restart on system upgrade. Defaults to true.
+      RESTART_ON_UPGRADE=true
+
+  # Couchbase configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      logging {
+        level = "debug"
+      }
+      
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      {% if prom_url -%}
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+      {%- endif %}
+
+      {% if loki_url -%}
+      loki.write "grafana_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      local.file_match "logs_integrations_integrations_couchbase" {
+        path_targets = [{
+          __address__       = "localhost",
+          __path__         = "/opt/couchbase/var/lib/couchbase/logs/*.log",
+          couchbase_cluster = "{{ couchbase_cluster }}",
+          instance         = constants.hostname,
+          job             = "integrations/couchbase",
+        }]
+      }
+
+      loki.process "logs_integrations_integrations_couchbase" {
+        forward_to = [loki.write.grafana_loki.receiver]
+
+        stage.drop {
+          expression = "---"
+        }
+
+        stage.multiline {
+          firstline     = "\\[(ns_server|couchdb):(error|info),.*\\]"
+          max_lines     = 0
+          max_wait_time = "3s"
+        }
+      }
+
+      loki.source.file "logs_integrations_integrations_couchbase" {
+        targets    = local.file_match.logs_integrations_integrations_couchbase.targets
+        forward_to = [loki.process.logs_integrations_integrations_couchbase.receiver]
+      }
+      {%- endif %}
+
+      prometheus.scrape "couchbase" {
+        targets = [
+          { "__address__" = "localhost:8091" },
+        ]
+        job_name = "integrations/couchbase"
+        forward_to = [prometheus.relabel.couchbase.receiver]
+        scrape_interval = "10s"
+        metrics_path = "/metrics"
+        basic_auth {
+          username = "admin"
+          password = "password"
+        }
+      }
+
+      prometheus.relabel "couchbase" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        
+        rule {
+          target_label = "instance"
+          replacement = constants.hostname
+        }
+        
+        rule {
+          target_label = "couchbase_cluster"
+          replacement = "{{ couchbase_cluster }}"
+        }
+      }
+
+  # Loadgen script for couchbase, will initialize the cluster and create a bucket
+  # will also run invalid queries in the background to generate some errors and log data
+  - path: /tmp/loadgen.sh
+    permissions: '0644'
+    content: |
+      #!/bin/bash
+      set -e
+
+      # Initialize cluster with minimum required memory settings
+      echo "Initializing Couchbase cluster..."
+      /opt/couchbase/bin/couchbase-cli cluster-init -c 127.0.0.1 \
+        --cluster-username admin \
+        --cluster-password password \
+        --cluster-name sample-app-couchbase-cluster \
+        --cluster-ramsize 256 \
+        --cluster-index-ramsize 256 \
+        --services data,query,index \
+        --index-storage-setting default
+
+      # Create bucket with minimum required memory quota
+      echo "Creating bucket..."
+      /opt/couchbase/bin/couchbase-cli bucket-create -c 127.0.0.1 \
+        --username admin \
+        --password password \
+        --bucket-type couchbase \
+        --bucket-ramsize 100 \
+        --bucket sample-app-couchbase-bucket || {
+          echo "Bucket creation failed, checking if bucket already exists..."
+          if curl -s -u admin:password http://localhost:8091/pools/default/buckets/sample-app-couchbase-bucket > /dev/null 2>&1; then
+            echo "Bucket already exists, continuing..."
+          else
+            echo "Bucket creation failed and bucket does not exist"
+            exit 1
+          fi
+        }
+
+      # Wait for bucket to be ready
+      echo "Waiting for bucket to be ready..."
+      sleep 15
+
+      # Create a simple document
+      echo "Creating test document..."
+      curl -X POST -u admin:password http://localhost:8091/pools/default/buckets/sample-app-couchbase-bucket/docs \
+        -H "Content-Type: application/json" \
+        -d '{"type": "test", "value": 1}' || echo "Document creation failed, but continuing..."
+
+      # Function to run invalid N1QL queries
+      run_invalid_queries() {
+        while true; do
+          echo "Running invalid queries..."
+          # Invalid syntax query
+          curl -s -u admin:password http://localhost:8093/query/service \
+            -H "Content-Type: application/json" \
+            -d '{"statement": "SELECT * FROM sample-app-couchbase-bucket WHERE", "client_context_id": "invalid_query_1"}'
+
+          # Invalid bucket name
+          curl -s -u admin:password http://localhost:8093/query/service \
+            -H "Content-Type: application/json" \
+            -d '{"statement": "SELECT * FROM nonexistent_bucket", "client_context_id": "invalid_query_2"}'
+
+          # Invalid field reference
+          curl -s -u admin:password http://localhost:8093/query/service \
+            -H "Content-Type: application/json" \
+            -d '{"statement": "SELECT nonexistent_field FROM sample-app-couchbase-bucket", "client_context_id": "invalid_query_3"}'
+
+          sleep 5
+        done
+      }
+
+      # Start the invalid query generator in the background
+      echo "Starting invalid query generator..."
+      run_invalid_queries &
+
+runcmd:
+  # Create keyring directory
+  - mkdir -p /etc/apt/keyrings/
+  # create data directory for alloy
+  - mkdir -p /var/lib/alloy/data
+  # move loadgen script to home directory and make it runnable
+  - mv /tmp/loadgen.sh /home/ubuntu/loadgen.sh
+  - chown ubuntu:ubuntu /home/ubuntu/loadgen.sh
+  - chmod 0755 /home/ubuntu/loadgen.sh
+  
+  
+  # Download and install Grafana GPG key
+  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+  
+  # Add Grafana repository
+  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+  
+  # Update package lists
+  - apt-get update
+
+  # Install Alloy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
+
+  # Install Couchbase
+  - |
+    curl -O https://packages.couchbase.com/releases/couchbase-release/couchbase-release-1.0-noarch.deb
+    dpkg -i ./couchbase-release-1.0-noarch.deb
+    apt-get update
+    apt-get install -y couchbase-server-community
+
+  # initially wait for couchbase service to be ready
+  - |
+    timeout 15s bash <<EOF
+    wait_for_couchbase() {
+      until curl -s http://localhost:8091/ > /dev/null 2>&1; do
+        echo "Waiting for Couchbase to be ready..."
+        sleep 5
+      done
+    }
+
+    wait_for_couchbase
+    EOF
+
+  # --- Configuring Alloy to run as root ---
+  # Modify the service file to remove User and Group lines
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
+  # Also try modifying in /etc/systemd/system just in case
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
+
+  # Start and enable Alloy
+  - systemctl daemon-reload
+  - systemctl enable alloy
+  - systemctl restart alloy
+
+  # start loadgen
+  - nohup /home/ubuntu/loadgen.sh > /home/ubuntu/load_generator.log 2>&1 &
+  
