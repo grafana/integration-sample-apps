@@ -239,30 +239,30 @@ auths:
   #   auth_protocol: MD5
   #   priv_protocol: DES
   #   version: 2
-  # net.mikrotik.941-2nD:
-  #   community: net.mikrotik.941-2nD
-  #   security_level: noAuthNoPriv
-  #   auth_protocol: MD5
-  #   priv_protocol: DES
-  #   version: 2
-  # net.mikrotik.951G-2HnD:
-  #   community: net.mikrotik.951G-2HnD
-  #   security_level: noAuthNoPriv
-  #   auth_protocol: MD5
-  #   priv_protocol: DES
-  #   version: 2
+  net.mikrotik.941-2nD:
+    community: net.mikrotik.941-2nD
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
+  net.mikrotik.951G-2HnD:
+    community: net.mikrotik.951G-2HnD
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
   # net.mikrotik.1100ahx2:
   #   community: net.mikrotik.1100ahx2
   #   security_level: noAuthNoPriv
   #   auth_protocol: MD5
   #   priv_protocol: DES
   #   version: 2
-  # net.mikrotik.CCR1016-12G:
-  #   community: net.mikrotik.CCR1016-12G
-  #   security_level: noAuthNoPriv
-  #   auth_protocol: MD5
-  #   priv_protocol: DES
-  #   version: 2
+  net.mikrotik.CCR1016-12G:
+    community: net.mikrotik.CCR1016-12G
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
   # net.mikrotik.CCR1036-12G-4S:
   #   community: net.mikrotik.CCR1036-12G-4S
   #   security_level: noAuthNoPriv
