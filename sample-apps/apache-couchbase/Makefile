@@ -21,7 +21,7 @@ render-config:
 	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --cloud-init cloud-init.yaml
+	@multipass launch -n $(VM_NAME) --memory 4G --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml

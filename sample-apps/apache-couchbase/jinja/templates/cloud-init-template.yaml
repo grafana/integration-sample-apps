@@ -184,27 +184,15 @@ write_files:
         --cluster-username admin \
         --cluster-password password \
         --cluster-name sample-app-couchbase-cluster \
-        --cluster-ramsize 256 \
+        --cluster-ramsize 600 \
         --cluster-index-ramsize 256 \
         --services data,query,index \
         --index-storage-setting default
 
-      # Create bucket with minimum required memory quota
-      echo "Creating bucket..."
-      /opt/couchbase/bin/couchbase-cli bucket-create -c 127.0.0.1 \
-        --username admin \
-        --password password \
-        --bucket-type couchbase \
-        --bucket-ramsize 100 \
-        --bucket sample-app-couchbase-bucket || {
-          echo "Bucket creation failed, checking if bucket already exists..."
-          if curl -s -u admin:password http://localhost:8091/pools/default/buckets/sample-app-couchbase-bucket > /dev/null 2>&1; then
-            echo "Bucket already exists, continuing..."
-          else
-            echo "Bucket creation failed and bucket does not exist"
-            exit 1
-          fi
-        }
+      # Install sample buckets
+      curl -X POST -u admin:password \
+        http://localhost:8091/sampleBuckets/install \
+        -d '["travel-sample", "beer-sample"]' | jq .
 
       # Wait for bucket to be ready
       echo "Waiting for bucket to be ready..."
@@ -212,7 +200,7 @@ write_files:
 
       # Create a simple document
       echo "Creating test document..."
-      curl -X POST -u admin:password http://localhost:8091/pools/default/buckets/sample-app-couchbase-bucket/docs \
+      curl -X POST -u admin:password http://localhost:8091/pools/default/buckets/travel-sample/docs \
         -H "Content-Type: application/json" \
         -d '{"type": "test", "value": 1}' || echo "Document creation failed, but continuing..."
 
@@ -223,7 +211,7 @@ write_files:
           # Invalid syntax query
           curl -s -u admin:password http://localhost:8093/query/service \
             -H "Content-Type: application/json" \
-            -d '{"statement": "SELECT * FROM sample-app-couchbase-bucket WHERE", "client_context_id": "invalid_query_1"}'
+            -d '{"statement": "SELECT * FROM travel-sample WHERE", "client_context_id": "invalid_query_1"}'
 
           # Invalid bucket name
           curl -s -u admin:password http://localhost:8093/query/service \
@@ -233,7 +221,7 @@ write_files:
           # Invalid field reference
           curl -s -u admin:password http://localhost:8093/query/service \
             -H "Content-Type: application/json" \
-            -d '{"statement": "SELECT nonexistent_field FROM sample-app-couchbase-bucket", "client_context_id": "invalid_query_3"}'
+            -d '{"statement": "SELECT nonexistent_field FROM beer-sample", "client_context_id": "invalid_query_3"}'
 
           sleep 5
         done
