@@ -1,4 +1,4 @@
-VM_NAME := apache-couchbase-sample-app
+VM_NAME := couchbase-sample-app
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE := your-loki-instance:3100
@@ -6,6 +6,8 @@ PROMETHEUS_INSTANCE := your-prometheus-instance:9090
 
 .PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
+# For CI, we don't care about long running tests, so we can get by with default disk size
+run: DISK_SIZE = 10
 run: launch-vm
 	@echo "VM $(VM_NAME) launched and configured."
 
@@ -21,7 +23,7 @@ render-config:
 	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --memory 4G --cloud-init cloud-init.yaml
+	@multipass launch -n $(VM_NAME) --memory 6G $(if $(DISK_SIZE),--disk $(DISK_SIZE)G) --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml
