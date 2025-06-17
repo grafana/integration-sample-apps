@@ -176,7 +176,6 @@ write_files:
     permissions: '0644'
     content: |
       #!/bin/bash
-      set -e
 
       # Initialize cluster with minimum required memory settings
       echo "Initializing Couchbase cluster..."
@@ -194,42 +193,153 @@ write_files:
         http://localhost:8091/sampleBuckets/install \
         -d '["travel-sample", "beer-sample"]' | jq .
 
-      # Wait for bucket to be ready
-      echo "Waiting for bucket to be ready..."
-      sleep 15
+      run_valid_queries() {
+        curl -X POST -u admin:password http://localhost:8093/pools/default/buckets/travel-sample/docs \
+          -H "Content-Type: application/json" \
+          -d '{"type": "test", "value": 1}' || echo "Document creation failed, but continuing..."
 
-      # Create a simple document
-      echo "Creating test document..."
-      curl -X POST -u admin:password http://localhost:8091/pools/default/buckets/travel-sample/docs \
-        -H "Content-Type: application/json" \
-        -d '{"type": "test", "value": 1}' || echo "Document creation failed, but continuing..."
-
-      # Function to run invalid N1QL queries
-      run_invalid_queries() {
-        while true; do
-          echo "Running invalid queries..."
-          # Invalid syntax query
+        for i in {1..10}; do
           curl -s -u admin:password http://localhost:8093/query/service \
             -H "Content-Type: application/json" \
-            -d '{"statement": "SELECT * FROM travel-sample WHERE", "client_context_id": "invalid_query_1"}'
-
-          # Invalid bucket name
-          curl -s -u admin:password http://localhost:8093/query/service \
-            -H "Content-Type: application/json" \
-            -d '{"statement": "SELECT * FROM nonexistent_bucket", "client_context_id": "invalid_query_2"}'
-
-          # Invalid field reference
-          curl -s -u admin:password http://localhost:8093/query/service \
-            -H "Content-Type: application/json" \
-            -d '{"statement": "SELECT nonexistent_field FROM beer-sample", "client_context_id": "invalid_query_3"}'
-
-          sleep 5
+            -d "{\"statement\": \"SELECT * FROM travel-sample\", \"client_context_id\": \"valid_query_${i}\"}"
         done
       }
 
-      # Start the invalid query generator in the background
-      echo "Starting invalid query generator..."
-      run_invalid_queries &
+      run_invalid_queries() {
+        curl -s -u admin:password http://localhost:8093/query/service \
+          -H "Content-Type: application/json" \
+          -d '{"statement": "SELECT * FROM travel-sample WHERE", "client_context_id": "invalid_query_1"}'
+
+        curl -s -u admin:password http://localhost:8093/query/service \
+          -H "Content-Type: application/json" \
+          -d '{"statement": "SELECT * FROM nonexistent_bucket", "client_context_id": "invalid_query_2"}'
+
+        curl -s -u admin:password http://localhost:8093/query/service \
+          -H "Content-Type: application/json" \
+          -d '{"statement": "SELECT nonexistent_field FROM beer-sample", "client_context_id": "invalid_query_3"}'
+      }
+
+      # KV operations for beer-sample bucket
+      run_kv_set_operations() {
+        echo "Running SET operations on beer-sample bucket..."
+        
+        # Create some test beer documents using N1QL UPSERT
+        for i in {1..5}; do
+          DOC_ID="test_beer_${i}_$(date +%s)"
+          ABV_INT=$(shuf -i 4-12 -n 1)
+          ABV_DEC=$(shuf -i 0-9 -n 1)
+          
+          # Use N1QL UPSERT instead of REST API
+          UPSERT_QUERY="{
+            \"statement\": \"UPSERT INTO \`beer-sample\` (KEY, VALUE) VALUES ('${DOC_ID}', { 'name': 'Test Ale ${i}', 'type': 'beer', 'brewery_id': 'test_brewery_${i}', 'abv': ${ABV_INT}.${ABV_DEC}, 'description': 'A delicious test ale number ${i}', 'style': 'Test Style', 'category': 'Test Category', 'updated': '$(date -Iseconds)', 'load_test': true })\",
+            \"client_context_id\": \"upsert_${DOC_ID}\"
+          }"
+          
+          echo "Upserting document: ${DOC_ID}"
+          curl -s -u admin:password http://localhost:8093/query/service \
+            -H "Content-Type: application/json" \
+            -d "${UPSERT_QUERY}" || echo "UPSERT failed for ${DOC_ID}"
+        done
+      }
+
+      run_kv_get_operations() {
+        echo "Running GET operations on beer-sample bucket..."
+        
+        # Get some existing beer documents using N1QL SELECT
+        SAMPLE_BEER_IDS=("21st_amendment_brewery_cafe" "21st_amendment_brewery_cafe-21a_ipa" "3_fonteinen_brouwerij")
+        
+        for beer_id in "${SAMPLE_BEER_IDS[@]}"; do
+          echo "Getting beer document: ${beer_id}"
+          SELECT_QUERY="{
+            \"statement\": \"SELECT * FROM \`beer-sample\` USE KEYS ['${beer_id}']\",
+            \"client_context_id\": \"select_${beer_id}\"
+          }"
+          curl -s -u admin:password http://localhost:8093/query/service \
+            -H "Content-Type: application/json" \
+            -d "${SELECT_QUERY}" || echo "SELECT failed for ${beer_id}"
+        done
+        
+        # Get our test documents using pattern matching
+        echo "Getting test documents..."
+        TEST_SELECT_QUERY="{
+          \"statement\": \"SELECT META().id, * FROM \`beer-sample\` WHERE load_test = true LIMIT 5\",
+          \"client_context_id\": \"select_test_docs\"
+        }"
+        curl -s -u admin:password http://localhost:8093/query/service \
+          -H "Content-Type: application/json" \
+          -d "${TEST_SELECT_QUERY}" || echo "SELECT failed for test documents"
+      }
+
+      run_kv_delete_operations() {
+        echo "Running DELETE operations on beer-sample bucket..."
+        
+        # Delete some of our test documents using N1QL DELETE
+        echo "Deleting test documents..."
+        DELETE_QUERY="{
+          \"statement\": \"DELETE FROM \`beer-sample\` WHERE load_test = true LIMIT 3\",
+          \"client_context_id\": \"delete_test_docs\"
+        }"
+        curl -s -u admin:password http://localhost:8093/query/service \
+          -H "Content-Type: application/json" \
+          -d "${DELETE_QUERY}" || echo "DELETE failed for test documents"
+        
+        # Try to delete some non-existent documents to generate errors
+        for i in {1..2}; do
+          FAKE_DOC_ID="nonexistent_beer_${i}_$(date +%s)"
+          echo "Attempting to delete non-existent document: ${FAKE_DOC_ID}"
+          DELETE_FAKE_QUERY="{
+            \"statement\": \"DELETE FROM \`beer-sample\` USE KEYS ['${FAKE_DOC_ID}']\",
+            \"client_context_id\": \"delete_${FAKE_DOC_ID}\"
+          }"
+          curl -s -u admin:password http://localhost:8093/query/service \
+            -H "Content-Type: application/json" \
+            -d "${DELETE_FAKE_QUERY}" || echo "DELETE failed for ${FAKE_DOC_ID} (expected - document doesn't exist)"
+        done
+      }
+
+      # Enhanced function to run all KV operations
+      run_kv_operations() {
+        echo "=== Running Key-Value operations on beer-sample bucket ==="
+        run_kv_set_operations
+        sleep 2
+        run_kv_get_operations
+        sleep 2
+        run_kv_delete_operations
+        echo "=== KV operations completed ==="
+      }
+
+      while true; do
+        echo "Running invalid queries..."
+        run_invalid_queries
+        echo "Running valid queries..."
+        run_valid_queries
+        echo "Running KV operations..."
+        run_kv_operations
+        sleep 5
+      done
+
+  # Systemd service file for loadgen
+  - path: /etc/systemd/system/couchbase-loadgen.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Couchbase Load Generator
+      After=network.target couchbase-server.service
+      Wants=couchbase-server.service
+      StartLimitIntervalSec=0
+
+      [Service]
+      Type=simple
+      Restart=always
+      RestartSec=10
+      User=ubuntu
+      Group=ubuntu
+      ExecStart=/home/ubuntu/loadgen.sh
+      WorkingDirectory=/home/ubuntu
+      Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+      [Install]
+      WantedBy=multi-user.target
 
 runcmd:
   # Create keyring directory
@@ -280,11 +390,11 @@ runcmd:
   # Also try modifying in /etc/systemd/system just in case
   - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
 
-  # Start and enable Alloy
   - systemctl daemon-reload
+  - systemctl enable couchbase-loadgen
+  - systemctl start couchbase-loadgen
   - systemctl enable alloy
   - systemctl restart alloy
 
-  # start loadgen
-  - nohup /home/ubuntu/loadgen.sh > /home/ubuntu/load_generator.log 2>&1 &
+  
   
