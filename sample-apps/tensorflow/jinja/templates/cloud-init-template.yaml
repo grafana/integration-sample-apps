@@ -1,0 +1,281 @@
+#cloud-config
+# Cloud-init configuration for setting up Alloy and TensorFlow sample-app
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - git
+  - gpg
+  - curl
+  - qemu-user-static
+  - binfmt-support
+
+write_files:
+  # Alloy profile
+  - owner: root:root
+    path: /etc/default/alloy
+    content: |
+      ## Path:
+      ## Description: Grafana Alloy settings
+      ## Type:        string
+      ## Default:     ""
+      ## ServiceRestart: alloy
+      #
+      # Command line options for Alloy.
+      #
+      # The configuration file holding the Alloy config.
+      CONFIG_FILE="/etc/alloy/config.alloy"
+      # User-defined arguments to pass to the run command.
+      CUSTOM_ARGS="--stability.level=experimental"
+      # Restart on system upgrade. Defaults to true.
+      RESTART_ON_UPGRADE=true
+
+  # Copy configuration files
+  - owner: root:root
+    path: /home/ubuntu/config/batching_config.txt
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/config/batching_config.txt' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/config/monitoring_config.txt
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/config/monitoring_config.txt' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/init.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/init.sh' -%}
+      {% endfilter %}
+    permissions: "0755"
+
+  - owner: root:root
+    path: /home/ubuntu/loadgen.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/loadgen.sh' -%}
+      {% endfilter %}
+    permissions: "0755"
+
+  # TensorFlow Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      logging {
+        level = "debug"
+      }
+
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/tensorflow"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      {% if prom_url -%}
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+          {% if prom_user and prom_password -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_password }}"
+          }
+          {% endif -%}
+        }
+      }
+      {% endif -%}
+
+      {% if loki_url -%}
+      loki.write "logs_service" {
+        endpoint {
+          url = "{{ loki_url }}"
+          {% if loki_user and loki_password -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_password }}"
+          }
+          {% endif -%}
+        }
+      }
+
+      discovery.docker "logs_integration_integrations_tensorflow" {
+        host = "unix:///var/run/docker.sock"
+        refresh_interval = "5s"
+        filter {
+          name = "name"
+          values = ["tensorflow"]
+        }
+      }
+      
+      discovery.relabel "logs_integration_integrations_tensorflow" {
+        targets = discovery.docker.logs_integration_integrations_tensorflow.targets
+        
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          target_label  = "name"
+          replacement   = "tensorflow"
+        }
+
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          target_label  = "job"
+          replacement   = "integrations/tensorflow"
+        }
+
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          target_label  = "instance"
+          replacement   = constants.hostname
+        }
+      }
+
+      loki.source.docker "logs_integration_integrations_tensorflow" {
+        host = "unix:///var/run/docker.sock"
+        targets = discovery.docker.logs_integration_integrations_tensorflow.targets
+        forward_to = [loki.write.logs_service.receiver]
+        relabel_rules = discovery.relabel.logs_integration_integrations_tensorflow.rules
+        refresh_interval = "5s"
+      }
+      {% endif -%}
+
+      discovery.relabel "metrics_integrations_integrations_tensorflow" {
+        targets = [{
+          __address__ = "localhost:8501",
+        }]
+        
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_integrations_tensorflow" {
+        targets = discovery.relabel.metrics_integrations_integrations_tensorflow.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        scrape_interval = "10s"
+        job_name = "integrations/tensorflow"
+        metrics_path = "/monitoring/prometheus/metrics"
+      }
+
+  # Add systemd service for loadgen
+  - owner: root:root
+    path: /etc/systemd/system/loadgen.service
+    content: |
+      [Unit]
+      Description=TensorFlow Load Generator
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=ubuntu
+      WorkingDirectory=/home/ubuntu
+      ExecStart=/home/ubuntu/loadgen.sh
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - mkdir -p /var/lib/alloy/data
+  - mkdir -p /home/ubuntu/models/half_plus_two/1/assets
+  - mkdir -p /home/ubuntu/models/half_plus_two/1/config
+  
+  # Create keyring directory
+  - mkdir -p /etc/apt/keyrings/
+
+  - chmod +x /home/ubuntu/init.sh
+  - chmod +x /home/ubuntu/loadgen.sh
+  - chown -R ubuntu:ubuntu /home/ubuntu/init.sh
+  - chown -R ubuntu:ubuntu /home/ubuntu/loadgen.sh
+  
+
+  # Download and install Grafana GPG key
+  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
+
+  # Add Grafana && tensorflow repository
+  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  
+
+  # Update package lists
+  - apt-get update
+
+  # Install Alloy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
+
+  # Add ubuntu user to docker group and ensure permissions are set correctly as to easier debug
+  - groupadd -f docker
+  - usermod -aG docker ubuntu
+  - chmod 666 /var/run/docker.sock || true
+  - systemctl restart docker
+
+  # --- Configuring Alloy to run as root ---
+  # Modify the service file to remove User and Group lines
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
+  # Also try modifying in /etc/systemd/system just in case
+  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
+
+  ## Installing Tensorflow Serving via Docker
+  - apt-get install -y docker-ce docker-ce-cli containerd.io
+  - systemctl enable docker
+  - systemctl start docker
+
+  # Configure Docker for QEMU
+  - docker run --privileged --rm tonistiigi/binfmt --install all
+  - systemctl restart docker
+
+  # Run init.sh
+  - /home/ubuntu/init.sh
+
+  # Run loadgen.sh in background
+  - /home/ubuntu/loadgen.sh &
+
+  # Start and enable Alloy
+  - systemctl daemon-reload
+  - systemctl enable alloy
+  - systemctl restart alloy
+
+  # Enable and start loadgen systemd service
+  - systemctl enable loadgen
+  - systemctl start loadgen
+
+    
+
+      
+      
