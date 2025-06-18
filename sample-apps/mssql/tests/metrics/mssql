@@ -1,0 +1,16 @@
+mssql_available_commit_memory_bytes	
+mssql_batch_requests_total
+mssql_buffer_cache_hit_ratio
+mssql_build_info
+mssql_checkpoint_pages_sec
+mssql_connections
+mssql_deadlocks_total
+mssql_io_stall_seconds_total
+mssql_kill_connection_errors_total
+mssql_log_growths_total
+mssql_os_memory
+mssql_os_page_file
+mssql_page_fault_count_total
+mssql_server_target_memory_bytes
+mssql_server_total_memory_bytes
+up
