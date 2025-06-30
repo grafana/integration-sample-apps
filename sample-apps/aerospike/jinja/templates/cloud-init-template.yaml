@@ -178,19 +178,22 @@ runcmd:
   # Install Alloy
   - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
 
-  # --- Configuring Alloy to run as root, for production environments people should specify permissions for the alloy user ---
-  # --- Since this sample app is for testing purposes, we're allowing the alloy user to run as root to simplify access to log files on the Aerospike server ---
-  # Modify the service file to remove User and Group lines
-  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
-  # Also try modifying in /etc/systemd/system just in case
-  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
-
+  # Create alloy user and set up permissions
+  - useradd --no-create-home --shell /bin/false alloy
   - mv /home/ubuntu/config.alloy /etc/alloy/config.alloy
+  - chown alloy:alloy /etc/alloy/config.alloy
+  - chmod 644 /etc/alloy/config.alloy
+  - chown -R alloy:alloy /var/lib/alloy/data
+  - chmod 755 /var/lib/alloy/data
 
   # Installs Aerospike
   - /home/ubuntu/install.sh
   # Installs the prometheus exporter
   - /home/ubuntu/install-prometheus-exporter.sh
+
+  # Give alloy user read access to aerospike logs
+  - chmod 644 /var/log/aerospike/aerospike.log || echo "Aerospike log file not yet created"
+  - usermod -aG adm alloy || echo "Could not add alloy to adm group"
 
   # Start and enable services
   - systemctl daemon-reload
