@@ -111,9 +111,7 @@ runcmd:
   # Create data directory for alloy
   - mkdir -p /var/lib/alloy/data
   - chmod +x /home/ubuntu/install.sh
-  - chmod +x /home/ubuntu/install-jmx-prometheus-exporter.sh
   - chown -R ubuntu:ubuntu /home/ubuntu/install.sh
-  - chown -R ubuntu:ubuntu /home/ubuntu/install-jmx-prometheus-exporter.sh
 
   # Download and install Grafana GPG key
   - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg

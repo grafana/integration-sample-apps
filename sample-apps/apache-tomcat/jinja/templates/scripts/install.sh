@@ -105,10 +105,6 @@ sudo cat > /etc/default/${TOMCAT_VERSION} << EOF
 # Tomcat Configuration for JMX Prometheus Exporter
 JAVA_OPTS="-Djava.awt.headless=true"
 JAVA_OPTS="\$JAVA_OPTS -javaagent:/opt/jmx-prometheus-exporter/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar=${JMX_EXPORTER_PORT}:/opt/jmx-prometheus-exporter/tomcat-jmx-config.yml"
-JAVA_OPTS="\$JAVA_OPTS -Dcom.sun.management.jmxremote"
-JAVA_OPTS="\$JAVA_OPTS -Dcom.sun.management.jmxremote.port=9010"
-JAVA_OPTS="\$JAVA_OPTS -Dcom.sun.management.jmxremote.authenticate=false"
-JAVA_OPTS="\$JAVA_OPTS -Dcom.sun.management.jmxremote.ssl=false"
 EOF
 
 sudo systemctl restart ${TOMCAT_VERSION}
