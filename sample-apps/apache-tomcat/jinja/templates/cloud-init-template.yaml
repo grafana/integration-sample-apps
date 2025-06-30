@@ -1,6 +1,4 @@
 #cloud-config
-# Cloud-init configuration for setting up Alloy and Aerospike sample-app
-
 package_update: true
 package_upgrade: false
 
@@ -11,26 +9,9 @@ packages:
   - curl
 
 write_files:
-  - owner: root:root
-    path: /etc/default/alloy
-    content: |
-      ## Path:
-      ## Description: Grafana Alloy settings
-      ## Type:        string
-      ## Default:     ""
-      ## ServiceRestart: alloy
-      #
-      # Command line options for Alloy.
-      #
-      # The configuration file holding the Alloy config.
-      CONFIG_FILE="/etc/alloy/config.alloy"
-      # User-defined arguments to pass to the run command.
-      CUSTOM_ARGS="--stability.level=experimental"
-      # Restart on system upgrade. Defaults to true.
-      RESTART_ON_UPGRADE=true
   # Tomcat Alloy configuration
   - owner: root:root
-    path: /etc/alloy/config.alloy
+    path: /home/ubuntu/config.alloy
     content: |
       logging {
         level = "debug"
@@ -100,25 +81,21 @@ write_files:
         targets    = local.file_match.logs_integrations_tomcat_linux.targets
         forward_to = [loki.write.grafana_loki.receiver]
       }
-      prometheus.scrape "tomcat" {
-        targets = [{ __address__ = "localhost:9145", tomcat_cluster = "" }]
-        job_name = "integrations/tomcat"
-        forward_to = [prometheus.relabel.tomcat.receiver]
-        scrape_interval = "10s"
-        metrics_path = "/metrics"
-      }
-      prometheus.relabel "tomcat" {
-        forward_to = [prometheus.remote_write.metrics_service.receiver]
-        
+
+      discovery.relabel "metrics_integrations_tomcat" {
+        targets = [{
+          __address__ = "localhost:9145",
+        }]
         rule {
           target_label = "instance"
-          replacement = constants.hostname
+          replacement  = constants.hostname
         }
-        
-        rule {
-          target_label = "tomcat_cluster"
-          replacement = ""
-        }
+      }
+
+      prometheus.scrape "metrics_integrations_tomcat" {
+        targets    = discovery.relabel.metrics_integrations_tomcat.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name   = "integrations/tomcat"
       }
 
   - owner: root:root
@@ -140,23 +117,23 @@ runcmd:
 
   # Download and install Grafana GPG key
   - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
-
   # Add Grafana repository
   - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
-
   # Update package lists
   - apt-get update
 
-  # Install Alloy
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Options::="--force-confold" alloy
-
-  # --- Configuring Alloy to run as root ---
-  # Modify the service file to remove User and Group lines
-  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
-  # Also try modifying in /etc/systemd/system just in case
-  - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
+  # Install tomcat server and configures the JMX Prometheus Exporter as a Java Agent
+  # output to install.log for a record of the installation
   - /home/ubuntu/install.sh > /home/ubuntu/install.log 2>&1
-  
+
+  # Install Alloy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
+  - mv /home/ubuntu/config.alloy /etc/alloy/config.alloy
+  - chown alloy:alloy /etc/alloy/config.alloy
+  - chown -R alloy:alloy /var/lib/alloy/data
+
+  # Modify permissions for alloy user to read Tomcat log files
+  - find /var /opt /usr/local -name "catalina.out" -path "*/log/*" -o -name "catalina.out" -path "*tomcat*/logs/*" -o -name "catalina.out" -path "*tomcat*" 2>/dev/null | xargs -r chmod +r
 
   # Start and enable services
   - systemctl daemon-reload

@@ -112,3 +112,5 @@ JAVA_OPTS="\$JAVA_OPTS -Dcom.sun.management.jmxremote.ssl=false"
 EOF
 
 sudo systemctl restart ${TOMCAT_VERSION}
+
+echo "Installation completed"

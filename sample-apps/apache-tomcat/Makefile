@@ -4,7 +4,7 @@ CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9009
 
-.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
+.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig tomcat-status
 
 run: launch-vm
 	@echo "VM $(VM_NAME) launched and configured."
@@ -26,6 +26,12 @@ launch-vm: render-config
 clean:
 	@rm -f cloud-init.yaml
 	@rm -rf $(CONFIG_FILE_DIR)
+
+shell:
+	@multipass shell $(VM_NAME)
+
+tomcat-status:
+	@multipass exec $(VM_NAME) -- bash -c "TOMCAT_SERVICE=\$$(systemctl list-units --type=service | grep -E 'tomcat(9|10)\.service' | awk '{print \$$1}'); if [ -n \"\$$TOMCAT_SERVICE\" ]; then systemctl status \$$TOMCAT_SERVICE; else echo 'No Tomcat service found'; fi"
 
 defaultconfig:
 	@mkdir -p $(CONFIG_FILE_DIR)

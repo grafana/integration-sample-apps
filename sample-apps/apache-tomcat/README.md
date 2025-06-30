@@ -37,6 +37,8 @@ To get started with the sample app, follow these steps:
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates the Apache Tomcat sample app.
+- `make status`: Checks the status of the Tomcat service running on the VM.
+- `make shell`: Opens a shell session to the VM.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
 ## Default configuration variables
@@ -59,4 +61,26 @@ To get started with the sample app, follow these steps:
 - **Check logs**: Review Alloy logs for any connectivity or configuration issues.
   ```bash
   journalctl -u alloy.service
+  ```
+
+### Apache Tomcat
+- **Check service status**: Use the make command to check Tomcat service status.
+  ```bash
+  make tomcat-status
+  ```
+- **Manual check**: Connect to the VM and check the Tomcat service directly.
+  ```bash
+  make shell
+  # Then run one of:
+  systemctl status tomcat9.service    # For Ubuntu < 24.x
+  systemctl status tomcat10.service   # For Ubuntu 24.x+ and Debian 12
+  ```
+- **Check logs**: Review Tomcat logs for any issues.
+  ```bash
+  make shell
+  journalctl -u tomcat9.service   # or tomcat10.service
+  ```
+- **Verify metrics endpoint**: Check that the JMX Prometheus exporter is working.
+  ```bash
+  curl http://localhost:9145/metrics
   ```
