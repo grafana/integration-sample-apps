@@ -178,8 +178,7 @@ runcmd:
   # Install Alloy
   - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
 
-  # Create alloy user and set up permissions
-  - useradd --no-create-home --shell /bin/false alloy
+  # Move config.alloy to /etc/alloy/config.alloy and set up permissions for alloy user
   - mv /home/ubuntu/config.alloy /etc/alloy/config.alloy
   - chown alloy:alloy /etc/alloy/config.alloy
   - chmod 644 /etc/alloy/config.alloy
