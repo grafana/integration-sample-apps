@@ -38,6 +38,7 @@ To get started with the sample app, follow these steps:
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates the Aerospike sample app VM with Aerospike Community Edition installed and configured.
 - `make run-ci`: Runs in CI mode by cleaning, setting up default config, and launching the VM.
+- `make shell`: Opens a shell session to the running VM for debugging and troubleshooting.
 - `make stop`: Stops and removes the VM, then purges multipass resources.
 - `make clean`: Removes generated configuration files and temporary resources.
 
@@ -49,6 +50,7 @@ To get started with the sample app, follow these steps:
 - `loki_url`: URL for Loki push endpoint (e.g., `http://your-loki-instance:3100/loki/api/v1/push`).
 - `loki_user`: Your Loki username.
 - `loki_pass`: Your Loki password.
+- `aerospike_cluster`: Name identifier for the Aerospike cluster (default: `aerospike-sample-app-cluster`).
 
 ## Aerospike version compatibility
 
@@ -57,6 +59,15 @@ The sample app automatically installs the appropriate Aerospike Community Editio
 - **Ubuntu 18.04**: Aerospike 5.7.0.23 with Tools 7.1.1
 - **Ubuntu 20.04/22.04**: Aerospike 6.3.0.2 with Tools 8.3.0  
 - **Ubuntu 24.04**: Aerospike 7.2.0.11 with Tools 11.2.2
+
+## Aerospike configuration
+
+The sample app configures Aerospike with two namespaces:
+
+- **test namespace**: Uses file-based storage with a 4GB data file located at `/opt/aerospike/data/test.data`
+- **bar namespace**: Uses in-memory storage with 4GB allocated memory
+
+This configuration allows you to test both storage engines and understand their performance characteristics.
 
 ## Validating services
 
@@ -102,3 +113,12 @@ The sample app automatically installs the appropriate Aerospike Community Editio
   ```bash
   journalctl -u aerospike-prometheus-exporter.service
   ```
+
+## Troubleshooting
+
+For debugging and troubleshooting, you can access the VM directly using:
+```bash
+make shell
+```
+
+This opens a shell session to the running VM where you can execute the validation commands above and investigate any issues with the services.

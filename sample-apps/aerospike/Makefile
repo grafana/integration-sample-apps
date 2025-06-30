@@ -27,6 +27,9 @@ clean:
 	@rm -f cloud-init.yaml
 	@rm -rf $(CONFIG_FILE_DIR)
 
+shell:
+	@multipass shell $(VM_NAME)
+
 defaultconfig:
 	@mkdir -p $(CONFIG_FILE_DIR)
 	@echo "# Default variables for cloud-init configuration" > jinja/variables/cloud-init.yaml
@@ -36,3 +39,4 @@ defaultconfig:
 	@echo "prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
 	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
+	@echo "aerospike_cluster: aerospike-sample-app-cluster" >> jinja/variables/cloud-init.yaml

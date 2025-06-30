@@ -18,29 +18,9 @@ packages:
   - curl
 
 write_files:
-  - owner: root:root
-    path: /etc/default/alloy
-    content: |
-      ## Path:
-      ## Description: Grafana Alloy settings
-      ## Type:        string
-      ## Default:     ""
-      ## ServiceRestart: alloy
-      #
-      # Command line options for Alloy.
-      #
-      # The configuration file holding the Alloy config.
-      CONFIG_FILE="/etc/alloy/config.alloy"
-
-      # User-defined arguments to pass to the run command.
-      CUSTOM_ARGS="--stability.level=experimental"
-
-      # Restart on system upgrade. Defaults to true.
-      RESTART_ON_UPGRADE=true
-
   # Aerospike configuration
   - owner: root:root
-    path: /etc/alloy/config.alloy
+    path: /home/ubuntu/config.alloy
     content: |
       logging {
         level = "debug"
@@ -145,26 +125,13 @@ write_files:
         forward_to = [loki.process.logs_integrations_integrations_aerospike.receiver]
       }
 
-      prometheus.scrape "aerospike" {
-        targets = [{ __address__ = "localhost:9145", aerospike_cluster = "" }]
-        job_name = "integrations/aerospike"
-        forward_to = [prometheus.relabel.aerospike.receiver]
-        scrape_interval = "10s"
-        metrics_path = "/metrics"
-      }
-
-      prometheus.relabel "aerospike" {
+      prometheus.scrape "metrics_integrations_integrations_aerospike" {
+        targets = [{
+          __address__       = constants.hostname + ":9145",
+          aerospike_cluster = "{{ aerospike_cluster }}",
+        }]
         forward_to = [prometheus.remote_write.metrics_service.receiver]
-        
-        rule {
-          target_label = "instance"
-          replacement = constants.hostname
-        }
-        
-        rule {
-          target_label = "aerospike_cluster"
-          replacement = ""
-        }
+        job_name   = "integrations/aerospike"
       }
 
   - owner: root:root
@@ -211,14 +178,19 @@ runcmd:
   # Install Alloy
   - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
 
-  # --- Configuring Alloy to run as root ---
+  # --- Configuring Alloy to run as root, for production environments people should specify permissions for the alloy user ---
+  # --- Since this sample app is for testing purposes, we're allowing the alloy user to run as root to simplify access to log files on the Aerospike server ---
   # Modify the service file to remove User and Group lines
   - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /lib/systemd/system/alloy.service || echo "Could not modify /lib/systemd/system/alloy.service"
   # Also try modifying in /etc/systemd/system just in case
   - sed -i '/^\[Service\]/,/^\[/ { /^[ \t]*User=/d; /^[ \t]*Group=/d }' /etc/systemd/system/alloy.service || echo "Could not modify /etc/systemd/system/alloy.service"
 
-  # Install the prometheus exporter
-  - /home/ubuntu/install.sh && /home/ubuntu/install-prometheus-exporter.sh
+  - mv /home/ubuntu/config.alloy /etc/alloy/config.alloy
+
+  # Installs Aerospike
+  - /home/ubuntu/install.sh
+  # Installs the prometheus exporter
+  - /home/ubuntu/install-prometheus-exporter.sh
 
   # Start and enable services
   - systemctl daemon-reload
