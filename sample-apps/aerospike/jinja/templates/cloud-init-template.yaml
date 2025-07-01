@@ -16,11 +16,12 @@ packages:
   - git
   - gpg
   - curl
+  - alloy
 
 write_files:
-  # Aerospike configuration
+  # Aerospike Integration configuration
   - owner: root:root
-    path: /home/ubuntu/config.alloy
+    path: /etc/alloy/config.alloy
     content: |
       logging {
         level = "debug"
@@ -156,34 +157,11 @@ write_files:
       {% endfilter %}
 
 runcmd:
-  # Create keyring directory
-  - mkdir -p /etc/apt/keyrings/
-  # Create data directory for alloy
-  - mkdir -p /var/lib/alloy/data
+  # Update package lists
+  - apt-get update
   # Set script permissions for ubuntu user
   - chmod +x /home/ubuntu/install.sh
   - chmod +x /home/ubuntu/install-prometheus-exporter.sh
-  - chown -R ubuntu:ubuntu /home/ubuntu/install.sh
-  - chown -R ubuntu:ubuntu /home/ubuntu/install-prometheus-exporter.sh
-  
-  # Download and install Grafana GPG key
-  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
-  
-  # Add Grafana repository
-  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
-  
-  # Update package lists
-  - apt-get update
-
-  # Install Alloy
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
-
-  # Move config.alloy to /etc/alloy/config.alloy and set up permissions for alloy user
-  - mv /home/ubuntu/config.alloy /etc/alloy/config.alloy
-  - chown alloy:alloy /etc/alloy/config.alloy
-  - chmod 644 /etc/alloy/config.alloy
-  - chown -R alloy:alloy /var/lib/alloy/data
-  - chmod 755 /var/lib/alloy/data
 
   # Installs Aerospike
   - /home/ubuntu/install.sh
