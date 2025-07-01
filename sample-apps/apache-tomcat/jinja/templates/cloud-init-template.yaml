@@ -1,0 +1,133 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+# Define required packages
+packages:
+  - git
+  - gpg
+  - curl
+  - alloy
+
+write_files:
+  # Tomcat Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      logging {
+        level = "debug"
+      }
+      
+      prometheus.exporter.self "alloy_check" { }
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]  
+        scrape_interval = "60s"
+      }
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+      loki.write "grafana_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      local.file_match "logs_integrations_tomcat_linux" {
+        path_targets = [{
+          __address__ = "localhost",
+          __path__    = "/{var,opt,usr/local}/{log,*tomcat*}/{*tomcat*,logs}/catalina.out",
+          instance    = constants.hostname,
+          job         = "integrations/tomcat",
+        }]
+      }
+      loki.source.file "logs_integrations_tomcat_linux" {
+        targets    = local.file_match.logs_integrations_tomcat_linux.targets
+        forward_to = [loki.write.grafana_loki.receiver]
+      }
+
+      discovery.relabel "metrics_integrations_tomcat" {
+        targets = [{
+          __address__ = "localhost:9145",
+        }]
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_tomcat" {
+        targets    = discovery.relabel.metrics_integrations_tomcat.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name   = "integrations/tomcat"
+      }
+
+  - owner: root:root
+    path: /home/ubuntu/install.sh
+    content: | 
+      {% filter indent(6) %}
+      {%- include 'scripts/install.sh' -%}
+      {% endfilter %}
+
+runcmd:
+  - chmod +x /home/ubuntu/install.sh
+  - chown -R ubuntu:ubuntu /home/ubuntu/install.sh
+
+  # Update package lists
+  - apt-get update
+
+  # Install tomcat server and configures the JMX Prometheus Exporter as a Java Agent
+  # output to install.log for a record of the installation
+  - /home/ubuntu/install.sh > /home/ubuntu/install.log 2>&1
+
+  # Modify permissions for alloy user to read Tomcat log files
+  - find /var /opt /usr/local -name "catalina.out" -path "*/log/*" -o -name "catalina.out" -path "*tomcat*/logs/*" -o -name "catalina.out" -path "*tomcat*" 2>/dev/null | xargs -r chmod +r
+
+  # Start and enable services
+  - systemctl daemon-reload
+  - systemctl enable alloy
+  - systemctl restart alloy
