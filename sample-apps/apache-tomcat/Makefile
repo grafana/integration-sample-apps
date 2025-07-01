@@ -4,7 +4,7 @@ CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9009
 
-.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig tomcat-status
+.PHONY: run run-ci stop render-config launch-vm clean defaultconfig tomcat-status
 
 run: launch-vm
 	@echo "VM $(VM_NAME) launched and configured."

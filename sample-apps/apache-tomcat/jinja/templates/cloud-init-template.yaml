@@ -2,16 +2,24 @@
 package_update: true
 package_upgrade: false
 
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
 # Define required packages
 packages:
   - git
   - gpg
   - curl
+  - alloy
 
 write_files:
   # Tomcat Alloy configuration
   - owner: root:root
-    path: /home/ubuntu/config.alloy
+    path: /etc/alloy/config.alloy
     content: |
       logging {
         level = "debug"
@@ -106,29 +114,15 @@ write_files:
       {% endfilter %}
 
 runcmd:
-  # Create keyring directory
-  - mkdir -p /etc/apt/keyrings/
-  # Create data directory for alloy
-  - mkdir -p /var/lib/alloy/data
   - chmod +x /home/ubuntu/install.sh
   - chown -R ubuntu:ubuntu /home/ubuntu/install.sh
 
-  # Download and install Grafana GPG key
-  - curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor -o /etc/apt/keyrings/grafana.gpg
-  # Add Grafana repository
-  - echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
   # Update package lists
   - apt-get update
 
   # Install tomcat server and configures the JMX Prometheus Exporter as a Java Agent
   # output to install.log for a record of the installation
   - /home/ubuntu/install.sh > /home/ubuntu/install.log 2>&1
-
-  # Install Alloy
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y alloy
-  - mv /home/ubuntu/config.alloy /etc/alloy/config.alloy
-  - chown alloy:alloy /etc/alloy/config.alloy
-  - chown -R alloy:alloy /var/lib/alloy/data
 
   # Modify permissions for alloy user to read Tomcat log files
   - find /var /opt /usr/local -name "catalina.out" -path "*/log/*" -o -name "catalina.out" -path "*tomcat*/logs/*" -o -name "catalina.out" -path "*tomcat*" 2>/dev/null | xargs -r chmod +r
