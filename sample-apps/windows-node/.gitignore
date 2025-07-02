@@ -1,0 +1,4 @@
+config/alloy-config.alloy
+temp/
+*.tmp
+bookmarks-*.xml 

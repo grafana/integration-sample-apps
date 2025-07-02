@@ -1,0 +1,169 @@
+name: "Windows Sample App"
+
+permissions:
+  contents: read
+
+on:
+  # To conserve resources we only run tests against main in PRs
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'sample-apps/windows-node/**'
+  
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+jobs:
+  test-windows-sample-app:
+    name: Test Windows sample app
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Docker containers for Mimir and Loki
+        shell: powershell
+        run: |
+          # Start Mimir and Loki containers
+          docker network create dbs 2>$null || echo "Network already exists"
+          
+          # Start Mimir
+          docker run -d --name mimir --network dbs -p 9009:9009 `
+            -v "${{ github.workspace }}/ops/qa/dbs/configs/mimir:/etc/mimir-config" `
+            grafana/mimir:latest `
+            /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
+          
+          # Start Loki  
+          docker run -d --name loki --network dbs -p 3100:3100 `
+            grafana/loki:latest `
+            -config.file=/etc/loki/local-config.yaml
+          
+          # Wait for services to be ready
+          Write-Host "Waiting for services to start..."
+          Start-Sleep -Seconds 30
+          
+          # Check if services are running
+          $mimirRunning = docker ps --filter "name=mimir" --filter "status=running" -q
+          $lokiRunning = docker ps --filter "name=loki" --filter "status=running" -q
+          
+          if (-not $mimirRunning) {
+            Write-Error "Mimir container is not running"
+            docker logs mimir
+            exit 1
+          }
+          
+          if (-not $lokiRunning) {
+            Write-Error "Loki container is not running"  
+            docker logs loki
+            exit 1
+          }
+          
+          Write-Host "Services are running successfully"
+
+      - name: Run Windows sample app
+        working-directory: ./sample-apps/windows-node
+        shell: cmd
+        run: |
+          make LOKI_INSTANCE=localhost:3100 PROMETHEUS_INSTANCE=localhost:9009 run-ci
+
+      - name: Wait for sample app to generate metrics
+        shell: powershell
+        run: |
+          Write-Host "Waiting for sample app to generate metrics..."
+          Start-Sleep -Seconds 180
+
+      - name: Check metrics in Mimir
+        shell: powershell
+        run: |
+          $maxRetries = 10
+          $retryDelay = 10
+          $found = $false
+          
+          for ($i = 1; $i -le $maxRetries; $i++) {
+            try {
+              Write-Host "Checking for Windows metrics... Attempt $i/$maxRetries"
+              
+              # Query for windows_exporter metrics
+              $response = Invoke-RestMethod -Uri "http://localhost:9009/api/v1/query?query=up{job='integrations/windows_exporter'}" -Method GET
+              
+              if ($response.data.result.Count -gt 0) {
+                Write-Host "Found Windows exporter metrics!"
+                $found = $true
+                break
+              }
+              
+              Write-Host "No metrics found yet, waiting..."
+              Start-Sleep -Seconds $retryDelay
+            } catch {
+              Write-Host "Error querying metrics: $_"
+              Start-Sleep -Seconds $retryDelay
+            }
+          }
+          
+          if (-not $found) {
+            Write-Error "Windows metrics not found in Mimir after $($maxRetries * $retryDelay) seconds"
+            
+            # Debug information
+            Write-Host "Checking Mimir health..."
+            try {
+              $health = Invoke-RestMethod -Uri "http://localhost:9009/ready" -Method GET
+              Write-Host "Mimir is ready: $health"
+            } catch {
+              Write-Host "Mimir health check failed: $_"
+            }
+            
+            # Check if Alloy is running
+            $alloyService = Get-Service -Name "Alloy" -ErrorAction SilentlyContinue
+            if ($alloyService) {
+              Write-Host "Alloy service status: $($alloyService.Status)"
+            } else {
+              Write-Host "Alloy service not found"
+            }
+            
+            exit 1
+          }
+
+      - name: Check logs in Loki
+        shell: powershell
+        run: |
+          try {
+            Write-Host "Checking for Windows logs in Loki..."
+            
+            # Query for logs from the windows exporter
+            $query = '{job="integrations/windows_exporter"}'
+            $encodedQuery = [System.Web.HttpUtility]::UrlEncode($query)
+            $response = Invoke-RestMethod -Uri "http://localhost:3100/loki/api/v1/query?query=$encodedQuery" -Method GET
+            
+            if ($response.data.result.Count -gt 0) {
+              Write-Host "Found Windows logs in Loki!"
+              Write-Host "Number of log streams: $($response.data.result.Count)"
+            } else {
+              Write-Warning "No Windows logs found in Loki"
+            }
+          } catch {
+            Write-Warning "Error querying logs from Loki: $_"
+          }
+
+      - name: Cleanup
+        if: always()
+        shell: powershell
+        run: |
+          # Stop and remove containers
+          docker stop mimir loki 2>$null || echo "Containers already stopped"
+          docker rm mimir loki 2>$null || echo "Containers already removed"
+          docker network rm dbs 2>$null || echo "Network already removed"
+          
+          # Stop Alloy service
+          try {
+            $service = Get-Service -Name "Alloy" -ErrorAction SilentlyContinue
+            if ($service -and $service.Status -eq "Running") {
+              Stop-Service -Name "Alloy" -Force
+              Write-Host "Alloy service stopped"
+            }
+          } catch {
+            Write-Host "Error stopping Alloy service: $_"
+          } 
