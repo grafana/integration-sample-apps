@@ -56,7 +56,7 @@ $configTemplate += @"
 
 // Windows exporter for system metrics
 prometheus.exporter.windows "integrations_windows_exporter" {
-  enabled_collectors = ["cpu", "logical_disk", "net", "os", "service", "system", "time", "diskdrive"]
+  enabled_collectors = ["cpu", "logical_disk", "net", "os", "service", "system", "time", "diskdrive", "pagefile", "memory"]
 }
 
 discovery.relabel "integrations_windows_exporter" {
