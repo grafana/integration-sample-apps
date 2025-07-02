@@ -84,6 +84,11 @@ jobs:
           
           echo "Docker is ready"
           docker --version
+          
+          # Install jq for JSON parsing in validation step
+          echo "Installing jq for JSON parsing..."
+          sudo apt-get install -y jq
+          echo "jq installed successfully"
 
       - name: Start Mimir and Loki containers
         run: |
@@ -101,13 +106,8 @@ jobs:
             grafana/loki:3.0.0 \
             -config.file=/etc/loki/local-config.yaml
           
-          # Set environment variables for later steps
-          echo "LOKI_ENDPOINT=localhost:3100" >> $GITHUB_ENV
-          echo "MIMIR_ENDPOINT=localhost:9009" >> $GITHUB_ENV
-          
           # Set default config
           source ./ops/.defaultconfig
-          echo "SAMPLE_APP_SETUP_TIME=$SAMPLE_APP_SETUP_TIME" >> $GITHUB_ENV
           
           echo "Database setup complete - Loki: localhost:3100, Mimir: localhost:9009"
           
@@ -171,9 +171,9 @@ jobs:
           
           # Create and configure Alloy with remote endpoints
           Write-Host "Creating Alloy configuration..."
-          Write-Host "Loki endpoint: http://${{ env.LOKI_ENDPOINT }}/loki/api/v1/push"
-          Write-Host "Mimir endpoint: http://${{ env.MIMIR_ENDPOINT }}/api/v1/push"
-          .\scripts\create_default_config.ps1 -LokiUrl "http://${{ env.LOKI_ENDPOINT }}/loki/api/v1/push" -PrometheusUrl "http://${{ env.MIMIR_ENDPOINT }}/api/v1/push"
+          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
           .\scripts\configure_alloy.ps1
           
           # Start Alloy service
@@ -193,19 +193,20 @@ jobs:
       - name: Wait for sample app to generate metrics
         run: |
           source ~/.vars
+          source ./ops/.defaultconfig
           echo "Waiting for sample app to generate metrics..."
-          sleep ${{ env.SAMPLE_APP_SETUP_TIME }}
+          sleep $SAMPLE_APP_SETUP_TIME
 
       - name: Validate metrics and logs
         run: |
           source ~/.vars
           
           echo "Validating metrics collection..."
-          echo "Checking endpoints: Mimir=${{ env.MIMIR_ENDPOINT }}, Loki=${{ env.LOKI_ENDPOINT }}"
+          echo "Checking endpoints: Mimir=localhost:9009, Loki=localhost:3100"
           
           # Test Mimir metrics endpoint for Windows exporter metrics
           echo "Checking for Windows exporter metrics..."
-          mimir_response=$(curl -s "http://${{ env.MIMIR_ENDPOINT }}/api/v1/query?query=up{job=\"integrations/windows_exporter\"}" || echo "failed")
+          mimir_response=$(curl -s "http://localhost:9009/api/v1/query?query=up{job=\"integrations/windows_exporter\"}" || echo "failed")
           if [[ "$mimir_response" == "failed" ]]; then
             echo "❌ Failed to query Mimir metrics"
             exit 1
@@ -215,7 +216,7 @@ jobs:
           metrics_count=$(echo "$mimir_response" | jq -r '.data.result | length' 2>/dev/null || echo "0")
           if [[ "$metrics_count" == "0" ]]; then
             echo "⚠️ No Windows exporter metrics found yet, checking general connectivity..."
-            general_response=$(curl -s "http://${{ env.MIMIR_ENDPOINT }}/api/v1/query?query=up" || echo "failed")
+            general_response=$(curl -s "http://localhost:9009/api/v1/query?query=up" || echo "failed")
             if [[ "$general_response" == "failed" ]]; then
               echo "❌ Mimir endpoint not responding"
               exit 1
@@ -227,7 +228,7 @@ jobs:
           
           # Test Loki logs endpoint  
           echo "Checking for Windows logs..."
-          loki_response=$(curl -s "http://${{ env.LOKI_ENDPOINT }}/loki/api/v1/query?query={job=\"integrations/windows_exporter\"}" || echo "failed")
+          loki_response=$(curl -s "http://localhost:3100/loki/api/v1/query?query={job=\"integrations/windows_exporter\"}" || echo "failed")
           if [[ "$loki_response" == "failed" ]]; then
             echo "❌ Failed to query Loki logs"
             exit 1
