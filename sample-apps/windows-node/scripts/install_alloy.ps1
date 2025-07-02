@@ -88,4 +88,4 @@ Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "Alloy installation completed."
 
 # Explicitly exit with success code
-exit 0 
+exit 0
