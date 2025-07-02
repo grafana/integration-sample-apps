@@ -106,12 +106,49 @@ jobs:
             grafana/loki:3.0.0 \
             -config.file=/etc/loki/local-config.yaml
           
-          # Wait for containers to be ready
-          echo "Waiting for services to start..."
-          timeout 60s bash -c 'until curl -s http://localhost:9009/ready >/dev/null; do sleep 3; done'
-          timeout 60s bash -c 'until curl -s http://localhost:3100/ready >/dev/null; do sleep 3; done'
+          # Wait for containers to be running first
+          echo "Waiting for containers to be running..."
+          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} mimir)" == "true" ]; do sleep 2; done'
+          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} loki)" == "true" ]; do sleep 2; done'
           
-          echo "Services are ready"
+          echo "Containers are running, waiting for services to be ready..."
+          
+          # Give services time to initialize before checking health endpoints
+          sleep 15
+          
+          # Check Mimir health endpoint with better error handling
+          echo "Checking Mimir health..."
+          for i in {1..20}; do
+            if curl -s -f http://localhost:9009/ready >/dev/null; then
+              echo "✅ Mimir is ready"
+              break
+            fi
+            echo "Attempt $i/20: Mimir not ready yet..."
+            sleep 3
+            if [ $i -eq 20 ]; then
+              echo "❌ Mimir failed to become ready"
+              docker logs mimir --tail 20
+              exit 1
+            fi
+          done
+          
+          # Check Loki health endpoint with better error handling  
+          echo "Checking Loki health..."
+          for i in {1..20}; do
+            if curl -s -f http://localhost:3100/ready >/dev/null; then
+              echo "✅ Loki is ready"
+              break
+            fi
+            echo "Attempt $i/20: Loki not ready yet..."
+            sleep 3
+            if [ $i -eq 20 ]; then
+              echo "❌ Loki failed to become ready"
+              docker logs loki --tail 20
+              exit 1
+            fi
+          done
+          
+          echo "✅ All services are ready"
 
       - name: Run Windows sample app
         shell: powershell
