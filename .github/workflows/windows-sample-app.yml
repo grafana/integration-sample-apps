@@ -103,7 +103,7 @@ jobs:
           docker compose up -d
           
           # Set default config
-          source ../../../.defaultconfig
+          source ../../.defaultconfig
           
           echo "Database setup complete - Loki: localhost:3100, Mimir: localhost:9009"
           
