@@ -49,92 +49,90 @@ jobs:
           source ~/.vars
           echo $PATH
 
-      - name: Install Multipass on Windows
-        shell: powershell
-        run: |
-          Write-Host "Installing Multipass using Chocolatey..."
-          choco install multipass --yes
-          
-          # Wait for Multipass to be available in PATH
-          Write-Host "Waiting for Multipass to be available..."
-          $timeout = 300 # 5 minutes
-          $elapsed = 0
-          while (-not (Get-Command multipass -ErrorAction SilentlyContinue) -and $elapsed -lt $timeout) {
-            # Refresh environment variables
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            Start-Sleep -Seconds 10
-            $elapsed += 10
-            Write-Host "Waiting for Multipass to be available... ($elapsed/$timeout seconds)"
-          }
-          
-          if (-not (Get-Command multipass -ErrorAction SilentlyContinue)) {
-            Write-Error "Multipass installation failed or timed out"
-            exit 1
-          }
-          
-          Write-Host "Multipass installed successfully"
-          multipass version
-
-      - name: Install jq in WSL
+      - name: Install Docker in WSL
         run: |
           source ~/.vars
           
-          echo "Installing jq for JSON parsing..."
-          sudo apt-get update
-          sudo apt-get install -y jq
+          echo "Installing Docker in WSL..."
           
-          echo "jq installed successfully"
-          jq --version
+          # Install Docker if not cached
+          if ! command -v docker &> /dev/null; then
+            echo "Installing Docker dependencies..."
+            sudo apt-get update
+            sudo apt-get install -y ca-certificates curl gnupg lsb-release
+            
+            echo "Adding Docker GPG key..."
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            
+            echo "Adding Docker repository..."
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            echo "Installing Docker..."
+            sudo apt-get update
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+            
+            echo "Docker installed successfully"
+          else
+            echo "Docker already available"
+          fi
+          
+          # Start Docker service
+          sudo service docker start
+          
+          # Wait for Docker to be ready
+          timeout 60s bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
+          
+          echo "Docker is ready"
+          docker --version
 
-      - name: Setup Multipass VM with databases
+      - name: Start Mimir and Loki containers
         run: |
           source ~/.vars
           
-          echo "Setting up Multipass VM with databases..."
+          echo "Starting Mimir and Loki containers..."
           
-          # Launch multipass VM with docker
-          echo "Launching Multipass VM..."
-          multipass launch docker --name dbs
+          echo "Starting Mimir container..."
+          docker run -d --name mimir -p 9009:9009 \
+            grafana/mimir:2.13.0 \
+            /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
           
-          # Transfer config files to VM
-          echo "Transferring database config files..."
-          multipass transfer ./ops/qa/dbs/* dbs:/home/ubuntu -r
+          echo "Starting Loki container..."
+          docker run -d --name loki -p 3100:3100 \
+            grafana/loki:3.0.0 \
+            -config.file=/etc/loki/local-config.yaml
           
-          # Start docker containers in the VM
-          echo "Starting Mimir and Loki containers in VM..."
-          multipass exec dbs -- bash -c "docker-compose -f docker-compose.yaml up -d"
-          
-          # Get VM IP and set environment variables
-          echo "Getting VM IP address..."
-          DB_IP=$(multipass info dbs --format json | jq -r .info.dbs.ipv4[0])
-          echo "Database VM IP: $DB_IP"
-          
-          # Export environment variables for later steps
-          echo "LOKI_ENDPOINT=$DB_IP:3100" >> $GITHUB_ENV
-          echo "MIMIR_ENDPOINT=$DB_IP:9009" >> $GITHUB_ENV
+          # Set environment variables for later steps
+          echo "LOKI_ENDPOINT=localhost:3100" >> $GITHUB_ENV
+          echo "MIMIR_ENDPOINT=localhost:9009" >> $GITHUB_ENV
           
           # Set default config
           source ./ops/.defaultconfig
           echo "SAMPLE_APP_SETUP_TIME=$SAMPLE_APP_SETUP_TIME" >> $GITHUB_ENV
           
-          echo "Database setup complete - Loki: $DB_IP:3100, Mimir: $DB_IP:9009"
+          echo "Database setup complete - Loki: localhost:3100, Mimir: localhost:9009"
           
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 30
+          # Wait for containers to be running first
+          echo "Waiting for containers to be running..."
+          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} mimir)" == "true" ]; do sleep 2; done'
+          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} loki)" == "true" ]; do sleep 2; done'
+          
+          echo "Containers are running, waiting for services to be ready..."
+          
+          # Give services time to initialize before checking health endpoints
+          sleep 15
           
           # Check Mimir health endpoint
           echo "Checking Mimir health..."
           for i in {1..20}; do
-            if curl -s -f http://$DB_IP:9009/ready >/dev/null; then
+            if curl -s -f http://localhost:9009/ready >/dev/null; then
               echo "✅ Mimir is ready"
               break
             fi
             echo "Attempt $i/20: Mimir not ready yet..."
-            sleep 5
+            sleep 3
             if [ $i -eq 20 ]; then
               echo "❌ Mimir failed to become ready"
-              multipass exec dbs -- docker logs mimir --tail 20
+              docker logs mimir --tail 20
               exit 1
             fi
           done
@@ -142,15 +140,15 @@ jobs:
           # Check Loki health endpoint  
           echo "Checking Loki health..."
           for i in {1..20}; do
-            if curl -s -f http://$DB_IP:3100/ready >/dev/null; then
+            if curl -s -f http://localhost:3100/ready >/dev/null; then
               echo "✅ Loki is ready"
               break
             fi
             echo "Attempt $i/20: Loki not ready yet..."
-            sleep 5
+            sleep 3
             if [ $i -eq 20 ]; then
               echo "❌ Loki failed to become ready"
-              multipass exec dbs -- docker logs loki --tail 20
+              docker logs loki --tail 20
               exit 1
             fi
           done
@@ -238,26 +236,16 @@ jobs:
           
           echo "✅ All validation checks passed"
 
-      - name: Cleanup Multipass VM
+      - name: Cleanup Docker containers
         if: always()
         run: |
           source ~/.vars
           
-          echo "Cleaning up Multipass VM..."
+          echo "Cleaning up Docker containers..."
           
-          # Stop and delete the VM
-          if multipass list | grep -q "dbs"; then
-            echo "Stopping Multipass VM..."
-            multipass stop dbs || true
-            
-            echo "Deleting Multipass VM..."
-            multipass delete dbs || true
-            
-            echo "Purging deleted VMs..."
-            multipass purge || true
-          else
-            echo "No Multipass VM found to clean up"
-          fi
+          echo "Stopping containers..."
+          docker stop mimir loki 2>/dev/null || true
+          docker rm mimir loki 2>/dev/null || true
           
           echo "Cleanup completed"
 
