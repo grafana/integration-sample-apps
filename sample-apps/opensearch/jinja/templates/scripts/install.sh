@@ -46,10 +46,3 @@ sudo systemctl enable opensearch
 sudo systemctl start opensearch
 
 echo "OpenSearch installation completed successfully"
-
-
-
-
-
-
-

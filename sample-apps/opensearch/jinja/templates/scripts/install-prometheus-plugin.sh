@@ -165,4 +165,3 @@ sudo systemctl restart opensearch
 
 echo "Prometheus plugin installation and configuration completed."
 echo "You can now access metrics at: http://localhost:9200/_prometheus/metrics"
-
