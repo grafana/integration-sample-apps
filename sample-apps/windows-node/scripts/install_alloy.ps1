@@ -85,4 +85,7 @@ if ($service) {
 # Clean up temporary files
 Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 
-Write-Host "Alloy installation completed." 
+Write-Host "Alloy installation completed."
+
+# Explicitly exit with success code
+exit 0 
