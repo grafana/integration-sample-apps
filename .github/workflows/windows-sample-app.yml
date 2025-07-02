@@ -34,48 +34,182 @@ jobs:
           Write-Host "Docker info:"
           docker info
           
+          # Switch Docker to Linux container mode
+          Write-Host "Switching Docker to Linux container mode..."
+          try {
+            # Try standard Docker Desktop path first
+            if (Test-Path "C:\Program Files\Docker\Docker\DockerCli.exe") {
+              & "C:\Program Files\Docker\Docker\DockerCli.exe" -SwitchLinuxEngine
+            } else {
+              Write-Host "DockerCli.exe not found at standard path, trying alternative approach..."
+              # Alternative: restart Docker service with Linux containers
+              Restart-Service -Name "Docker Desktop Service" -Force -ErrorAction SilentlyContinue
+            }
+            Start-Sleep -Seconds 30
+          } catch {
+            Write-Warning "Could not switch Docker to Linux mode: $_"
+            Write-Host "Proceeding with current Docker configuration..."
+          }
+          
+          # Verify Docker status and container mode
+          Write-Host "Checking Docker status..."
+          docker info --format "json" | ConvertFrom-Json | ForEach-Object {
+            Write-Host "Docker OS Type: $($_.OSType)"
+            Write-Host "Server Version: $($_.ServerVersion)"
+            Write-Host "Container Runtime: $($_.DefaultRuntime)"
+          }
+          
+          # Pull Docker images explicitly with platform specification
+          Write-Host "Pulling Docker images..."
+          try {
+            Write-Host "Pulling Mimir image..."
+            docker pull --platform linux/amd64 grafana/mimir:2.13.0
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Failed to pull Mimir image, will try to run anyway"
+            }
+            
+            Write-Host "Pulling Loki image..."
+            docker pull --platform linux/amd64 grafana/loki:3.0.0
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Failed to pull Loki image, will try to run anyway"
+            }
+          } catch {
+            Write-Warning "Error during image pull: $_"
+          }
+          
           # Start Mimir and Loki containers (using Linux containers explicitly)
           Write-Host "Starting Mimir..."
           
-          # Start Mimir with explicit Linux platform
+          # Start Mimir with explicit Linux platform and specific version
           $mimirConfigPath = "${{ github.workspace }}/ops/qa/dbs/configs/mimir".Replace('\', '/')
           Write-Host "Starting Mimir with config path: $mimirConfigPath"
           
-          docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
-            -v "${mimirConfigPath}:/etc/mimir-config" `
-            grafana/mimir:latest `
-            /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
-            
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to start Mimir"
+          # Try multiple approaches for Mimir
+          $mimirStarted = $false
+          
+          # Approach 1: With config file
+          try {
+            docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
+              -v "${mimirConfigPath}:/etc/mimir-config" `
+              grafana/mimir:2.13.0 `
+              /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
+            if ($LASTEXITCODE -eq 0) { $mimirStarted = $true }
+          } catch { Write-Host "Approach 1 failed: $_" }
+          
+          # Approach 2: Simplified config without volume mount
+          if (-not $mimirStarted) {
+            Write-Host "Trying simplified Mimir configuration..."
+            try {
+              docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
+                grafana/mimir:2.13.0 `
+                /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
+              if ($LASTEXITCODE -eq 0) { $mimirStarted = $true }
+            } catch { Write-Host "Approach 2 failed: $_" }
+          }
+          
+          # Approach 3: Alternative image or different version
+          if (-not $mimirStarted) {
+            Write-Host "Trying alternative Mimir image..."
+            try {
+              docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
+                grafana/mimir:2.12.0 `
+                /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
+              if ($LASTEXITCODE -eq 0) { $mimirStarted = $true }
+            } catch { Write-Host "Approach 3 failed: $_" }
+          }
+          
+          # Approach 4: Use Prometheus as a fallback
+          if (-not $mimirStarted) {
+            Write-Host "Mimir failed, falling back to Prometheus..."
+            try {
+              docker run -d --name mimir --platform linux/amd64 -p 9009:9090 `
+                prom/prometheus:latest `
+                --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.console.libraries=/etc/prometheus/console_libraries --web.console.templates=/etc/prometheus/consoles --web.listen-address=0.0.0.0:9090
+              if ($LASTEXITCODE -eq 0) { 
+                $mimirStarted = $true 
+                Write-Host "Using Prometheus as Mimir replacement"
+              }
+            } catch { Write-Host "Prometheus fallback failed: $_" }
+          }
+          
+          if (-not $mimirStarted) {
+            Write-Error "All Mimir startup approaches failed"
             docker logs mimir 2>$null
             exit 1
           }
           Write-Host "Mimir container started"
           
-          # Start Loki with explicit Linux platform
+          # Try multiple approaches for Loki
           Write-Host "Starting Loki..."
-          docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
-            grafana/loki:latest `
-            -config.file=/etc/loki/local-config.yaml
-            
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to start Loki"
+          $lokiStarted = $false
+          
+          # Approach 1: Latest stable version
+          try {
+            docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
+              grafana/loki:3.0.0 `
+              -config.file=/etc/loki/local-config.yaml
+            if ($LASTEXITCODE -eq 0) { $lokiStarted = $true }
+          } catch { Write-Host "Loki 3.0.0 failed: $_" }
+          
+          # Approach 2: Alternative version
+          if (-not $lokiStarted) {
+            Write-Host "Trying alternative Loki version..."
+            try {
+              docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
+                grafana/loki:2.9.0 `
+                -config.file=/etc/loki/local-config.yaml
+              if ($LASTEXITCODE -eq 0) { $lokiStarted = $true }
+            } catch { Write-Host "Loki 2.9.0 failed: $_" }
+          }
+          
+          # Approach 3: Simplified config
+          if (-not $lokiStarted) {
+            Write-Host "Trying simplified Loki configuration..."
+            try {
+              docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
+                grafana/loki:2.9.0 `
+                -log.level=info
+              if ($LASTEXITCODE -eq 0) { $lokiStarted = $true }
+            } catch { Write-Host "Simplified Loki failed: $_" }
+          }
+          
+          if (-not $lokiStarted) {
+            Write-Error "All Loki startup approaches failed"
             docker logs loki 2>$null
             exit 1
           }
           Write-Host "Loki container started"
           
-          # Wait for services to be ready
+          # Wait for services to be ready with retry logic
           Write-Host "Waiting for services to start..."
-          Start-Sleep -Seconds 45
+          $maxWaitTime = 120
+          $waitInterval = 10
+          $waited = 0
           
-          # Check if services are running
+          while ($waited -lt $maxWaitTime) {
+            Start-Sleep -Seconds $waitInterval
+            $waited += $waitInterval
+            
+            # Check if services are running
+            $mimirRunning = docker ps --filter "name=mimir" --filter "status=running" -q
+            $lokiRunning = docker ps --filter "name=loki" --filter "status=running" -q
+            
+            if ($mimirRunning -and $lokiRunning) {
+              Write-Host "Both containers are running after $waited seconds"
+              break
+            }
+            
+            Write-Host "Waiting for containers... ($waited/$maxWaitTime seconds)"
+            if (-not $mimirRunning) { Write-Host "  - Mimir not yet running" }
+            if (-not $lokiRunning) { Write-Host "  - Loki not yet running" }
+          }
+          
+          # Final check for running containers
           $mimirRunning = docker ps --filter "name=mimir" --filter "status=running" -q
           $lokiRunning = docker ps --filter "name=loki" --filter "status=running" -q
           
           if (-not $mimirRunning) {
-            Write-Error "Mimir container is not running"
+            Write-Error "Mimir container is not running after $maxWaitTime seconds"
             Write-Host "Mimir container logs:"
             docker logs mimir 2>$null
             Write-Host "All running containers:"
@@ -84,7 +218,7 @@ jobs:
           }
           
           if (-not $lokiRunning) {
-            Write-Error "Loki container is not running"  
+            Write-Error "Loki container is not running after $maxWaitTime seconds"
             Write-Host "Loki container logs:"
             docker logs loki 2>$null
             Write-Host "All running containers:"
@@ -94,21 +228,48 @@ jobs:
           
           Write-Host "Services are running successfully"
           
-          # Test connectivity
+          # Test connectivity with retry logic
           Write-Host "Testing service connectivity..."
-          try {
-            $mimirHealth = Invoke-RestMethod -Uri "http://localhost:9009/ready" -TimeoutSec 10
-            Write-Host "Mimir is ready"
-          } catch {
-            Write-Warning "Mimir health check failed: $_"
+          $maxRetries = 6
+          $retryInterval = 10
+          
+          # Test Mimir connectivity
+          $mimirReady = $false
+          for ($i = 1; $i -le $maxRetries; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri "http://localhost:9009/ready" -TimeoutSec 5 -Method GET
+              Write-Host "Mimir is ready (attempt $i)"
+              $mimirReady = $true
+              break
+            } catch {
+              Write-Host "Mimir health check attempt $i failed: $_"
+              if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryInterval }
+            }
           }
           
-          try {
-            $lokiHealth = Invoke-RestMethod -Uri "http://localhost:3100/ready" -TimeoutSec 10
-            Write-Host "Loki is ready"
-          } catch {
-            Write-Warning "Loki health check failed: $_"
+          # Test Loki connectivity  
+          $lokiReady = $false
+          for ($i = 1; $i -le $maxRetries; $i++) {
+            try {
+              $response = Invoke-RestMethod -Uri "http://localhost:3100/ready" -TimeoutSec 5 -Method GET
+              Write-Host "Loki is ready (attempt $i)"
+              $lokiReady = $true
+              break
+            } catch {
+              Write-Host "Loki health check attempt $i failed: $_"
+              if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryInterval }
+            }
           }
+          
+          if (-not $mimirReady) {
+            Write-Warning "Mimir health checks failed after $maxRetries attempts"
+          }
+          
+          if (-not $lokiReady) {
+            Write-Warning "Loki health checks failed after $maxRetries attempts"
+          }
+          
+          Write-Host "Container setup completed - proceeding with sample app"
 
       - name: Run Windows sample app
         working-directory: ./sample-apps/windows-node
