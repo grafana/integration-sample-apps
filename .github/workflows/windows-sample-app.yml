@@ -28,44 +28,41 @@ jobs:
       - name: Setup Docker containers for Mimir and Loki
         shell: powershell
         run: |
-          # Start Mimir and Loki containers
-          docker network create dbs 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Network 'dbs' created successfully"
-          } else {
-            Write-Host "Network 'dbs' already exists or creation failed"
-          }
+          # Start Mimir and Loki containers without custom network (Windows compatibility)
+          Write-Host "Starting Mimir..."
           
-          # Start Mimir
+          # Start Mimir with default networking
           $mimirConfigPath = "${{ github.workspace }}/ops/qa/dbs/configs/mimir".Replace('\', '/')
           Write-Host "Starting Mimir with config path: $mimirConfigPath"
           
-          docker run -d --name mimir --network dbs -p 9009:9009 `
+          docker run -d --name mimir -p 9009:9009 `
             -v "${mimirConfigPath}:/etc/mimir-config" `
             grafana/mimir:latest `
             /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
             
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to start Mimir"
+            docker logs mimir 2>$null
             exit 1
           }
           Write-Host "Mimir container started"
           
-          # Start Loki  
+          # Start Loki with default networking
           Write-Host "Starting Loki..."
-          docker run -d --name loki --network dbs -p 3100:3100 `
+          docker run -d --name loki -p 3100:3100 `
             grafana/loki:latest `
             -config.file=/etc/loki/local-config.yaml
             
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to start Loki"
+            docker logs loki 2>$null
             exit 1
           }
           Write-Host "Loki container started"
           
           # Wait for services to be ready
           Write-Host "Waiting for services to start..."
-          Start-Sleep -Seconds 30
+          Start-Sleep -Seconds 45
           
           # Check if services are running
           $mimirRunning = docker ps --filter "name=mimir" --filter "status=running" -q
@@ -73,17 +70,39 @@ jobs:
           
           if (-not $mimirRunning) {
             Write-Error "Mimir container is not running"
-            docker logs mimir
+            Write-Host "Mimir container logs:"
+            docker logs mimir 2>$null
+            Write-Host "All running containers:"
+            docker ps
             exit 1
           }
           
           if (-not $lokiRunning) {
             Write-Error "Loki container is not running"  
-            docker logs loki
+            Write-Host "Loki container logs:"
+            docker logs loki 2>$null
+            Write-Host "All running containers:"
+            docker ps
             exit 1
           }
           
           Write-Host "Services are running successfully"
+          
+          # Test connectivity
+          Write-Host "Testing service connectivity..."
+          try {
+            $mimirHealth = Invoke-RestMethod -Uri "http://localhost:9009/ready" -TimeoutSec 10
+            Write-Host "Mimir is ready"
+          } catch {
+            Write-Warning "Mimir health check failed: $_"
+          }
+          
+          try {
+            $lokiHealth = Invoke-RestMethod -Uri "http://localhost:3100/ready" -TimeoutSec 10
+            Write-Host "Loki is ready"
+          } catch {
+            Write-Warning "Loki health check failed: $_"
+          }
 
       - name: Run Windows sample app
         working-directory: ./sample-apps/windows-node
@@ -174,6 +193,7 @@ jobs:
         shell: powershell
         run: |
           # Stop and remove containers
+          Write-Host "Cleaning up Docker containers..."
           docker stop mimir loki 2>$null
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Containers stopped"
@@ -188,20 +208,18 @@ jobs:
             Write-Host "Containers already removed or removal failed"
           }
           
-          docker network rm dbs 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Network removed"
-          } else {
-            Write-Host "Network already removed or removal failed"
-          }
-          
           # Stop Alloy service
+          Write-Host "Stopping Alloy service..."
           try {
             $service = Get-Service -Name "Alloy" -ErrorAction SilentlyContinue
             if ($service -and $service.Status -eq "Running") {
               Stop-Service -Name "Alloy" -Force
               Write-Host "Alloy service stopped"
+            } else {
+              Write-Host "Alloy service not running or not found"
             }
           } catch {
             Write-Host "Error stopping Alloy service: $_"
-          } 
+          }
+          
+          Write-Host "Cleanup completed" 
