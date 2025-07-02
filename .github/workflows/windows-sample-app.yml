@@ -120,7 +120,7 @@ jobs:
           
           # Give services time to initialize
           echo "Waiting for services to initialize..."
-          sleep 30
+          sleep 45
           
           # Check Mimir health using official readiness probe
           echo "Checking Mimir health..."
