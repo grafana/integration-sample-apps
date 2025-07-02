@@ -194,45 +194,12 @@ jobs:
           echo "Waiting for sample app to generate metrics..."
           sleep $SAMPLE_APP_SETUP_TIME
 
-      - name: Validate metrics and logs
+      - name: Validate metrics
         run: |
           source ~/.vars
           
-          echo "Validating metrics collection..."
-          echo "Checking endpoints: Mimir=localhost:9009, Loki=localhost:3100"
-          
-          # Test Mimir metrics endpoint for Windows exporter metrics
-          echo "Checking for Windows exporter metrics..."
-          mimir_response=$(curl -s "http://localhost:9009/api/v1/query?query=up{job=\"integrations/windows_exporter\"}" || echo "failed")
-          if [[ "$mimir_response" == "failed" ]]; then
-            echo "❌ Failed to query Mimir metrics"
-            exit 1
-          fi
-          
-          # Check if we got actual metrics
-          metrics_count=$(echo "$mimir_response" | jq -r '.data.result | length' 2>/dev/null || echo "0")
-          if [[ "$metrics_count" == "0" ]]; then
-            echo "⚠️ No Windows exporter metrics found yet, checking general connectivity..."
-            general_response=$(curl -s "http://localhost:9009/api/v1/query?query=up" || echo "failed")
-            if [[ "$general_response" == "failed" ]]; then
-              echo "❌ Mimir endpoint not responding"
-              exit 1
-            fi
-            echo "✅ Mimir endpoint responding but no Windows metrics yet"
-          else
-            echo "✅ Found $metrics_count Windows exporter metric series"
-          fi
-          
-          # Test Loki logs endpoint  
-          echo "Checking for Windows logs..."
-          loki_response=$(curl -s "http://localhost:3100/loki/api/v1/query?query={job=\"integrations/windows_exporter\"}" || echo "failed")
-          if [[ "$loki_response" == "failed" ]]; then
-            echo "❌ Failed to query Loki logs"
-            exit 1
-          fi
-          echo "✅ Loki logs endpoint responding"
-          
-          echo "✅ All validation checks passed"
+          echo "Validating metrics using check_metrics.sh script..."
+          ./ops/scripts/check_metrics.sh windows-node localhost:9009
 
       - name: Cleanup Docker containers
         if: always()
