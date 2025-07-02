@@ -1,0 +1,206 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required Opensearch sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+  - git
+  - gpg
+  - curl
+  - alloy
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      discovery.relabel "metrics_integrations_integrations_opensearch" {
+        targets = [{
+          __address__ = "localhost:9200",
+        }]
+
+        rule {
+          target_label = "node"
+          replacement  = constants.hostname
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_integrations_opensearch" {
+        targets      = discovery.relabel.metrics_integrations_integrations_opensearch.output
+        forward_to   = [prometheus.relabel.metrics_integrations_integrations_opensearch.receiver]
+        job_name     = "integrations/opensearch"
+        metrics_path = "/_prometheus/metrics"
+      }
+
+      prometheus.relabel "metrics_integrations_integrations_opensearch" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          action      = "labelmap"
+          regex       = "cluster"
+          replacement = "opensearch_cluster"
+        }
+
+        rule {
+          action = "labeldrop"
+          regex  = "cluster"
+        }
+
+        // Asserts-specific rules
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        // this should either be
+        // 1. k8s deployment name
+        // 2. opensearch_cluster name in case of non-k8s environment
+        rule {
+          target_label = "service"
+          replacement = "opensearch-sample-app"
+        }
+
+        // this should either be
+        // 1. k8s deployment name
+        // 2. opensearch_cluster name in case of non-k8s environment
+        rule {
+          target_label = "workload"
+          replacement = "opensearch-sample-app"
+        }
+
+        // k8s-specific rules
+        rule {
+          target_label = "namespace"
+          replacement  = "default"
+        }
+
+        rule {
+          target_label = "pod"
+          replacement  = constants.hostname
+        }
+      }
+
+      local.file_match "logs_integrations_integrations_opensearch" {
+        path_targets = [{
+          __address__        = "localhost",
+          __path__           = "/var/log/opensearch/opensearch.log",
+          job                = "integrations/opensearch",
+          opensearch_cluster = "opensearch-sample-app-cluster",
+          node               = constants.hostname,
+        }]
+      }
+
+      loki.source.file "logs_integrations_integrations_opensearch" {
+        targets    = local.file_match.logs_integrations_integrations_opensearch.targets
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+      }
+
+  - owner: root:root
+    path: /home/ubuntu/install.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/install.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/install-prometheus-plugin.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/install-prometheus-plugin.sh' -%}
+      {% endfilter %}
+
+  # Update sysctl.conf for OpenSearch
+  - owner: root:root
+    path: /etc/sysctl.d/99-opensearch.conf
+    content: |
+      # OpenSearch configuration
+      vm.max_map_count=262144
+
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - chmod +x /home/ubuntu/install.sh
+  - chmod +x /home/ubuntu/install-prometheus-plugin.sh
+
+  # Install Opensearch
+  - /home/ubuntu/install.sh > /home/ubuntu/install.log 2>&1
+
+  # Install Prometheus plugin for Opensearch: https://github.com/Aiven-Open/prometheus-exporter-plugin-for-opensearch
+  - /home/ubuntu/install-prometheus-plugin.sh > /home/ubuntu/install-prometheus-plugin.log 2>&1
+
+  # Give alloy access to opensearch logs
+  - sudo usermod -a -G opensearch alloy
+
+  # Configure Alloy
+  - sudo systemctl enable alloy
+  - sudo systemctl start alloy
