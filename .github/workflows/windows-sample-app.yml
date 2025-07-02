@@ -28,14 +28,20 @@ jobs:
       - name: Setup Docker containers for Mimir and Loki
         shell: powershell
         run: |
-          # Start Mimir and Loki containers without custom network (Windows compatibility)
+          # Check Docker version and info
+          Write-Host "Docker version:"
+          docker version
+          Write-Host "Docker info:"
+          docker info
+          
+          # Start Mimir and Loki containers (using Linux containers explicitly)
           Write-Host "Starting Mimir..."
           
-          # Start Mimir with default networking
+          # Start Mimir with explicit Linux platform
           $mimirConfigPath = "${{ github.workspace }}/ops/qa/dbs/configs/mimir".Replace('\', '/')
           Write-Host "Starting Mimir with config path: $mimirConfigPath"
           
-          docker run -d --name mimir -p 9009:9009 `
+          docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
             -v "${mimirConfigPath}:/etc/mimir-config" `
             grafana/mimir:latest `
             /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
@@ -47,9 +53,9 @@ jobs:
           }
           Write-Host "Mimir container started"
           
-          # Start Loki with default networking
+          # Start Loki with explicit Linux platform
           Write-Host "Starting Loki..."
-          docker run -d --name loki -p 3100:3100 `
+          docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
             grafana/loki:latest `
             -config.file=/etc/loki/local-config.yaml
             
