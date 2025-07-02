@@ -52,15 +52,18 @@ jobs:
       - name: Install Multipass on Windows
         shell: powershell
         run: |
-          Write-Host "Installing Multipass using winget..."
-          winget install --id=Canonical.Multipass --exact --silent --accept-package-agreements --accept-source-agreements
+          Write-Host "Installing Multipass using Chocolatey..."
+          choco install multipass --yes
           
           # Wait for Multipass to be available in PATH
+          Write-Host "Waiting for Multipass to be available..."
           $timeout = 300 # 5 minutes
           $elapsed = 0
           while (-not (Get-Command multipass -ErrorAction SilentlyContinue) -and $elapsed -lt $timeout) {
-            Start-Sleep -Seconds 5
-            $elapsed += 5
+            # Refresh environment variables
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            Start-Sleep -Seconds 10
+            $elapsed += 10
             Write-Host "Waiting for Multipass to be available... ($elapsed/$timeout seconds)"
           }
           
