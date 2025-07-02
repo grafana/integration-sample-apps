@@ -30,7 +30,8 @@ jobs:
           dir_names: true
           dir_names_exclude_current_dir: true
           dir_names_max_depth: 1
-          dir_names_exclude: "windows-node"
+          files_ignore: |
+            windows-node/**
           matrix: true
 
       - name: List all changed sample app dir_names
