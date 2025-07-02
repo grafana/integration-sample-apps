@@ -29,18 +29,39 @@ jobs:
         shell: powershell
         run: |
           # Start Mimir and Loki containers
-          docker network create dbs 2>$null || echo "Network already exists"
+          docker network create dbs 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Network 'dbs' created successfully"
+          } else {
+            Write-Host "Network 'dbs' already exists or creation failed"
+          }
           
           # Start Mimir
+          $mimirConfigPath = "${{ github.workspace }}/ops/qa/dbs/configs/mimir".Replace('\', '/')
+          Write-Host "Starting Mimir with config path: $mimirConfigPath"
+          
           docker run -d --name mimir --network dbs -p 9009:9009 `
-            -v "${{ github.workspace }}/ops/qa/dbs/configs/mimir:/etc/mimir-config" `
+            -v "${mimirConfigPath}:/etc/mimir-config" `
             grafana/mimir:latest `
             /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
+            
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to start Mimir"
+            exit 1
+          }
+          Write-Host "Mimir container started"
           
           # Start Loki  
+          Write-Host "Starting Loki..."
           docker run -d --name loki --network dbs -p 3100:3100 `
             grafana/loki:latest `
             -config.file=/etc/loki/local-config.yaml
+            
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to start Loki"
+            exit 1
+          }
+          Write-Host "Loki container started"
           
           # Wait for services to be ready
           Write-Host "Waiting for services to start..."
@@ -153,9 +174,26 @@ jobs:
         shell: powershell
         run: |
           # Stop and remove containers
-          docker stop mimir loki 2>$null || echo "Containers already stopped"
-          docker rm mimir loki 2>$null || echo "Containers already removed"
-          docker network rm dbs 2>$null || echo "Network already removed"
+          docker stop mimir loki 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Containers stopped"
+          } else {
+            Write-Host "Containers already stopped or stop failed"
+          }
+          
+          docker rm mimir loki 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Containers removed"
+          } else {
+            Write-Host "Containers already removed or removal failed"
+          }
+          
+          docker network rm dbs 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Network removed"
+          } else {
+            Write-Host "Network already removed or removal failed"
+          }
           
           # Stop Alloy service
           try {
