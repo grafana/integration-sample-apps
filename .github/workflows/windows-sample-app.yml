@@ -32,12 +32,12 @@ jobs:
           git config --global core.eol lf
       
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
       - name: Setup WSL
-        uses: Vampire/setup-wsl@v2
+        uses: Vampire/setup-wsl@3b46b44374d5d0ae94654c45d114a3ed7a0e07a8 # v5.0.1
         with:
           distribution: Ubuntu-20.04
           wsl-shell-command: bash -e -u -o pipefail
@@ -50,7 +50,7 @@ jobs:
           echo $PATH
 
       - name: Cache Docker installation
-        uses: actions/cache@v3
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v3.3.2
         with:
           path: ./docker-cache
           key: ${{ runner.os }}-docker-${{ hashFiles('**/lockfiles') }}
