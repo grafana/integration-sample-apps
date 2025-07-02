@@ -55,29 +55,37 @@ $configTemplate += @"
 }
 
 // Windows exporter for system metrics
-prometheus.exporter.windows "windows_metrics" {
-  enabled_collectors = ["cpu", "cs", "logical_disk", "memory", "net", "os", "service", "system"]
+prometheus.exporter.windows "integrations_windows_exporter" {
+  enabled_collectors = ["cpu", "logical_disk", "net", "os", "service", "system", "time", "diskdrive"]
 }
 
-// Scrape Windows metrics
-prometheus.scrape "windows_scrape" {
-  targets    = prometheus.exporter.windows.windows_metrics.targets
-  forward_to = [prometheus.relabel.windows_relabel.receiver]
-  scrape_interval = "15s"
-}
+discovery.relabel "integrations_windows_exporter" {
+  targets = prometheus.exporter.windows.integrations_windows_exporter.targets
 
-// Relabel Windows metrics with proper job label
-prometheus.relabel "windows_relabel" {
-  forward_to = [prometheus.remote_write.metrics_service.receiver]
-  
   rule {
     target_label = "job"
     replacement  = "integrations/windows_exporter"
   }
-  
+
   rule {
     target_label = "instance"
-    replacement  = env("COMPUTERNAME")
+    replacement  = constants.hostname
+  }
+}
+
+prometheus.scrape "integrations_windows_exporter" {
+  targets    = discovery.relabel.integrations_windows_exporter.output
+  forward_to = [prometheus.relabel.integrations_windows_exporter.receiver]
+  job_name   = "integrations/windows_exporter"
+}
+
+prometheus.relabel "integrations_windows_exporter" {
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+  rule {
+    source_labels = ["volume"]
+    regex         = "HarddiskVolume.*"
+    action        = "drop"
   }
 }
 
