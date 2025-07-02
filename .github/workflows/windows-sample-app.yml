@@ -267,4 +267,4 @@ jobs:
         run: |
           Write-Host "Stopping Alloy service..."
           cd sample-apps/windows-node
-          .\scripts\stop_alloy.ps1 
+          .\scripts\stop_alloy.ps1
