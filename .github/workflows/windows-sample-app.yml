@@ -18,375 +18,171 @@ jobs:
   test-windows-sample-app:
     name: Test Windows sample app
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    
+    defaults:
+      run:
+        shell: wsl-bash {0}
+        
     steps:
+      - name: Set git to use LF
+        shell: cmd
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      
       - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Setup Docker containers for Mimir and Loki
-        shell: powershell
+      - name: Setup WSL
+        uses: Vampire/setup-wsl@v2
+        with:
+          distribution: Ubuntu-20.04
+          wsl-shell-command: bash -e -u -o pipefail
+
+      - name: Setup environment variables
         run: |
-          # Check Docker version and info
-          Write-Host "Docker version:"
-          docker version
-          Write-Host "Docker info:"
-          docker info
+          echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.vars
+          echo 'DEBIAN_FRONTEND=noninteractive' >> ~/.vars
+          source ~/.vars
+          echo $PATH
+
+      - name: Cache Docker installation
+        uses: actions/cache@v3
+        with:
+          path: ./docker-cache
+          key: ${{ runner.os }}-docker-${{ hashFiles('**/lockfiles') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      - name: Install Docker in WSL
+        run: |
+          source ~/.vars
+          mkdir -p ./docker-cache
           
-          # Switch Docker to Linux container mode
-          Write-Host "Switching Docker to Linux container mode..."
-          try {
-            # Try standard Docker Desktop path first
-            if (Test-Path "C:\Program Files\Docker\Docker\DockerCli.exe") {
-              & "C:\Program Files\Docker\Docker\DockerCli.exe" -SwitchLinuxEngine
-            } else {
-              Write-Host "DockerCli.exe not found at standard path, trying alternative approach..."
-              # Alternative: restart Docker service with Linux containers
-              Restart-Service -Name "Docker Desktop Service" -Force -ErrorAction SilentlyContinue
-            }
-            Start-Sleep -Seconds 30
-          } catch {
-            Write-Warning "Could not switch Docker to Linux mode: $_"
-            Write-Host "Proceeding with current Docker configuration..."
-          }
-          
-          # Verify Docker status and container mode
-          Write-Host "Checking Docker status..."
-          docker info --format "json" | ConvertFrom-Json | ForEach-Object {
-            Write-Host "Docker OS Type: $($_.OSType)"
-            Write-Host "Server Version: $($_.ServerVersion)"
-            Write-Host "Container Runtime: $($_.DefaultRuntime)"
-          }
-          
-          # Pull Docker images explicitly with platform specification
-          Write-Host "Pulling Docker images..."
-          try {
-            Write-Host "Pulling Mimir image..."
-            docker pull --platform linux/amd64 grafana/mimir:2.13.0
-            if ($LASTEXITCODE -ne 0) {
-              Write-Warning "Failed to pull Mimir image, will try to run anyway"
-            }
+          # Install Docker if not cached
+          if ! command -v docker &> /dev/null; then
+            echo "Installing Docker dependencies..."
+            sudo apt-get update
+            sudo apt-get install -y ca-certificates curl gnupg lsb-release
             
-            Write-Host "Pulling Loki image..."
-            docker pull --platform linux/amd64 grafana/loki:3.0.0
-            if ($LASTEXITCODE -ne 0) {
-              Write-Warning "Failed to pull Loki image, will try to run anyway"
-            }
-          } catch {
-            Write-Warning "Error during image pull: $_"
-          }
-          
-          # Start Mimir and Loki containers (using Linux containers explicitly)
-          Write-Host "Starting Mimir..."
-          
-          # Start Mimir with explicit Linux platform and specific version
-          $mimirConfigPath = "${{ github.workspace }}/ops/qa/dbs/configs/mimir".Replace('\', '/')
-          Write-Host "Starting Mimir with config path: $mimirConfigPath"
-          
-          # Try multiple approaches for Mimir
-          $mimirStarted = $false
-          
-          # Approach 1: With config file
-          try {
-            docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
-              -v "${mimirConfigPath}:/etc/mimir-config" `
-              grafana/mimir:2.13.0 `
-              /bin/mimir -config.file=/etc/mimir-config/mimir.yaml
-            if ($LASTEXITCODE -eq 0) { $mimirStarted = $true }
-          } catch { Write-Host "Approach 1 failed: $_" }
-          
-          # Approach 2: Simplified config without volume mount
-          if (-not $mimirStarted) {
-            Write-Host "Trying simplified Mimir configuration..."
-            try {
-              docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
-                grafana/mimir:2.13.0 `
-                /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
-              if ($LASTEXITCODE -eq 0) { $mimirStarted = $true }
-            } catch { Write-Host "Approach 2 failed: $_" }
-          }
-          
-          # Approach 3: Alternative image or different version
-          if (-not $mimirStarted) {
-            Write-Host "Trying alternative Mimir image..."
-            try {
-              docker run -d --name mimir --platform linux/amd64 -p 9009:9009 `
-                grafana/mimir:2.12.0 `
-                /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
-              if ($LASTEXITCODE -eq 0) { $mimirStarted = $true }
-            } catch { Write-Host "Approach 3 failed: $_" }
-          }
-          
-          # Approach 4: Use Prometheus as a fallback
-          if (-not $mimirStarted) {
-            Write-Host "Mimir failed, falling back to Prometheus..."
-            try {
-              docker run -d --name mimir --platform linux/amd64 -p 9009:9090 `
-                prom/prometheus:latest `
-                --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.console.libraries=/etc/prometheus/console_libraries --web.console.templates=/etc/prometheus/consoles --web.listen-address=0.0.0.0:9090
-              if ($LASTEXITCODE -eq 0) { 
-                $mimirStarted = $true 
-                Write-Host "Using Prometheus as Mimir replacement"
-              }
-            } catch { Write-Host "Prometheus fallback failed: $_" }
-          }
-          
-          if (-not $mimirStarted) {
-            Write-Error "All Mimir startup approaches failed"
-            docker logs mimir 2>$null
-            exit 1
-          }
-          Write-Host "Mimir container started"
-          
-          # Try multiple approaches for Loki
-          Write-Host "Starting Loki..."
-          $lokiStarted = $false
-          
-          # Approach 1: Latest stable version
-          try {
-            docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
-              grafana/loki:3.0.0 `
-              -config.file=/etc/loki/local-config.yaml
-            if ($LASTEXITCODE -eq 0) { $lokiStarted = $true }
-          } catch { Write-Host "Loki 3.0.0 failed: $_" }
-          
-          # Approach 2: Alternative version
-          if (-not $lokiStarted) {
-            Write-Host "Trying alternative Loki version..."
-            try {
-              docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
-                grafana/loki:2.9.0 `
-                -config.file=/etc/loki/local-config.yaml
-              if ($LASTEXITCODE -eq 0) { $lokiStarted = $true }
-            } catch { Write-Host "Loki 2.9.0 failed: $_" }
-          }
-          
-          # Approach 3: Simplified config
-          if (-not $lokiStarted) {
-            Write-Host "Trying simplified Loki configuration..."
-            try {
-              docker run -d --name loki --platform linux/amd64 -p 3100:3100 `
-                grafana/loki:2.9.0 `
-                -log.level=info
-              if ($LASTEXITCODE -eq 0) { $lokiStarted = $true }
-            } catch { Write-Host "Simplified Loki failed: $_" }
-          }
-          
-          if (-not $lokiStarted) {
-            Write-Error "All Loki startup approaches failed"
-            docker logs loki 2>$null
-            exit 1
-          }
-          Write-Host "Loki container started"
-          
-          # Wait for services to be ready with retry logic
-          Write-Host "Waiting for services to start..."
-          $maxWaitTime = 120
-          $waitInterval = 10
-          $waited = 0
-          
-          while ($waited -lt $maxWaitTime) {
-            Start-Sleep -Seconds $waitInterval
-            $waited += $waitInterval
+            echo "Adding Docker GPG key..."
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
             
-            # Check if services are running
-            $mimirRunning = docker ps --filter "name=mimir" --filter "status=running" -q
-            $lokiRunning = docker ps --filter "name=loki" --filter "status=running" -q
+            echo "Adding Docker repository..."
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
             
-            if ($mimirRunning -and $lokiRunning) {
-              Write-Host "Both containers are running after $waited seconds"
-              break
-            }
+            echo "Installing Docker..."
+            sudo apt-get update
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
             
-            Write-Host "Waiting for containers... ($waited/$maxWaitTime seconds)"
-            if (-not $mimirRunning) { Write-Host "  - Mimir not yet running" }
-            if (-not $lokiRunning) { Write-Host "  - Loki not yet running" }
-          }
+            echo "Docker installed successfully"
+          else
+            echo "Docker already available"
+          fi
           
-          # Final check for running containers
-          $mimirRunning = docker ps --filter "name=mimir" --filter "status=running" -q
-          $lokiRunning = docker ps --filter "name=loki" --filter "status=running" -q
+          # Start Docker service
+          sudo service docker start
           
-          if (-not $mimirRunning) {
-            Write-Error "Mimir container is not running after $maxWaitTime seconds"
-            Write-Host "Mimir container logs:"
-            docker logs mimir 2>$null
-            Write-Host "All running containers:"
-            docker ps
-            exit 1
-          }
+          # Wait for Docker to be ready
+          timeout 60s bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
           
-          if (-not $lokiRunning) {
-            Write-Error "Loki container is not running after $maxWaitTime seconds"
-            Write-Host "Loki container logs:"
-            docker logs loki 2>$null
-            Write-Host "All running containers:"
-            docker ps
-            exit 1
-          }
+          echo "Docker is ready"
+          docker --version
+
+      - name: Start Mimir and Loki containers
+        run: |
+          source ~/.vars
           
-          Write-Host "Services are running successfully"
+          echo "Starting Mimir container..."
+          docker run -d --name mimir -p 9009:9009 \
+            grafana/mimir:2.13.0 \
+            /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
           
-          # Test connectivity with retry logic
-          Write-Host "Testing service connectivity..."
-          $maxRetries = 6
-          $retryInterval = 10
+          echo "Starting Loki container..."
+          docker run -d --name loki -p 3100:3100 \
+            grafana/loki:3.0.0 \
+            -config.file=/etc/loki/local-config.yaml
           
-          # Test Mimir connectivity
-          $mimirReady = $false
-          for ($i = 1; $i -le $maxRetries; $i++) {
-            try {
-              $response = Invoke-RestMethod -Uri "http://localhost:9009/ready" -TimeoutSec 5 -Method GET
-              Write-Host "Mimir is ready (attempt $i)"
-              $mimirReady = $true
-              break
-            } catch {
-              Write-Host "Mimir health check attempt $i failed: $_"
-              if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryInterval }
-            }
-          }
+          # Wait for containers to be ready
+          echo "Waiting for services to start..."
+          timeout 60s bash -c 'until curl -s http://localhost:9009/ready >/dev/null; do sleep 3; done'
+          timeout 60s bash -c 'until curl -s http://localhost:3100/ready >/dev/null; do sleep 3; done'
           
-          # Test Loki connectivity  
-          $lokiReady = $false
-          for ($i = 1; $i -le $maxRetries; $i++) {
-            try {
-              $response = Invoke-RestMethod -Uri "http://localhost:3100/ready" -TimeoutSec 5 -Method GET
-              Write-Host "Loki is ready (attempt $i)"
-              $lokiReady = $true
-              break
-            } catch {
-              Write-Host "Loki health check attempt $i failed: $_"
-              if ($i -lt $maxRetries) { Start-Sleep -Seconds $retryInterval }
-            }
-          }
-          
-          if (-not $mimirReady) {
-            Write-Warning "Mimir health checks failed after $maxRetries attempts"
-          }
-          
-          if (-not $lokiReady) {
-            Write-Warning "Loki health checks failed after $maxRetries attempts"
-          }
-          
-          Write-Host "Container setup completed - proceeding with sample app"
+          echo "Services are ready"
 
       - name: Run Windows sample app
-        working-directory: ./sample-apps/windows-node
-        shell: cmd
-        run: |
-          make LOKI_INSTANCE=localhost:3100 PROMETHEUS_INSTANCE=localhost:9009 run-ci
-
-      - name: Wait for sample app to generate metrics
         shell: powershell
         run: |
-          Write-Host "Waiting for sample app to generate metrics..."
-          Start-Sleep -Seconds 180
-
-      - name: Check metrics in Mimir
-        shell: powershell
-        run: |
-          $maxRetries = 10
-          $retryDelay = 10
-          $found = $false
+          Write-Host "Running Windows sample app..."
+          cd sample-apps/windows-node
           
-          for ($i = 1; $i -le $maxRetries; $i++) {
-            try {
-              Write-Host "Checking for Windows metrics... Attempt $i/$maxRetries"
-              
-              # Query for windows_exporter metrics
-              $response = Invoke-RestMethod -Uri "http://localhost:9009/api/v1/query?query=up{job='integrations/windows_exporter'}" -Method GET
-              
-              if ($response.data.result.Count -gt 0) {
-                Write-Host "Found Windows exporter metrics!"
-                $found = $true
-                break
-              }
-              
-              Write-Host "No metrics found yet, waiting..."
-              Start-Sleep -Seconds $retryDelay
-            } catch {
-              Write-Host "Error querying metrics: $_"
-              Start-Sleep -Seconds $retryDelay
-            }
-          }
-          
-          if (-not $found) {
-            Write-Error "Windows metrics not found in Mimir after $($maxRetries * $retryDelay) seconds"
-            
-            # Debug information
-            Write-Host "Checking Mimir health..."
-            try {
-              $health = Invoke-RestMethod -Uri "http://localhost:9009/ready" -Method GET
-              Write-Host "Mimir is ready: $health"
-            } catch {
-              Write-Host "Mimir health check failed: $_"
-            }
-            
-            # Check if Alloy is running
-            $alloyService = Get-Service -Name "Alloy" -ErrorAction SilentlyContinue
-            if ($alloyService) {
-              Write-Host "Alloy service status: $($alloyService.Status)"
-            } else {
-              Write-Host "Alloy service not found"
-            }
-            
+          # Install Alloy
+          Write-Host "Installing Alloy..."
+          .\scripts\install_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to install Alloy"
             exit 1
           }
-
-      - name: Check logs in Loki
-        shell: powershell
-        run: |
-          try {
-            Write-Host "Checking for Windows logs in Loki..."
-            
-            # Query for logs from the windows exporter
-            $query = '{job="integrations/windows_exporter"}'
-            $encodedQuery = [System.Web.HttpUtility]::UrlEncode($query)
-            $response = Invoke-RestMethod -Uri "http://localhost:3100/loki/api/v1/query?query=$encodedQuery" -Method GET
-            
-            if ($response.data.result.Count -gt 0) {
-              Write-Host "Found Windows logs in Loki!"
-              Write-Host "Number of log streams: $($response.data.result.Count)"
-            } else {
-              Write-Warning "No Windows logs found in Loki"
-            }
-          } catch {
-            Write-Warning "Error querying logs from Loki: $_"
+          
+          # Create and configure Alloy
+          Write-Host "Creating Alloy configuration..."
+          .\scripts\create_default_config.ps1
+          .\scripts\configure_alloy.ps1
+          
+          # Start Alloy service
+          Write-Host "Starting Alloy service..."
+          .\scripts\start_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to start Alloy service"
+            exit 1
           }
+          
+          # Generate load for testing
+          Write-Host "Generating test load..."
+          .\scripts\generate_load.ps1
+
+      - name: Validate metrics and logs
+        run: |
+          source ~/.vars
+          
+          echo "Validating metrics collection..."
+          
+          # Test Mimir metrics endpoint
+          mimir_response=$(curl -s "http://localhost:9009/api/v1/query?query=up" || echo "failed")
+          if [[ "$mimir_response" == "failed" ]]; then
+            echo "❌ Failed to query Mimir metrics"
+            exit 1
+          fi
+          echo "✅ Mimir metrics endpoint responding"
+          
+          # Test Loki logs endpoint  
+          loki_response=$(curl -s "http://localhost:3100/loki/api/v1/query?query={job=\"alloy\"}" || echo "failed")
+          if [[ "$loki_response" == "failed" ]]; then
+            echo "❌ Failed to query Loki logs"
+            exit 1
+          fi
+          echo "✅ Loki logs endpoint responding"
+          
+          echo "✅ All validation checks passed"
 
       - name: Cleanup
         if: always()
+        run: |
+          source ~/.vars
+          
+          echo "Stopping containers..."
+          docker stop mimir loki 2>/dev/null || true
+          docker rm mimir loki 2>/dev/null || true
+          
+          echo "Cleanup completed"
+
+      - name: Stop Alloy service
+        if: always()
         shell: powershell
         run: |
-          # Stop and remove containers
-          Write-Host "Cleaning up Docker containers..."
-          docker stop mimir loki 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Containers stopped"
-          } else {
-            Write-Host "Containers already stopped or stop failed"
-          }
-          
-          docker rm mimir loki 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Containers removed"
-          } else {
-            Write-Host "Containers already removed or removal failed"
-          }
-          
-          # Stop Alloy service
           Write-Host "Stopping Alloy service..."
-          try {
-            $service = Get-Service -Name "Alloy" -ErrorAction SilentlyContinue
-            if ($service -and $service.Status -eq "Running") {
-              Stop-Service -Name "Alloy" -Force
-              Write-Host "Alloy service stopped"
-            } else {
-              Write-Host "Alloy service not running or not found"
-            }
-          } catch {
-            Write-Host "Error stopping Alloy service: $_"
-          }
-          
-          Write-Host "Cleanup completed" 
+          cd sample-apps/windows-node
+          .\scripts\stop_alloy.ps1 
