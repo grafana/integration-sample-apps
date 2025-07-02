@@ -49,101 +49,105 @@ jobs:
           source ~/.vars
           echo $PATH
 
-      - name: Cache Docker installation
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: ./docker-cache
-          key: ${{ runner.os }}-docker-${{ hashFiles('**/lockfiles') }}
-          restore-keys: |
-            ${{ runner.os }}-docker-
-
-      - name: Install Docker in WSL
+      - name: Install Multipass on Windows
+        shell: powershell
         run: |
-          source ~/.vars
-          mkdir -p ./docker-cache
+          Write-Host "Installing Multipass using winget..."
+          winget install --id=Canonical.Multipass --exact --silent --accept-package-agreements --accept-source-agreements
           
-          # Install Docker if not cached
-          if ! command -v docker &> /dev/null; then
-            echo "Installing Docker dependencies..."
-            sudo apt-get update
-            sudo apt-get install -y ca-certificates curl gnupg lsb-release
-            
-            echo "Adding Docker GPG key..."
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            
-            echo "Adding Docker repository..."
-            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            
-            echo "Installing Docker..."
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-            
-            echo "Docker installed successfully"
-          else
-            echo "Docker already available"
-          fi
+          # Wait for Multipass to be available in PATH
+          $timeout = 300 # 5 minutes
+          $elapsed = 0
+          while (-not (Get-Command multipass -ErrorAction SilentlyContinue) -and $elapsed -lt $timeout) {
+            Start-Sleep -Seconds 5
+            $elapsed += 5
+            Write-Host "Waiting for Multipass to be available... ($elapsed/$timeout seconds)"
+          }
           
-          # Start Docker service
-          sudo service docker start
+          if (-not (Get-Command multipass -ErrorAction SilentlyContinue)) {
+            Write-Error "Multipass installation failed or timed out"
+            exit 1
+          }
           
-          # Wait for Docker to be ready
-          timeout 60s bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
-          
-          echo "Docker is ready"
-          docker --version
+          Write-Host "Multipass installed successfully"
+          multipass version
 
-      - name: Start Mimir and Loki containers
+      - name: Install jq in WSL
         run: |
           source ~/.vars
           
-          echo "Starting Mimir container..."
-          docker run -d --name mimir -p 9009:9009 \
-            grafana/mimir:2.13.0 \
-            /bin/mimir -target=all -log.level=info -server.http-listen-port=9009
+          echo "Installing jq for JSON parsing..."
+          sudo apt-get update
+          sudo apt-get install -y jq
           
-          echo "Starting Loki container..."
-          docker run -d --name loki -p 3100:3100 \
-            grafana/loki:3.0.0 \
-            -config.file=/etc/loki/local-config.yaml
+          echo "jq installed successfully"
+          jq --version
+
+      - name: Setup Multipass VM with databases
+        run: |
+          source ~/.vars
           
-          # Wait for containers to be running first
-          echo "Waiting for containers to be running..."
-          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} mimir)" == "true" ]; do sleep 2; done'
-          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} loki)" == "true" ]; do sleep 2; done'
+          echo "Setting up Multipass VM with databases..."
           
-          echo "Containers are running, waiting for services to be ready..."
+          # Launch multipass VM with docker
+          echo "Launching Multipass VM..."
+          multipass launch docker --name dbs
           
-          # Give services time to initialize before checking health endpoints
-          sleep 15
+          # Transfer config files to VM
+          echo "Transferring database config files..."
+          multipass transfer ./ops/qa/dbs/* dbs:/home/ubuntu -r
           
-          # Check Mimir health endpoint with better error handling
+          # Start docker containers in the VM
+          echo "Starting Mimir and Loki containers in VM..."
+          multipass exec dbs -- bash -c "docker-compose -f docker-compose.yaml up -d"
+          
+          # Get VM IP and set environment variables
+          echo "Getting VM IP address..."
+          DB_IP=$(multipass info dbs --format json | jq -r .info.dbs.ipv4[0])
+          echo "Database VM IP: $DB_IP"
+          
+          # Export environment variables for later steps
+          echo "LOKI_ENDPOINT=$DB_IP:3100" >> $GITHUB_ENV
+          echo "MIMIR_ENDPOINT=$DB_IP:9009" >> $GITHUB_ENV
+          
+          # Set default config
+          source ./ops/.defaultconfig
+          echo "SAMPLE_APP_SETUP_TIME=$SAMPLE_APP_SETUP_TIME" >> $GITHUB_ENV
+          
+          echo "Database setup complete - Loki: $DB_IP:3100, Mimir: $DB_IP:9009"
+          
+          # Wait for services to be ready
+          echo "Waiting for services to be ready..."
+          sleep 30
+          
+          # Check Mimir health endpoint
           echo "Checking Mimir health..."
           for i in {1..20}; do
-            if curl -s -f http://localhost:9009/ready >/dev/null; then
+            if curl -s -f http://$DB_IP:9009/ready >/dev/null; then
               echo "✅ Mimir is ready"
               break
             fi
             echo "Attempt $i/20: Mimir not ready yet..."
-            sleep 3
+            sleep 5
             if [ $i -eq 20 ]; then
               echo "❌ Mimir failed to become ready"
-              docker logs mimir --tail 20
+              multipass exec dbs -- docker logs mimir --tail 20
               exit 1
             fi
           done
           
-          # Check Loki health endpoint with better error handling  
+          # Check Loki health endpoint  
           echo "Checking Loki health..."
           for i in {1..20}; do
-            if curl -s -f http://localhost:3100/ready >/dev/null; then
+            if curl -s -f http://$DB_IP:3100/ready >/dev/null; then
               echo "✅ Loki is ready"
               break
             fi
             echo "Attempt $i/20: Loki not ready yet..."
-            sleep 3
+            sleep 5
             if [ $i -eq 20 ]; then
               echo "❌ Loki failed to become ready"
-              docker logs loki --tail 20
+              multipass exec dbs -- docker logs loki --tail 20
               exit 1
             fi
           done
@@ -164,9 +168,11 @@ jobs:
             exit 1
           }
           
-          # Create and configure Alloy
+          # Create and configure Alloy with remote endpoints
           Write-Host "Creating Alloy configuration..."
-          .\scripts\create_default_config.ps1
+          Write-Host "Loki endpoint: http://${{ env.LOKI_ENDPOINT }}/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://${{ env.MIMIR_ENDPOINT }}/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://${{ env.LOKI_ENDPOINT }}/loki/api/v1/push" -PrometheusUrl "http://${{ env.MIMIR_ENDPOINT }}/api/v1/push"
           .\scripts\configure_alloy.ps1
           
           # Start Alloy service
@@ -180,23 +186,47 @@ jobs:
           # Generate load for testing
           Write-Host "Generating test load..."
           .\scripts\generate_load.ps1
+          
+          Write-Host "Windows sample app setup complete"
+
+      - name: Wait for sample app to generate metrics
+        run: |
+          source ~/.vars
+          echo "Waiting for sample app to generate metrics..."
+          sleep ${{ env.SAMPLE_APP_SETUP_TIME }}
 
       - name: Validate metrics and logs
         run: |
           source ~/.vars
           
           echo "Validating metrics collection..."
+          echo "Checking endpoints: Mimir=${{ env.MIMIR_ENDPOINT }}, Loki=${{ env.LOKI_ENDPOINT }}"
           
-          # Test Mimir metrics endpoint
-          mimir_response=$(curl -s "http://localhost:9009/api/v1/query?query=up" || echo "failed")
+          # Test Mimir metrics endpoint for Windows exporter metrics
+          echo "Checking for Windows exporter metrics..."
+          mimir_response=$(curl -s "http://${{ env.MIMIR_ENDPOINT }}/api/v1/query?query=up{job=\"integrations/windows_exporter\"}" || echo "failed")
           if [[ "$mimir_response" == "failed" ]]; then
             echo "❌ Failed to query Mimir metrics"
             exit 1
           fi
-          echo "✅ Mimir metrics endpoint responding"
+          
+          # Check if we got actual metrics
+          metrics_count=$(echo "$mimir_response" | jq -r '.data.result | length' 2>/dev/null || echo "0")
+          if [[ "$metrics_count" == "0" ]]; then
+            echo "⚠️ No Windows exporter metrics found yet, checking general connectivity..."
+            general_response=$(curl -s "http://${{ env.MIMIR_ENDPOINT }}/api/v1/query?query=up" || echo "failed")
+            if [[ "$general_response" == "failed" ]]; then
+              echo "❌ Mimir endpoint not responding"
+              exit 1
+            fi
+            echo "✅ Mimir endpoint responding but no Windows metrics yet"
+          else
+            echo "✅ Found $metrics_count Windows exporter metric series"
+          fi
           
           # Test Loki logs endpoint  
-          loki_response=$(curl -s "http://localhost:3100/loki/api/v1/query?query={job=\"alloy\"}" || echo "failed")
+          echo "Checking for Windows logs..."
+          loki_response=$(curl -s "http://${{ env.LOKI_ENDPOINT }}/loki/api/v1/query?query={job=\"integrations/windows_exporter\"}" || echo "failed")
           if [[ "$loki_response" == "failed" ]]; then
             echo "❌ Failed to query Loki logs"
             exit 1
@@ -205,14 +235,26 @@ jobs:
           
           echo "✅ All validation checks passed"
 
-      - name: Cleanup
+      - name: Cleanup Multipass VM
         if: always()
         run: |
           source ~/.vars
           
-          echo "Stopping containers..."
-          docker stop mimir loki 2>/dev/null || true
-          docker rm mimir loki 2>/dev/null || true
+          echo "Cleaning up Multipass VM..."
+          
+          # Stop and delete the VM
+          if multipass list | grep -q "dbs"; then
+            echo "Stopping Multipass VM..."
+            multipass stop dbs || true
+            
+            echo "Deleting Multipass VM..."
+            multipass delete dbs || true
+            
+            echo "Purging deleted VMs..."
+            multipass purge || true
+          else
+            echo "No Multipass VM found to clean up"
+          fi
           
           echo "Cleanup completed"
 
