@@ -1,0 +1,176 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required <INTEGRATION_NAME> sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+  - git
+  - gpg
+  - alloy
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      prometheus.exporter.squid "integrations_squid" {
+        address = "localhost:3128"
+      }
+
+      discovery.relabel "integrations_squid" {
+        targets = prometheus.exporter.squid.integrations_squid.targets
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+      }
+
+      prometheus.scrape "integrations_squid" {
+        targets    = discovery.relabel.integrations_squid.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name   = "integrations/squid"
+      }
+
+      local.file_match "logs_integrations_integrations_squid" {
+        path_targets = [{
+          __address__ = "localhost",
+          __path__    = "/var/log/squid/cache.log",
+          instance    = constants.hostname,
+          job         = "integrations/squid",
+        },
+        {
+          __address__ = "localhost",
+          __path__    = "/var/log/squid/access.log",
+          instance    = constants.hostname,
+          job         = "integrations/squid",
+        }]
+      }
+
+      loki.source.file "logs_integrations_integrations_squid" {
+        targets    = local.file_match.logs_integrations_integrations_squid.targets
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+      }
+
+  - owner: root:root
+    path: /home/ubuntu/setup-squid.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/setup-squid.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/loadgen.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/loadgen.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /etc/systemd/system/loadgen.service
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/loadgen.service' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/index.html
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/index.html' -%}
+      {% endfilter %}
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+
+  # Install Squid
+  - sudo apt-get install -y squid
+
+  # configure squid for loadgen
+  - chmod +x /home/ubuntu/setup-squid.sh
+  - /home/ubuntu/setup-squid.sh
+
+  # Make loadgen script executable and configure service
+  - chmod +x /home/ubuntu/loadgen.sh
+  - chown ubuntu:ubuntu /home/ubuntu/loadgen.sh
+
+  # reload systemd and start loadgen service
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable loadgen.service
+  - sudo systemctl start loadgen.service
+
+  # give alloy access to squid logs
+  - sudo usermod -a -G proxy alloy
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service

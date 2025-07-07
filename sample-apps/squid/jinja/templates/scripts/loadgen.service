@@ -1,0 +1,28 @@
+[Unit]
+Description=Squid Load Generation Service
+After=network.target squid.service
+Wants=squid.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/bin/bash /home/ubuntu/loadgen.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=squid-loadgen
+
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+
+# Resource limits
+LimitNOFILE=1024
+CPUQuota=50%
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
