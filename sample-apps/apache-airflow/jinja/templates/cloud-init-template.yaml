@@ -1,0 +1,218 @@
+# Cloud-init configuration for setting up Alloy and required apache-airflow sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+      
+      prometheus.exporter.statsd "integrations_statsd_exporter" {
+        listen_udp = "localhost:8125"
+        mapping_config_path = "/home/ubuntu/statsd_mapping.yaml"
+      }
+
+      discovery.relabel "integrations_statsd_exporter" {
+        targets = prometheus.exporter.statsd.integrations_statsd_exporter.targets
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/apache-airflow"
+        }
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+      }
+
+      prometheus.scrape "integrations_statsd_exporter" {
+        targets    = discovery.relabel.integrations_statsd_exporter.output
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name   = "integrations/statsd_exporter"
+      }
+
+      local.file_match "logs_integrations_integrations_apache_airflow" {
+        path_targets = [
+          {
+            __address__ = "localhost",
+            __path__    = "/home/airflow/airflow/logs/dag_id=*/**/*.log",
+            instance    = constants.hostname,
+            job         = "integrations/apache-airflow",
+          },
+          {
+            __address__ = "localhost",
+            __path__    = "/home/airflow/airflow/logs/scheduler/latest/*.py.log",
+            instance    = constants.hostname,
+            job         = "integrations/apache-airflow",
+          },
+        ]
+      }
+
+      loki.process "logs_integrations_integrations_apache_airflow" {
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+
+        stage.match {
+          selector = format("{job=\"integrations/apache-airflow\",instance=\"%s\"}", constants.hostname)
+
+          stage.regex {
+            expression = "/home/airflow/airflow/logs/dag_id=(?P<dag_id>\\S+?)/.*/task_id=(?P<task_id>\\S+?)/.*log"
+            source     = "filename"
+          }
+
+          stage.labels {
+            values = {
+              dag_id  = null,
+              task_id = null,
+            }
+          }
+        }
+
+        stage.match {
+          selector = format("{job=\"integrations/apache-airflow\",instance=\"%s\"}", constants.hostname)
+
+          stage.regex {
+            expression = "/home/airflow/airflow/logs/scheduler/latest/(?P<dag_file>\\S+?)\\.log"
+            source     = "filename"
+          }
+
+          stage.labels {
+            values = {
+              dag_file = null,
+            }
+          }
+        }
+
+        stage.multiline {
+          firstline     = "\\[\\d+-\\d+-\\d+T\\d+:\\d+:\\d+\\.\\d+\\+\\d+\\]"
+          max_lines     = 0
+          max_wait_time = "3s"
+        }
+      }
+
+      loki.source.file "logs_integrations_integrations_apache_airflow" {
+        targets    = local.file_match.logs_integrations_integrations_apache_airflow.targets
+        forward_to = [loki.process.logs_integrations_integrations_apache_airflow.receiver]
+      }
+
+  - owner: root:root
+    path: /home/ubuntu/install-airflow.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/install-airflow.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/statsd_mapping.yaml
+    content: |
+      {% filter indent(6) %}
+      {%- include 'statsd_mapping.yaml' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/loadgen.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/loadgen.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /etc/systemd/system/loadgen.service
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/loadgen.service' -%}
+      {% endfilter %}
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - chmod +x /home/ubuntu/install-airflow.sh
+  - chmod +x /home/ubuntu/loadgen.sh
+
+  # Installs Apache Airflow
+  - sudo /home/ubuntu/install-airflow.sh > /home/ubuntu/airflow-install.log 2>&1
+
+  # Give alloy user access to airflow logs
+  - sudo usermod -a -G airflow alloy || echo "Could not add alloy to airflow group"
+
+  # Configure Alloy
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+  - sudo systemctl enable loadgen.service
+  - sudo systemctl start loadgen.service
