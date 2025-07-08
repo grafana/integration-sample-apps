@@ -2,6 +2,8 @@
 
 This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of [Apache Airflow](https://airflow.apache.org/) using StatsD metrics collection and comprehensive log aggregation.
 
+This also sets up some loadgen as a systemd service for creating a dag run every 30 seconds.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
@@ -191,6 +193,14 @@ For debugging and troubleshooting, you can access the VM directly using:
 make shell
 ```
 
+```bash
+sudo systemctl status airflow
+```
+
+```bash
+sudo systemctl status loadgen
+```
+
 This opens a shell session to the running VM where you can:
 - Execute validation commands
 - Check service logs
@@ -202,4 +212,3 @@ Additional debugging locations:
 - Airflow logs: `/home/airflow/airflow/logs/`
 - Installation log: `/home/ubuntu/airflow-install.log`
 - StatsD mapping: `/home/ubuntu/statsd_mapping.yaml`
-- Credentials: `/home/ubuntu/airflow-creds.json`
