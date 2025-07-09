@@ -77,9 +77,19 @@ The sample app configures Airflow with the following setup:
 - **Database**: PostgreSQL 16 with `postgres` user and password `sekret`
 - **Airflow User**: Dedicated `airflow` system user with home directory at `/home/airflow`
 - **Virtual Environment**: Python virtual environment at `/home/airflow/airflow-venv`
+- **Admin User**: Pre-configured admin user with username `admin` and password `admin`
 - **StatsD Metrics**: Enabled with UDP endpoint at `localhost:8125`
-- **Web UI**: Accessible on port 8080 with auto-generated admin credentials
+- **Web UI**: Accessible on port 8080 with admin credentials available via `make airflow-creds`
 - **Logging**: Comprehensive DAG and scheduler log collection
+
+## User Authentication
+
+The sample app automatically creates an admin user during initialization with the following credentials:
+- **Username**: `admin`
+- **Password**: `admin`
+- **Role**: Admin
+
+These credentials are immediately available after the service starts, ensuring you can access the web interface without delay. The user creation is handled by a pre-initialization script that runs before the Airflow standalone service starts.
 
 ## Monitoring and metrics
 
@@ -160,6 +170,10 @@ The following metrics are exposed through the StatsD exporter:
 2. Retrieve admin credentials: `make airflow-creds`
 3. Access the web interface and log in with the provided credentials
 
+The default admin credentials are:
+- **Username**: `admin`
+- **Password**: `admin`
+
 ### Command Line Interface
 Access the Airflow CLI through the VM:
 ```bash
@@ -176,12 +190,17 @@ sudo -u airflow /home/airflow/airflow-venv/bin/airflow --help
    - Verify Python and pip installation
    - Check systemd service configuration
 
-2. **No Metrics in Prometheus**
+2. **Admin User Not Created**
+   - The service includes an initialization script that creates the admin user automatically
+   - Check the initialization log: `sudo journalctl -u airflow.service | grep init`
+   - Verify the admin user exists: `sudo -u airflow /home/airflow/airflow-venv/bin/airflow users list`
+
+3. **No Metrics in Prometheus**
    - Verify StatsD is receiving metrics: `netstat -ul | grep 8125`
    - Check Alloy configuration and connectivity
    - Ensure Airflow StatsD is enabled in configuration
 
-3. **Log Collection Issues**
+4. **Log Collection Issues**
    - Verify Alloy has access to Airflow logs
    - Check if the `alloy` user is in the `airflow` group
    - Review log file permissions in `/home/airflow/airflow/logs/`

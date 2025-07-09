@@ -203,16 +203,17 @@ runcmd:
   - chmod +x /home/ubuntu/install-airflow.sh
   - chmod +x /home/ubuntu/loadgen.sh
 
-  # Installs Apache Airflow
+  # Installs Apache Airflow and creates the admin user
   - sudo /home/ubuntu/install-airflow.sh > /home/ubuntu/airflow-install.log 2>&1
 
   # Give alloy user access to airflow logs
   - sudo usermod -a -G airflow alloy || echo "Could not add alloy to airflow group"
 
-  # Configure Alloy
+  # Start Alloy
   - sudo systemctl daemon-reload
   - sudo systemctl enable alloy.service
   - sudo systemctl start alloy.service
 
+  # Start placed loadgen service
   - sudo systemctl enable loadgen.service
   - sudo systemctl start loadgen.service

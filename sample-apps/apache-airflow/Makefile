@@ -47,4 +47,7 @@ airflow-ui:
 	@echo "http://$(shell multipass info $(VM_NAME) --format json | jq -r '.info."$(VM_NAME)".ipv4[0]'):8080"
 
 airflow-creds:
-	@multipass exec $(VM_NAME) -- sudo journalctl -u airflow --no-pager | grep "admin"
+	@echo "Airflow Admin Credentials:"
+	@echo "Username: admin"
+	@echo "Password: admin"
+	@echo "URL: http://$(shell multipass info $(VM_NAME) --format json | jq -r '.info."$(VM_NAME)".ipv4[0]'):8080"

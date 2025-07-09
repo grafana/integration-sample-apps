@@ -5,8 +5,25 @@ set -e
 # Pre-requisites
 # - Python 3.8+
 
-
 {% set airflow_version = airflow_version | default("2.9.3") %}
+{% set wait_timeout = wait_timeout | default(120) %}
+
+function wait_for_airflow {
+    echo "Waiting for Airflow to be fully operational..."
+    counter=0
+    timeout={{ wait_timeout }}
+    while [ $counter -lt $timeout ]; do
+        if sudo -u airflow bash -c "source $VENV_PATH/bin/activate && airflow dags list" > /dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+        counter=$((counter + 1))
+    done
+    if [ $counter -eq $timeout ]; then
+        echo "Error: Airflow did not become operational within ${timeout} seconds"
+        exit 1
+    fi
+}
 
 AIRFLOW_VERSION="{{ airflow_version }}"
 airflow_download_dir="$(mktemp -d)"
@@ -47,6 +64,33 @@ fi
 # Install statsd client for metrics
 sudo -u airflow bash -c "source $VENV_PATH/bin/activate && pip install statsd --no-color"
 
+# Create initialization script
+sudo tee /home/airflow/init-airflow.sh > /dev/null << 'EOF'
+#!/bin/bash
+set -e
+
+VENV_PATH="/home/airflow/airflow-venv"
+export AIRFLOW_HOME="/home/airflow/airflow"
+
+# Initialize database
+source $VENV_PATH/bin/activate
+airflow db migrate
+
+# Create admin user (ignore if it already exists)
+airflow users create \
+    --username admin \
+    --firstname Airflow \
+    --lastname Admin \
+    --role Admin \
+    --email admin@example.com \
+    --password admin || echo "Admin user already exists"
+
+echo "Airflow initialized successfully"
+EOF
+
+sudo chmod +x /home/airflow/init-airflow.sh
+sudo chown airflow:airflow /home/airflow/init-airflow.sh
+
 # Create systemd service file for Airflow
 sudo tee /etc/systemd/system/airflow.service > /dev/null << 'EOF'
 [Unit]
@@ -57,7 +101,9 @@ Type=simple
 User=airflow
 Group=airflow
 Environment=PATH=/home/airflow/airflow-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=AIRFLOW_HOME=/home/airflow/airflow
 WorkingDirectory=/home/airflow
+ExecStartPre=/home/airflow/init-airflow.sh
 ExecStart=/home/airflow/airflow-venv/bin/airflow standalone
 Restart=always
 RestartSec=10
@@ -66,31 +112,12 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-# Reload systemd and enable the service
+# Reload systemd and enable the service to create all the configuration files
 sudo systemctl daemon-reload
 sudo systemctl enable airflow.service
 sudo systemctl start airflow.service
 
-
-
-# Wait for airflow.cfg to appear
-echo "Waiting for airflow.cfg to appear..."
-timeout=10
-counter=0
-while [ $counter -lt $timeout ]; do
-    if [ -f "/home/airflow/airflow/airflow.cfg" ]; then
-        echo "airflow.cfg found!"
-        break
-    fi
-    sleep 1
-    counter=$((counter + 1))
-done
-
-if [ $counter -eq $timeout ]; then
-    echo "Error: airflow.cfg did not appear within ${timeout} seconds"
-    exit 1
-fi
-
+wait_for_airflow
 
 # Modify airflow.cfg to enable StatsD metrics
 sudo sed -i 's/statsd_on = False/statsd_on = True/' /home/airflow/airflow/airflow.cfg
@@ -99,42 +126,6 @@ sudo sed -i 's/statsd_prefix = airflow/statsd_prefix = airflow/' /home/airflow/a
 # Restart the service to apply the configuration change
 sudo systemctl restart airflow.service
 
+wait_for_airflow
+
 echo "Airflow installation completed!"
-
-# Run DAG triggering in the background
-(
-    echo "Starting background DAG triggering process..."
-    
-    # Wait for Airflow to be fully operational
-    echo "Waiting for Airflow to be fully operational..."
-    timeout=120
-    counter=0
-    while [ $counter -lt $timeout ]; do
-        if sudo -u airflow bash -c "source $VENV_PATH/bin/activate && airflow dags list" > /dev/null 2>&1; then
-            echo "Airflow is operational!"
-            break
-        fi
-        sleep 5
-        counter=$((counter + 5))
-    done
-
-    if [ $counter -ge $timeout ]; then
-        echo "Warning: Airflow may not be fully operational yet"
-    else
-        # Check if there are any DAGs available and trigger one
-        echo "Checking for available DAGs..."
-        available_dags=$(sudo -u airflow bash -c "source $VENV_PATH/bin/activate && airflow dags list --output plain" 2>/dev/null | tail -n +2)
-        
-        if [ -n "$available_dags" ]; then
-            # Get the first available DAG
-            first_dag=$(echo "$available_dags" | head -n 1 | awk '{print $1}')
-            echo "Triggering DAG run for: $first_dag"
-            sudo -u airflow bash -c "source $VENV_PATH/bin/activate && airflow dags trigger $first_dag"
-            echo "DAG run triggered successfully!"
-        else
-            echo "No DAGs found to trigger"
-        fi
-    fi
-) >> /home/ubuntu/dag-trigger.log 2>&1 &
-
-echo "DAG triggering started in background. Check /home/ubuntu/dag-trigger.log for progress."
