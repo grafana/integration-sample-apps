@@ -1,0 +1,515 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required <INTEGRATION_NAME> sample-app
+# {% set gitlab_root_password = gitlab_root_password | default("d.^_R740Vp=/") %}
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+
+write_files:
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    discovery.relabel "metrics_integrations_integrations_gitlab" {
+      targets = [{
+        __address__ = "localhost:80",
+      }]
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+    }
+    prometheus.scrape "metrics_integrations_integrations_gitlab" {
+      targets      = discovery.relabel.metrics_integrations_integrations_gitlab.output
+      forward_to   = [prometheus.remote_write.metrics_service.receiver]
+      job_name     = "integrations/gitlab"
+      metrics_path = "/-/metrics"
+    }
+      
+    local.file_match "logs_integrations_integrations_gitlab" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/gitlab/gitlab-rails/exceptions_json.log",
+        instance    = constants.hostname,
+        job         = "integrations/gitlab",
+      }]
+    }
+
+    loki.process "logs_integrations_integrations_gitlab" {
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+
+      stage.match {
+        selector            = "{job=\"integrations/gitlab\"} |~ \"^#\""
+        action              = "drop"
+        drop_counter_reason = "gitlab_comment_line"
+      }
+    }
+
+    loki.source.file "logs_integrations_integrations_gitlab" {
+      targets    = local.file_match.logs_integrations_integrations_gitlab.targets
+      forward_to = [loki.process.logs_integrations_integrations_gitlab.receiver]
+    }
+    
+
+- owner: root:root
+  path: /home/ubuntu/generate-error-log.sh
+  content: |
+    #!/bin/bash
+    gitlab-rails runner "begin; raise StandardError, 'Test exception for logging'; rescue => e; Gitlab::ErrorTracking.track_exception(e, extra_info: 'Manual test for exceptions_json.log'); end"
+
+- owner: root:root
+  path: /home/ubuntu/reset-root-password.sh
+  content: |
+    #!/bin/bash
+    gitlab-rails runner "user = User.find_by(username: 'root'); user.password = '{{ gitlab_root_password }}'; user.password_confirmation = '{{ gitlab_root_password }}'; user.password_automatically_set = false; user.save!"
+
+- owner: root:root
+  path: /home/ubuntu/create-gitlab-project.sh
+  content: |
+    #!/bin/bash
+    echo "Waiting for GitLab to be fully ready..."
+    
+    # Wait for GitLab to be ready (check both health endpoint and rails console)
+    while ! curl -f http://localhost/-/health > /dev/null 2>&1; do
+      echo "Waiting for GitLab health endpoint..."
+      sleep 10
+    done
+    
+    # Additional wait to ensure GitLab Rails is fully loaded
+    sleep 30
+    
+    echo "Creating GitLab project for load testing..."
+    gitlab-rails runner "
+      begin
+        # Create a test project
+        user = User.find_by(username: 'root')
+        project = Projects::CreateService.new(user, {
+          name: 'load-test-project',
+          path: 'load-test-project',
+          description: 'Automated project for generating GitLab metrics and load',
+          visibility_level: Gitlab::VisibilityLevel::PRIVATE,
+          initialize_with_readme: true
+        }).execute
+        
+        if project.persisted?
+          puts 'Successfully created project: ' + project.web_url
+          puts 'Project ID: ' + project.id.to_s
+        else
+          puts 'Failed to create project: ' + project.errors.full_messages.join(', ')
+        end
+      rescue => e
+        puts 'Error creating project: ' + e.message
+      end
+    "
+
+- owner: root:root
+  path: /home/ubuntu/setup-ci-pipeline.sh
+  content: |
+    #!/bin/bash
+    echo "Setting up CI/CD pipeline for load testing..."
+    
+    # Wait a bit more to ensure project is ready
+    sleep 10
+    
+    gitlab-rails runner "
+      begin
+        project = Project.find_by(path: 'load-test-project')
+        if project.nil?
+          puts 'Project not found, skipping CI setup'
+          exit
+        end
+        
+        # Create .gitlab-ci.yml content
+        ci_content = <<~YAML
+          stages:
+            - build
+            - test
+            - deploy
+            - cleanup
+          
+          variables:
+            LOAD_TEST: 'true'
+          
+          build_job:
+            stage: build
+            script:
+              - echo 'Building application at' \$(date)
+              - echo 'Simulating build process...'
+              - sleep 15
+              - echo 'Creating build artifacts...'
+              - mkdir -p build/
+              - echo 'Build complete' > build/status.txt
+              - echo 'Build completed successfully'
+            artifacts:
+              paths:
+                - build/
+              expire_in: 1 hour
+          
+          unit_tests:
+            stage: test
+            script:
+              - echo 'Running unit tests...'
+              - sleep 10
+              - echo 'All tests passed'
+            dependencies:
+              - build_job
+          
+          integration_tests:
+            stage: test
+            script:
+              - echo 'Running integration tests...'
+              - sleep 12
+              - echo 'Integration tests completed'
+            dependencies:
+              - build_job
+          
+          deploy_staging:
+            stage: deploy
+            script:
+              - echo 'Deploying to staging environment...'
+              - sleep 8
+              - echo 'Staging deployment complete'
+            dependencies:
+              - unit_tests
+              - integration_tests
+          
+          cleanup_job:
+            stage: cleanup
+            script:
+              - echo 'Cleaning up temporary files...'
+              - rm -rf build/ || true
+              - echo 'Cleanup complete'
+            when: always
+        YAML
+        
+        # Create the CI file in the repository
+        result = Files::CreateService.new(project, User.find_by(username: 'root'), {
+          file_path: '.gitlab-ci.yml',
+          file_content: ci_content,
+          commit_message: 'Add CI/CD pipeline for load testing',
+          branch_name: 'main'
+        }).execute
+        
+        if result[:status] == :success
+          puts 'Successfully created .gitlab-ci.yml file'
+        else
+          puts 'Failed to create CI file: ' + result[:message].to_s
+        end
+        
+        # Also create a simple README update to trigger initial pipeline
+        readme_content = <<~MD
+          # Load Test Project
+          
+          This project is automatically created for GitLab integration testing and load generation.
+          
+          ## Features
+          - Automated CI/CD pipeline
+          - Multi-stage builds and tests
+          - Staging deployments
+          - Artifact management
+          
+          Generated at: #{Time.current}
+        MD
+        
+        Files::UpdateService.new(project, User.find_by(username: 'root'), {
+          file_path: 'README.md',
+          file_content: readme_content,
+          commit_message: 'Update README with project information',
+          branch_name: 'main'
+        }).execute
+        
+        puts 'Project setup complete with CI/CD pipeline'
+        
+      rescue => e
+        puts 'Error setting up CI pipeline: ' + e.message
+      end
+    "
+
+- owner: root:root
+  path: /home/ubuntu/generate-api-token.sh
+  content: |
+    #!/bin/bash
+    echo "Generating API token for automation..."
+    
+    gitlab-rails runner "
+      begin
+        user = User.find_by(username: 'root')
+        
+        # Create a personal access token for API automation
+        token = user.personal_access_tokens.create!(
+          name: 'load-test-automation',
+          scopes: ['api', 'read_user', 'read_repository', 'write_repository'],
+          expires_at: 30.days.from_now
+        )
+        
+        if token.persisted?
+          puts 'API Token created successfully'
+          puts 'Token: ' + token.token
+          # Save token to file for later use
+          File.write('/home/ubuntu/gitlab-api-token.txt', token.token)
+          puts 'Token saved to /home/ubuntu/gitlab-api-token.txt'
+        else
+          puts 'Failed to create token: ' + token.errors.full_messages.join(', ')
+        end
+        
+      rescue => e
+        puts 'Error generating API token: ' + e.message
+      end
+    "
+
+- owner: root:root
+  path: /home/ubuntu/setup-gitlab-runner.sh
+  content: |
+    #!/bin/bash
+    echo "Setting up GitLab Runner..."
+    
+    # Install GitLab Runner
+    echo "Installing GitLab Runner..."
+    curl -L "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | sudo bash
+    sudo apt-get install -y gitlab-runner
+    
+    # Wait for GitLab to be ready
+    echo "Waiting for GitLab to be ready for runner registration..."
+    while ! curl -f http://localhost/-/health > /dev/null 2>&1; do
+      echo "Waiting for GitLab..."
+      sleep 10
+    done
+    
+    # Additional wait to ensure GitLab is fully operational
+    sleep 30
+    
+    # Get the registration token using gitlab-rails runner
+    echo "Getting runner registration token..."
+    REGISTRATION_TOKEN=$(gitlab-rails runner "
+      begin
+        # For GitLab 13.x+, get the shared runner registration token
+        token = Gitlab::CurrentSettings.runners_registration_token
+        puts token
+      rescue => e
+        # Fallback for different GitLab versions
+        puts ApplicationSetting.current.runners_registration_token rescue ''
+      end
+    " 2>/dev/null | tail -n 1)
+    
+    if [ -z "$REGISTRATION_TOKEN" ] || [ "$REGISTRATION_TOKEN" = "nil" ]; then
+      echo "Could not get registration token, trying alternative method..."
+      REGISTRATION_TOKEN=$(gitlab-rails runner "puts ApplicationSetting.current&.runners_registration_token" 2>/dev/null | tail -n 1)
+    fi
+    
+    if [ -z "$REGISTRATION_TOKEN" ] || [ "$REGISTRATION_TOKEN" = "nil" ]; then
+      echo "Still no token, creating one..."
+      REGISTRATION_TOKEN=$(gitlab-rails runner "
+        setting = ApplicationSetting.current || ApplicationSetting.create_from_defaults
+        if setting.runners_registration_token.blank?
+          setting.reset_runners_registration_token!
+          setting.save!
+        end
+        puts setting.runners_registration_token
+      " 2>/dev/null | tail -n 1)
+    fi
+    
+    echo "Registration token obtained: ${REGISTRATION_TOKEN:0:8}..."
+    
+    # Register the runner
+    echo "Registering GitLab Runner..."
+    sudo gitlab-runner register \
+      --non-interactive \
+      --url "http://localhost" \
+      --registration-token "$REGISTRATION_TOKEN" \
+      --executor "shell" \
+      --description "Local Shell Runner" \
+      --tag-list "shell,local,load-test" \
+      --run-untagged="true" \
+      --locked="false" \
+      --access-level="not_protected"
+    
+    if [ $? -eq 0 ]; then
+      echo "Runner registered successfully"
+      
+      # Start and enable the runner service
+      sudo systemctl enable gitlab-runner
+      sudo systemctl start gitlab-runner
+      
+      # Verify runner status
+      sudo gitlab-runner status
+      echo "GitLab Runner setup complete"
+      
+      # Save runner info for debugging
+      sudo gitlab-runner list 2>&1 | tee /home/ubuntu/runner-info.txt
+      
+    else
+      echo "Runner registration failed"
+      exit 1
+    fi
+
+- owner: root:root
+  path: /home/ubuntu/trigger-initial-pipeline.sh
+  content: |
+    #!/bin/bash
+    echo "Triggering initial pipeline to generate load..."
+    
+    # Wait a bit for runner to be fully ready
+    sleep 20
+    
+    # Get the API token
+    if [ -f "/home/ubuntu/gitlab-api-token.txt" ]; then
+      API_TOKEN=$(cat /home/ubuntu/gitlab-api-token.txt)
+      echo "Using API token for pipeline trigger"
+      
+      # Trigger pipeline via API
+      curl -X POST \
+        -H "PRIVATE-TOKEN: $API_TOKEN" \
+        -H "Content-Type: application/json" \
+        "http://localhost/api/v4/projects/1/pipeline?ref=main" \
+        2>&1 | tee /home/ubuntu/pipeline-trigger.log
+      
+      if [ $? -eq 0 ]; then
+        echo "Initial pipeline triggered successfully"
+      else
+        echo "Pipeline trigger failed, will be retried later"
+      fi
+    else
+      echo "API token not found, skipping initial pipeline trigger"
+    fi
+    
+    # Also trigger via gitlab-rails runner as backup
+    gitlab-rails runner "
+      begin
+        project = Project.find_by(path: 'load-test-project')
+        if project
+          pipeline = project.pipelines.create!(
+            ref: 'main',
+            source: :api,
+            user: User.find_by(username: 'root')
+          )
+          puts 'Pipeline created with ID: ' + pipeline.id.to_s if pipeline.persisted?
+        end
+      rescue => e
+        puts 'Error creating pipeline: ' + e.message
+      end
+    "
+
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - sudo chmod +x /home/ubuntu/generate-error-log.sh
+  - sudo chmod +x /home/ubuntu/reset-root-password.sh
+
+  ## Install Gitlab
+  # this script already predetermines based off your OS which version of GitLab to install
+  - curl https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
+  - sudo apt-get install -y gitlab-ce
+
+  # Enable monitoring whitelist for localhost
+  - echo "gitlab_rails['monitoring_whitelist'] = ['127.0.0.0/8']" | sudo tee -a /etc/gitlab/gitlab.rb 
+
+  # This is a heavy operation, it can take a while to complete
+  - sudo gitlab-ctl reconfigure
+
+  # Reset root password using gitlab-rails runner (non-interactive)
+  - sudo /home/ubuntu/reset-root-password.sh
+
+
+
+  # Add alloy user to adm group for log access, not recommended for production but works for testing
+  - sudo usermod -a -G adm alloy
+  - sudo chgrp adm /var/log/gitlab/gitlab-rails/
+  - sudo chmod g+rx /var/log/gitlab/gitlab-rails/ && sudo usermod -a -G git alloy
+
+  - sudo sh -c /home/ubuntu/generate-error-log.sh 2>&1 > /home/ubuntu/error.log
+  
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+  # Setup load generation components
+  - sudo chmod +x /home/ubuntu/create-gitlab-project.sh
+  - sudo chmod +x /home/ubuntu/setup-ci-pipeline.sh
+  - sudo chmod +x /home/ubuntu/generate-api-token.sh
+  
+  # Create project and setup CI/CD pipeline for load testing
+  - sudo /home/ubuntu/create-gitlab-project.sh
+  - sudo /home/ubuntu/setup-ci-pipeline.sh
+  - sudo /home/ubuntu/generate-api-token.sh
+
+  # Setup GitLab Runner for executing pipelines
+  - sudo chmod +x /home/ubuntu/setup-gitlab-runner.sh
+  - sudo /home/ubuntu/setup-gitlab-runner.sh
+  - sudo chmod +x /home/ubuntu/trigger-initial-pipeline.sh
+  - sudo /home/ubuntu/trigger-initial-pipeline.sh

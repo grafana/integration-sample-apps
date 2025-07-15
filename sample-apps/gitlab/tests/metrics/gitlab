@@ -1,0 +1,6 @@
+gitlab_rails_boot_time_seconds
+http_request_duration_seconds_count
+http_request_duration_seconds_sum
+http_requests_total
+up
+user_session_logins_total
