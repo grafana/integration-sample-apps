@@ -15,6 +15,7 @@ The following files require manual review or modification, and is where logic fo
 | File | Instructions |
 |------|--------------|
 |[.config](./.config) | Add integration specific config like the job label, or potential pass-rate override here.|
+|[.hardware_requirements](./.hardware_requirements) | Fill this out with the required hardware specs for your sample app. Allows specification of values for the number of cores: `PRIMARY_CPU` and `WORKER_CPU`, amount of memory to provision: `PRIMARY_MEMORY` and `WORKER_MEMORY`, and the amount of disk: `PRIMARY_DISK` and `WORKER_DISK`. |
 |[expected_metrics](./expected_metrics) | Add a newline separated list of expected metrics for the integration. Simple metrics names only, no labels or other qualifiers should be present |
 |[README](./README.md) | End-user facing README, update with a brief summary of the what the sample app does, and any specific instructions needed to run it. If you include any new relevant make commands, make sure to add them. |
 |[makefile](./Makefile) | Makefile for setting up the sample app. There is a minimal interface contract that must be obeyed, which the Github Actions CI expects to be present, which you can find documented briefly under [section 6 here](https://github.com/grafana/integration-sample-apps/blob/main/sample-apps/README.md) |
