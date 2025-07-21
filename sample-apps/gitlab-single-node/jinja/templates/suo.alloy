@@ -1,0 +1,70 @@
+prometheus.exporter.self "alloy_check" { }
+
+discovery.relabel "alloy_check" {
+    targets = prometheus.exporter.self.alloy_check.targets
+    rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+    }
+    rule {
+    target_label = "alloy_hostname"
+    replacement  = constants.hostname
+    }
+    rule {
+    target_label = "job"
+    replacement  = "integrations/alloy-check"
+    }
+}
+
+prometheus.scrape "alloy_check" {
+    targets    = discovery.relabel.alloy_check.output
+    forward_to = [prometheus.relabel.alloy_check.receiver]  
+    scrape_interval = "60s"
+}
+prometheus.relabel "alloy_check" {
+    forward_to = [prometheus.relabel.metrics_service.receiver]
+    rule {
+    source_labels = ["__name__"]
+    regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+    action        = "keep"
+    }
+}
+
+// GitLab service discovery and scraping
+discovery.kubernetes "gitlab_services" {
+    role = "service"
+}
+
+discovery.relabel "gitlab_metrics" {
+    targets = discovery.kubernetes.gitlab_services.targets
+    
+    rule {
+        action        = "keep"
+        source_labels = ["__meta_kubernetes_service_name", "__meta_kubernetes_namespace"]
+        regex         = "gitlab-webservice-default;gitlab"
+    }
+    
+    rule {
+        action        = "keep"
+        source_labels = ["__meta_kubernetes_service_port_name"]
+        regex         = "http-webservice"
+    }
+    
+    rule {
+        target_label = "job"
+        replacement  = "integrations/gitlab"
+    }
+    
+    rule {
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_service_name"]
+        separator     = "-"
+        target_label  = "instance"
+    }
+}
+
+prometheus.scrape "gitlab_metrics" {
+    targets       = discovery.relabel.gitlab_metrics.output
+    forward_to    = [prometheus.relabel.metrics_service.receiver]
+    metrics_path  = "/-/metrics"
+    scrape_interval = "60s"
+}

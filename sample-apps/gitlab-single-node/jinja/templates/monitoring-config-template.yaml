@@ -1,0 +1,88 @@
+cluster:
+  name: gitlab-sample-app-cluster
+
+externalServices:
+  prometheus:
+    host: "{{prom_host}}"
+    basicAuth:
+      username: "{{prom_user}}"
+      password: "{{prom_pass}}"
+    {% if prom_path -%}
+    writeEndpoint: "{{prom_path}}"
+    {%- endif %}
+    {% if prom_query_path -%}
+    queryEndpoint: "{{prom_query_path}}"
+    {%- endif %}
+  loki:
+    host: "{{loki_host}}"
+    basicAuth:
+      username: "{{loki_user}}"
+      password: "{{loki_pass}}"
+    {% if loki_path -%}
+    writeEndpoint: "{{loki_path}}"
+    {%- endif %}
+
+
+alloy-metrics:
+  extraConfig: |-
+    discovery.kubernetes "gitlab" {
+        role = "pod"
+        selectors {
+            role = "pod"
+            label = "app.kubernetes.io/name=gitlab"
+        }
+    }
+
+
+podLogs:
+  enabled: true
+  labelsToKeep: ["app_kubernetes_io_name","container","instance","job","level","namespace","service_name","service_namespace","deployment_environment","deployment_environment_name"]
+  namespaces: ["gitlab"]
+  extraDiscoveryRules: |-
+    rule {
+        source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+        regex         = "gitlab"
+        replacement   = "gitlab"
+        target_label  = "integration"
+    }
+
+  extraLogProcessingStages: |-
+    stage.match {
+        selector = "{integration=\"gitlab\"}"
+
+        stage.regex {
+            expression = `^\{"severity":"(?P<severity>ERROR)","time":"(?P<time>[^"]+)","correlation_id":"(?P<correlation_id>[^"]+)","exception.class":"(?P<exception_class>[^"]+)",.*$`
+        }
+
+        stage.labels {
+            values = {
+                severity = "",
+                time = "",
+                correlation_id = "",
+                exception_class = "",
+            }
+        }
+
+        stage.match {
+            selector = `{exception_class=""}`
+            action = "drop"
+        }
+
+        stage.template {
+            source   = "instance"
+            template = "{% raw %}{{ .namespace }}-{{ .container }}{% endraw %}"
+        }
+
+        stage.static_labels {
+            values = {
+                job = "integrations/gitlab",
+            }
+        }
+    }
+
+metrics:
+  cost:
+    enabled: false
+
+opencost:
+  enabled: false
