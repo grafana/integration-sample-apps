@@ -1,4 +1,3 @@
-include ../Makefile
 VM_NAME := <INTEGRATION_SLUG>-sample-app
 VM_CLUSTER_MAIN := $(VM_NAME)-k3s-main
 CONFIG_FILE_DIR := jinja/variables
@@ -9,6 +8,9 @@ TEMPLATE_FILE := $(TEMPLATE_FILE_DIR)/monitoring-config-template.yaml
 ALLOY_FILE := configs/suo.alloy
 LOKI_INSTANCE := your-loki-instance:3100
 PROMETHEUS_INSTANCE := your-prometheus-instance:9090
+
+# Import last to ensure expected parameters are set and available to import (e.g. VM_CLUSTER_MAIN)
+include ../Makefile
 
 .PHONY: run-ci stop install-suo default-monitoring-config render-config install-monitoring transfer-configs clean
 

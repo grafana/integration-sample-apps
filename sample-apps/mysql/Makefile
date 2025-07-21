@@ -1,3 +1,4 @@
+include ../Makefile
 VM_NAME := mysql-sample-app
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml

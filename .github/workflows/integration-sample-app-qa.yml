@@ -112,7 +112,7 @@ jobs:
       - name: Setup config & databases
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
         run: |
-          ./ops/scripts/multipass_setup_qa_dbs.sh dbs qa
+          ./ops/scripts/setup_dbs.sh dbs qa
           export "DB_IP=$(./ops/scripts/multipass_get_ips.sh dbs)"
           echo "LOKI=$DB_IP:3100" >> $GITHUB_ENV
           echo "MIMIR=$DB_IP:9009" >> $GITHUB_ENV
@@ -134,6 +134,6 @@ jobs:
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
         run: |
-          ./ops/scripts/check_metrics.sh ${SAMPLE_APP} $MIMIR
+          ./ops/scripts/test_sample_app_metrics.sh ${SAMPLE_APP} $MIMIR
           # test get link to this particular stage
           echo "CHECK_METRICS_STEP_LINKL=https://github.com/${{ github.repository }}/commit/${{ github.sha }}/checks/${{ github.run_id }}"

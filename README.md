@@ -28,49 +28,41 @@ Before you begin, ensure you have the following installed:
 
 Ensure Multipass is running, then from the root of the repo execute:
 ```sh 
-./ops/scripts/multipass_setup_qa_dbs.sh dbs local
+make setup-dbs
 ```
 
 This will setup Grafana, Mimir, and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation.
 
-Then get the IP address of the deployed VM with the databases, either manually through the Multipass GUI, or via the following script:
-
-```sh
-./ops/scripts/multipass_get_ips.sh dbs
-``` 
-This command should result in a single IP being returned, and can be piped into further commands or used manually, e.g. `10.252.79.181` in this example and can be piped into further commands, env vars, or used manually, if you wish. Again, `dbs` is the name of the VM, and can be changed to whatever name you chose.
-
 ### Run a sample-app
 Running sample apps can differ from sample-app to sample-app, but if they are CI compatible, e.g. if they do **not** have a `.CI_BYPASS` file in their directory, then they can be run locally as well.
 
-To do so, navigate to the sample app of choice, then run the following command, substituting the `<ip>` variable with the IP of your database obtained above, or an environment variable if you stored it in one. 
-This provides an override for the make command to set the `remote_write` address for Alloy:
+Simply run the following, replacing `<apps>` with a comma-separated list of desired sample-apps. This will, by default connect to the established databases in the previous section, with no need to supply IP address or ports.
 
 ```sh
-make LOKI_INSTANCE=<ip>:3100 PROMETHEUS_INSTANCE=<ip>:9009 run-ci
+make setup-apps APPS=<apps>
 ```
 
-For most purposes, the `run-ci` make target will be the ideal, and so is used as the default here, as that will run any templating and prerequisite steps needed, and potentially load generation.
+Should you desire another metrics target, such as k3d for cloud integration development, simply supply `ENV=k3d`
 
 ### Checking metrics match expected_metrics
 
 Once your sample-app has been setup, and given time to run (we recommend 2-3 minutes), you can run a script to check if the expected metrics have been emitted, scraped, and stored in Mimir:
 
-To do so, run the following command from the root of the repository, substituting `<sample-app>` with the name of your sample app, and `<ip>` of the database host:
+To do so, simply run the following make command, again providing a comma-separated list of apps, and an optional `ENV` parameter.
 ```sh
-./ops/scripts/check_metrics.sh <sample-app> <ip>:9009
+make test-apps APPS=<apps>
 ```
-
 This will give you a metric by metric pass/fail, as well as an overall pass-fail based on the configured pass-rate for the given sample-app
 
 ### Tearing down the test setup
 
-Tearing down the sample-app is as simple as running the following command from within the sample-app directory:
-```sh
-make stop
+Tearing down can be done separately for the databases and sample-apps.
+For the databases, run:
+```shell
+make stop-dbs
 ```
 
-To destroy the database vm and ensure it's properly cleaned up, run the following command, substituting `dbs` if you changed the name of the database deployment:
-```sh
-multipass delete --purge dbs
+For sample-apps, a comma-separated list is again expected, and can therefore selectively tear down apps.
+```shell
+make stop-apps APPS=<apps>
 ```
