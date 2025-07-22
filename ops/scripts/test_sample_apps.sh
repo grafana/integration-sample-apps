@@ -30,6 +30,6 @@ if [[ -z "${SAMPLE_APPS}" ]]; then
   exit 1
 else
   for APP in ${SAMPLE_APPS//,/ }; do
-    "${OPS_DIR}/scripts/test.sh" "${APP}" "${PROMETHEUS_INSTANCE}"
+    "${OPS_DIR}/scripts/test_sample_app_metrics.sh" "${APP}" "${PROMETHEUS_INSTANCE}"
   done
 fi
