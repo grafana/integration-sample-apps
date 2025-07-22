@@ -1,6 +1,6 @@
 # GitLab sample app
 
-This sample application stands up a single-node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full GitLab setup using the official GitLab Helm chart. The sample app deploys GitLab Community Edition with embedded PostgreSQL, Redis, and MinIO for a complete self-contained GitLab instance. The sample app is capable of running both in a ubuntu-latest-8-core Github Actions runner, and locally.
+This sample application stands up a single-node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full GitLab setup using the official GitLab Helm chart. The sample app deploys GitLab Community Edition with embedded PostgreSQL, Redis, and MinIO for a complete self-contained GitLab instance. There is also a simple loadgen cron job that gets created to help generate specific load on the cluster.
 
 ## Architecture
 
@@ -124,6 +124,9 @@ For a complete list of expected metrics, see the `expected_metrics` file.
 - `jinja/templates/`: Jinja2 templates for dynamic configuration generation
 - `jinja/variables/monitoring-config.yaml`: Variables for template rendering
 
+## Known Metric Issues
+- As of right now there are some metrics that rely on users actually logging in and start contributing to the cluster. A majority of metrics are generated but there are some that cannot be easily automatically generated.
+
 ## Troubleshooting
 
 ### GitLab Not Accessible
@@ -136,7 +139,7 @@ For a complete list of expected metrics, see the `expected_metrics` file.
 2. Check Alloy UI: `make access-alloy-ui`
 3. Review configuration: `make shell` then `kubectl logs -n monitoring deployment/k8s-monitoring-alloy`
 
-### VM Issues
+### VM (Node) Issues
 1. Check VM status: `multipass info gitlab-sample-app-k3s-main`
 2. Restart if needed: `multipass restart gitlab-sample-app-k3s-main`
 3. For persistent issues: `make clean` and re-run `make run-ci`
