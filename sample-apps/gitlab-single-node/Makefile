@@ -86,11 +86,6 @@ gitlab-info:
 	else \
 		echo "❌ NodePort not available"; \
 	fi; \
-	echo ""; \
-	echo "🔄 Port-forward Access (recommended):"; \
-	echo "   Run: make port-forward-gitlab"; \
-	echo "   Then browse to: http://localhost:8080"; \
-	echo ""; \
 	echo "👤 Login credentials:"; \
 	echo "   Username: root"; \
 	echo "   Password: $(shell multipass exec $(VM_K3S_NAME) -- kubectl get secret gitlab-gitlab-initial-root-password -n gitlab -o jsonpath="{.data.password}" | base64 --decode)"; \

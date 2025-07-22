@@ -31,8 +31,4 @@ helm upgrade --install gitlab gitlab/gitlab \
     --version 9.1.2 \
     --timeout 20m
 
-
-# loadgen
-
 kubectl apply -f /home/ubuntu/configs/load-generation.yaml
-

@@ -53,18 +53,10 @@ To get started with the sample app, follow these steps:
 
 ## Accessing GitLab
 
-### Option 1: Port Forwarding (Recommended)
 ```sh
-make port-forward-gitlab
-```
-Then browse to: http://localhost:8080
-
-### Option 2: Direct VM Access
-```sh
-# Set up local DNS resolution
+# Set up local DNS resolution as Gitlab has security features that require non-port forward based access
 make setup-hosts
-
-# Get the NodePort URL
+# Retrieve Gitlab Connection Information
 make gitlab-info
 ```
 Then browse to the provided URL (e.g., http://gitlab.local:32080)
