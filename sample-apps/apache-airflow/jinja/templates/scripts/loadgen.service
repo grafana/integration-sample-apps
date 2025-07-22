@@ -1,0 +1,18 @@
+[Unit]
+Description=Apache Airflow Load Generator
+After=airflow.service
+Requires=airflow.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/ubuntu
+ExecStart=/home/ubuntu/loadgen.sh
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
