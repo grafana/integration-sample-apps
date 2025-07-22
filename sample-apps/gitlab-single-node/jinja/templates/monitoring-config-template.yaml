@@ -34,50 +34,68 @@ alloy-metrics:
     }
 
 
-podLogs:
+logs:
   enabled: true
-  labelsToKeep: ["app_kubernetes_io_name","container","instance","job","level","namespace","service_name","service_namespace","deployment_environment","deployment_environment_name"]
-  namespaces: ["gitlab"]
-  extraDiscoveryRules: |-
-    rule {
+  extraConfig: |-
+    discovery.relabel "gitlab_logs" {
+      targets = discovery.kubernetes.pods.targets
+
+      rule {
+        action        = "keep"
         source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
         regex         = "gitlab"
-        replacement   = "gitlab"
-        target_label  = "integration"
+      }
+      
+      rule {
+        action        = "keep"
+        source_labels = ["__meta_kubernetes_namespace"]
+        regex         = "gitlab"
+      }
+
+      rule {
+        target_label = "job"
+        replacement = "integrations/gitlab"
+      }
+      
+      rule {
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+        separator = "-"
+        target_label = "instance"
+      }
+      
+      rule {
+        action = "replace"
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
     }
 
-  extraLogProcessingStages: |-
-    stage.match {
-        selector = "{integration=\"gitlab\"}"
+    loki.source.kubernetes "gitlab_logs" {
+      targets    = discovery.relabel.gitlab_logs.output
+      forward_to = [loki.process.gitlab_logs.receiver]
+    }
 
-        stage.regex {
-            expression = `^\{"severity":"(?P<severity>ERROR)","time":"(?P<time>[^"]+)","correlation_id":"(?P<correlation_id>[^"]+)","exception.class":"(?P<exception_class>[^"]+)",.*$`
-        }
+    loki.process "gitlab_logs" {
+      forward_to = [loki.process.logs_service.receiver]
+      
+      stage.cri {}
+      
+      stage.json {
+        severity = "severity"
+      }
 
-        stage.labels {
-            values = {
-                severity = "",
-                time = "",
-                correlation_id = "",
-                exception_class = "",
-            }
+      stage.labels {
+        values = {
+          severity = "",
+          correlation_id = "",
+          exception_class = "",
         }
+      }
 
-        stage.match {
-            selector = `{exception_class=""}`
-            action = "drop"
-        }
-
-        stage.template {
-            source   = "instance"
-            template = "{% raw %}{{ .namespace }}-{{ .container }}{% endraw %}"
-        }
-
-        stage.static_labels {
-            values = {
-                job = "integrations/gitlab",
-            }
-        }
+      stage.template {
+        source   = "instance"
+        template = "{% raw %}{{ .namespace }}-{{ .container }}{% endraw %}"
+      }
     }
 
 metrics:
