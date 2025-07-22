@@ -49,6 +49,7 @@ Should you desire another metrics target, such as k3d for cloud integration deve
 Once your sample-app has been setup, and given time to run (we recommend 2-3 minutes), you can run a script to check if the expected metrics have been emitted, scraped, and stored in Mimir:
 
 To do so, simply run the following make command, again providing a comma-separated list of apps, and an optional `ENV` parameter.
+*Note*: The `APPS` and `ENV` parameters can be assigned as environment variables and thus easily reused throughout.
 ```sh
 make test-apps APPS=<apps>
 ```
@@ -65,4 +66,9 @@ make stop-dbs
 For sample-apps, a comma-separated list is again expected, and can therefore selectively tear down apps.
 ```shell
 make stop-apps APPS=<apps>
+```
+
+Should you wish to delete all spawned VMs, you can do so with 
+```shell
+make stop-all
 ```

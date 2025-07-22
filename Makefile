@@ -4,9 +4,9 @@
 MAKEFLAGS += --no-print-directory
 WORK_DIR = $(shell pwd)
 OPS_SCRIPTS_DIR = "./ops/scripts"
-DBS_NAME = "dbs"
-APPS = ""
-ENV = "local"
+DBS_NAME ?= "dbs"
+APPS ?= ""
+ENV ?= "local"
 
 .PHONY: setup-dbs stop-dbs setup-apps test-apps stop-apps stop-all
 
@@ -33,3 +33,9 @@ test-apps:
 stop-apps:
 	@echo "Tearing down apps=$(APPS)"
 	@bash $(OPS_SCRIPTS_DIR)/stop_sample_apps.sh $(APPS)
+
+# General
+stop-all: 
+	@echo "Deleting all Multipass VMs"
+	@multipass delete --all
+	@multipass purge
