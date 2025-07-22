@@ -14,8 +14,7 @@ else
 	VM_MAIN = $(VM_NAME)
 endif
 
-
-.PHONY: k3s-setup k3s-stop check-cluster-mode
+.PHONY: k3s-setup k3s-stop configure_k3d_dns
 
 #k3s/multinode setup
 k3s-setup:

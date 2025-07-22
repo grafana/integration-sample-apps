@@ -1,4 +1,4 @@
-VM_NAME := <INTEGRATION_SLUG>-sample-app
+VM_NAME ?= <INTEGRATION_SLUG>-sample-app
 VM_K3S_NAME := $(VM_NAME)-k3s-main
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE_VARS := $(CONFIG_FILE_DIR)/monitoring-config.yaml
@@ -6,8 +6,8 @@ CONFIG_OUT_FILE := monitoring-config.yaml
 TEMPLATE_FILE_DIR := jinja/templates
 TEMPLATE_FILE := $(TEMPLATE_FILE_DIR)/monitoring-config-template.yaml
 ALLOY_FILE := configs/suo.alloy
-LOKI_INSTANCE := your-loki-instance:3100
-PROMETHEUS_INSTANCE := your-prometheus-instance:9090
+LOKI_INSTANCE ?= your-loki-instance:3100
+PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
 
 # Import last to ensure expected parameters are set and available to import (e.g. VM_CLUSTER_MAIN)
 include ../Makefile
