@@ -1,0 +1,10 @@
+loki_url: http://192.168.64.4:3100/loki/api/v1/push
+loki_host: http://192.168.64.4:3100
+loki_path: /loki/api/v1/push
+loki_user: your_loki_username
+loki_pass: your_loki_password
+prom_url: http://192.168.64.4:9009/api/v1/push
+prom_host: http://192.168.64.4:9009
+prom_path: /api/v1/push
+prom_user: your_prometheus_username
+prom_pass: your_prometheus_password
