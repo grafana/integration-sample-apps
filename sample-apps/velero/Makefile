@@ -1,4 +1,4 @@
-VM_NAME := velero-sample-app
+VM_NAME ?= velero-sample-app
 
 .PHONY: run stop exporter generate-load fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
