@@ -17,7 +17,6 @@ runcmd:
   # General setup
   - sudo apt-get update
 
-
   # Configure Alloy
   - sudo systemctl enable alloy.service
   - sudo systemctl start alloy.service
