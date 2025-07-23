@@ -1,5 +1,9 @@
 #!/bin/bash
 
+ROOT_DIR=$(git rev-parse --show-toplevel)
+OPS_DIR=${ROOT_DIR}/ops
+SAMPLE_APPS_DIR=${ROOT_DIR}/sample-apps
+
 # This script will check each metric of a provided metric list against a provided Prometheus host
 # and calculate the success rate
 
@@ -11,7 +15,7 @@ PROMETHEUS_INSTANCE=$2
 # - SAMPLE_APP_CONFIG_FILE
 # - OUTPUT_MISSING_METRICS_FILE
 # - METRICS_SUCCESS_RATE_REQUIRED
-source ./ops/.defaultconfig
+source "${OPS_DIR}/.defaultconfig"
 
 # Track overall test status
 OVERALL_STATUS=0
@@ -100,7 +104,6 @@ else
     fi
   done
 fi
-
 echo "--- [ FINAL TEST RESULTS ] ---"
 if [ $OVERALL_STATUS == 0 ]; then
   echo "All test cases completed successfully"

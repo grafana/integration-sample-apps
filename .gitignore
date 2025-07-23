@@ -5,6 +5,7 @@
 /.cache
 /.vscode
 /.eventcache
+/network-cache
 
 # Integration QA specifics
 missing_metrics

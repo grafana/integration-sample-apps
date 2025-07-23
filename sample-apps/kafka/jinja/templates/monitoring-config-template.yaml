@@ -28,3 +28,11 @@ metrics:
 
 opencost:
   enabled: false
+
+alloy:
+  alloy:
+    hostAliases:
+      - ip: "placeholder_dns_ip"
+        hostnames:
+          - "loki.k3d.localhost"
+          - "mimir.k3d.localhost"

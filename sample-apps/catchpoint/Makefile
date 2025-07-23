@@ -1,4 +1,4 @@
-VM_NAME := catchpoint
+VM_NAME ?= catchpoint
 K8S_NAMESPACE := default
 CONFIG_FILE := jinja/variables/cloud-init.yaml
 TEMPLATE_DIR := jinja/templates
