@@ -33,8 +33,8 @@ The CI workflow expects a few things from a CI enabled sample app. For a working
     1. Should be present in sample-app dir
     1. Variables should be created for logs and metrics database hosts, e.g: 
         ```
-        LOKI_INSTANCE := your-loki-instance:3100
-        PROMETHEUS_INSTANCE := your-prometheus-instance:9090
+        LOKI_INSTANCE ?= your-loki-instance:3100
+        PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
         ```
     1. `make run-ci` must be a valid make option, making use of the variables defined in 2., such that a clean cloud-init or similar configuration is generated and applied, load-testing is run, and so forth depending on sample-app requirements
 

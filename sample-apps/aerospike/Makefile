@@ -1,8 +1,8 @@
-VM_NAME := aerospike-sample-app
+VM_NAME ?= aerospike-sample-app
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
-LOKI_INSTANCE := your-loki-instance:3100
-PROMETHEUS_INSTANCE := your-prometheus-instance:9009
+LOKI_INSTANCE ?= your-loki-instance:3100
+PROMETHEUS_INSTANCE ?= your-prometheus-instance:9009
 
 .PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
