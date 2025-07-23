@@ -1,4 +1,4 @@
-VM_NAME := ldap-server
+VM_NAME ?= ldap-server
 K8S_NAMESPACE := default
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
@@ -11,8 +11,11 @@ OPENLDAP_EXPORTER_DEPLOYMENT := cloud/openldap_exporter_deployment.yaml
 OPENLDAP_SERVICE := cloud/openldap_service.yaml
 OPENLDAP_EXPORTER_SERVICE := cloud/openldap_exporter_service.yaml
 GRAFANA_AGENT_DEPLOYMENT := cloud/grafana-agent-deployment.yaml
-LOKI_INSTANCE := your-loki-instance:3100
-PROMETHEUS_INSTANCE := your-prometheus-instance:9090
+LOKI_INSTANCE ?= your-loki-instance:3100
+PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
+
+# Import last to ensure expected parameters are set and available to import from this file
+include ../Makefile
 
 .PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig run-k8s stop-k8s render-k8s install-grafana-agent install-grafana-flow install-openldap deploy-openldap-exporter deploy-grafana-agent clean-generated
 
