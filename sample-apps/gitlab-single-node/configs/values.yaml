@@ -1,0 +1,256 @@
+# ---------------------------
+# Global GitLab configuration
+# ---------------------------
+global:
+  edition: ce
+
+  # Application-level configuration
+  appConfig:
+    lfs:
+      enabled: true
+    artifacts:
+      enabled: false
+    uploads:
+      enabled: true
+    packages:
+      enabled: false
+
+  # Host and domain settings
+  hosts:
+    domain: gitlab.local
+    gitlab:
+      name: gitlab.local
+    registry:
+      name: gitlab-registry.local
+      https: false
+    minio:
+      name: minio.local
+      https: false
+    https: false
+
+  workhorse:
+    host: gitlab.local
+
+  # Ingress settings
+  ingress:
+    configureCertmanager: false
+    class: "nginx"
+    enabled: true
+    tls:
+      enabled: false
+
+  # Service type for GitLab
+  service:
+    type: ClusterIP
+
+  # Shell (SSH) configuration
+  shell:
+    port: 22
+
+  # Built-in services toggles
+  postgresql:
+    install: true
+  redis:
+    install: true
+  minio:
+    enabled: true
+
+
+# ---------------------------
+# GitLab Application Services
+# ---------------------------
+gitlab:
+  gitaly:
+    persistence:
+      enabled: false
+
+
+  webservice:
+    service:
+      type: ClusterIP
+      port: 8080
+      targetPort: 8080
+
+    # Environment variables for Rails/Omnibus
+    extraEnv:
+      GITLAB_HOST: "0.0.0.0"
+      GITLAB_PORT: "8080"
+      GITLAB_HTTPS: "false"
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url = 'http://gitlab.local'
+        gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0']
+        gitlab_rails['artifacts_enabled'] = false
+        nginx['listen_port'] = 8080
+        nginx['listen_https'] = false
+        nginx['referrer_policy'] = false
+        nginx['proxy_set_headers'] = {
+          "Host" => "$http_host",
+          "X-Real-IP" => "$remote_addr",
+          "X-Forwarded-For" => "$proxy_add_x_forwarded_for",
+          "X-Forwarded-Proto" => "$scheme"
+        }
+
+    ingress:
+      enabled: true
+      configureCertManager: false
+      useNewIngressForCerts: false
+      annotations:
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+        nginx.ingress.kubernetes.io/use-regex: "true"
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+        nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
+        nginx.ingress.kubernetes.io/ssl-redirect: "false"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+      path: /
+      pathType: Prefix
+
+    monitoring:
+      enabled: true
+      whiteListedIPs:
+        - 0.0.0.0/0
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+  gitlab-shell:
+    enabled: true
+    service:
+      type: ClusterIP
+      port: 22
+
+  sidekiq:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 600Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# ---------------------------
+# Storage & Database Services
+# ---------------------------
+registry:
+  enabled: true
+
+postgresql:
+  install: true
+  persistence:
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+redis:
+  install: true
+  persistence:
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+
+minio:
+  image: minio/minio
+  imageTag: RELEASE.2025-06-13T11-33-47Z-cpuv1
+  minioMc:
+    image: minio/mc
+    tag: RELEASE.2024-11-21T17-21-54Z-cpuv1
+  defaultBuckets:
+    - name: public
+      policy: public
+      purge: true
+
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ---------------------------
+# Ingress Controller
+# ---------------------------
+nginx-ingress:
+  enabled: true
+  controller:
+    service:
+      type: LoadBalancer
+      nodePorts:
+        http: 30080
+        https: 30443
+    config:
+      use-forwarded-headers: "true"
+      compute-full-forwarded-for: "true"
+      use-proxy-protocol: "false"
+      hsts: "false"
+      ssl-redirect: "false"
+      force-ssl-redirect: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 90Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ---------------------------
+# Monitoring & Observability
+# ---------------------------
+installCertManager: false
+
+prometheus:
+  install: false
+
+gitlab-exporter:
+  enabled: true
+
+# ---------------------------
+# Optional/Non-Essential Features
+# ---------------------------
+geo-logcursor:
+  enabled: false
+
+# ---------------------------
+# GitLab Runner (enabled for chart compatibility, but not used)
+# ---------------------------
+gitlab-runner:
+  install: true
+  rbac:
+    create: true
+  gitlabUrl: "http://gitlab-webservice-default:8080"
+  runners:
+    locked: false
+    privileged: true
+    secret: "nonempty"
+    extraEnv:
+      GITLAB_API_URL: "http://gitlab-webservice-default:8080"
+      CI_SERVER_URL: "http://gitlab-webservice-default:8080"
+      RUNNER_NAME: "gitlab-runner"
+      CI_DEBUG_TRACE: "false"
+      REGISTER_NON_INTERACTIVE: "true"
+    
+  podAnnotations:
+    gitlab.com/prometheus_scrape: "true"
+    gitlab.com/prometheus_port: 9252
+  podSecurityContext:
+    seccompProfile:
+      type: "RuntimeDefault"
