@@ -12,13 +12,6 @@ This sample app deploys the following components:
 - **k8s-monitoring-helm** - Grafana Alloy-based monitoring stack
 - **Kubernetes (k3s)** - Container orchestration platform
 
-## System Requirements
-
-- **CPU**: 8 cores
-- **Memory**: 12 GB RAM
-- **Disk**: 20 GB available space
-- **OS**: macOS, Linux, or Windows with Multipass support
-
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:

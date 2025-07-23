@@ -39,4 +39,5 @@ configure-k3d-dns:
 	@multipass transfer $(COMMON_DIR)/scripts/configure_k3d_dns.sh $(VM_MAIN):/home/ubuntu/configure_k3d_dns.sh
 	@multipass exec $(VM_MAIN) -- bash -c "chmod +x configure_k3d_dns.sh && sudo ./configure_k3d_dns.sh"
 
-
+shell:
+	@multipass shell $(VM_MAIN)
