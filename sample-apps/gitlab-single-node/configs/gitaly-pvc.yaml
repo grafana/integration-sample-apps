@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: gitaly-storage
+  namespace: gitlab
+spec:
+  storageClassName: local-path
+  capacity: 
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data/gitaly-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitaly-storage
+  namespace: gitlab
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: local-path
