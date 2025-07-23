@@ -10,7 +10,7 @@ OPS_SCRIPTS_DIR = "../../ops/scripts"
 VM_MAIN = ""
 ifdef VM_CLUSTER_MAIN
 	VM_MAIN = $(VM_CLUSTER_MAIN)
-else ifdev VM_K3S_NAME
+else ifdef VM_K3S_NAME
 	VM_MAIN = $(VM_K3S_NAME)
 else
 	VM_MAIN = $(VM_NAME)
