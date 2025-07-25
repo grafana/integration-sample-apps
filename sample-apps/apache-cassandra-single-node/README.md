@@ -134,4 +134,3 @@ multipass exec apache-cassandra-sample-app-k3s-main -- kubectl exec -it -n cassa
 # Run a simple query to test
 multipass exec apache-cassandra-sample-app-k3s-main -- kubectl exec -n cassandra cassandra-0 -- cqlsh -e "DESCRIBE KEYSPACES;"
 ```
-

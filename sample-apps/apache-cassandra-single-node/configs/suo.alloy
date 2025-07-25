@@ -30,8 +30,6 @@ prometheus.relabel "alloy_check" {
     }
 }
 
-
-
 discovery.kubernetes "apache_cassandra" {
   role = "pod"
   selectors {
@@ -70,7 +68,6 @@ prometheus.scrape "metrics_apache_cassandra" {
   scrape_interval = "30s"
 }
 
-
 discovery.relabel "apache_cassandra_logs" {
   targets = discovery.kubernetes.apache_cassandra.targets
 
@@ -96,7 +93,6 @@ discovery.relabel "apache_cassandra_logs" {
     target_label = "job"
   }
 }
-
 
 loki.source.kubernetes "apache_cassandra_logs" {
   targets = discovery.relabel.apache_cassandra_logs.output
