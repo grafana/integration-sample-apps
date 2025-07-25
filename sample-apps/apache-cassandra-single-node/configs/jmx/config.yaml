@@ -1,0 +1,113 @@
+---
+lowercaseOutputLabelNames: true
+lowercaseOutputName: true
+rules:
+# Generic gauges with 0-2 labels
+- pattern: org.apache.cassandra.metrics<type=(\S*)(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=(\S*)><>Value
+  name: cassandra_$1_$5
+  type: GAUGE
+  labels:
+    "$1": "$4"
+    "$2": "$3"
+
+# Generic JVM metrics
+- pattern: 'java.lang<type=Memory><(\w+)MemoryUsage>(\w+): (\d+)'
+  name: jvm_memory_usage_$2_bytes
+  labels:
+    area: "$1"  # Heap/NonHeap
+  value: $3
+  type: GAUGE
+
+- pattern: 'java.lang<type=OperatingSystem><>ProcessCpuLoad: (.[0-9]*[.]?[0-9]+)'
+  name: jvm_process_cpu_load
+  value: $1
+  type: GAUGE
+
+- pattern: 'java.lang<type=OperatingSystem><>TotalPhysicalMemorySize: (\d+)'
+  name: jvm_physical_memory_size
+  value: $1
+  type: GAUGE
+
+# name is always the same, the name of the GC
+- pattern: 'java.lang<name=[^,]+, type=GarbageCollector, key=([^>]+)><LastGcInfo, memoryUsageAfterGc>(used|committed): (\d+)'
+  name: jvm_memory_after_gc_$2_bytes
+  value: $3
+  labels:
+    space: $1
+  type: GAUGE
+
+- pattern: 'java.lang<name=([^>]+), type=GarbageCollector><LastGcInfo>duration: (\d+)'
+  name: jvm_gc_duration_seconds
+  value: $2
+  labels:
+    name: $1
+  type: GAUGE
+  # Convert microseconds to seconds
+  valueFactor: 0.000001
+
+# java.lang<type=GarbageCollector, name=G1 Young Generation><>CollectionCount
+- pattern: 'java.lang<name=([^>]+), type=GarbageCollector><>CollectionCount: (\d+)'
+  name: jvm_gc_collection_count
+  value: $2
+  labels:
+    name: $1
+  type: GAUGE
+
+#
+# Emulate Prometheus 'Summary' metrics for the exported 'Histogram's.
+# TotalLatency is the sum of all latencies since server start
+#
+- pattern: org.apache.cassandra.metrics<type=(\S*)(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=(.+)?(?:Total)(Latency)><>Count
+  name: cassandra_$1_$5$6_seconds_sum
+  type: UNTYPED
+  labels:
+    "$1": "$4"
+    "$2": "$3"
+  # Convert microseconds to seconds
+  valueFactor: 0.000001
+
+- pattern: org.apache.cassandra.metrics<type=(\S*)(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=((?:.+)?(?:Latency))><>Count
+  name: cassandra_$1_$5_seconds_count
+  type: UNTYPED
+  labels:
+    "$1": "$4"
+    "$2": "$3"
+
+- pattern: org.apache.cassandra.metrics<type=(\S*)(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=(.+)><>Count
+  name: cassandra_$1_$5_count
+  type: UNTYPED
+  labels:
+    "$1": "$4"
+    "$2": "$3"
+
+- pattern: org.apache.cassandra.metrics<type=(\S*)(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=((?:.+)?(?:Latency))><>(\d+)thPercentile
+  name: cassandra_$1_$5_seconds
+  type: GAUGE
+  labels:
+    "$1": "$4"
+    "$2": "$3"
+    quantile: "0.$6"
+  # Convert microseconds to seconds
+  valueFactor: 0.000001
+
+- pattern: org.apache.cassandra.metrics<type=(\S*)(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=(.+)><>(\d+)thPercentile
+  name: cassandra_$1_$5
+  type: GAUGE
+  labels:
+    "$1": "$4"
+    "$2": "$3"
+    quantile: "0.$6"
+
+# Get mean write and read latency
+- pattern: org.apache.cassandra.metrics<type=Keyspace(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=((?:.+)?(?:)(?:Read|Write)Latency)><>Mean
+  name: cassandra_keyspace_$4_seconds_average
+  type: GAUGE
+  labels: 
+    "$1": "$2"
+  # Convert microseconds to seconds
+  valueFactor: 0.000001
+
+- pattern: 'org.apache.cassandra.net<type=FailureDetector><>(\w+)EndpointCount: (\d+)'
+  name: cassandra_$1_endpoint_count
+  value: $2
+  type: GAUGE
