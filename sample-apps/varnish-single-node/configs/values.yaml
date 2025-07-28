@@ -1,0 +1,4 @@
+replicas: 1
+varnishImage: varnish:stable
+exporterImage: sample/varnish:0.0.1
+nginxImage: nginx:1.25.1
