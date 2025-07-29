@@ -2,27 +2,27 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: cassandra
-  namespace: cassandra
+  name: apache-cassandra
+  namespace: apache-cassandra
 spec:
-  serviceName: cassandra
+  serviceName: apache-cassandra
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/app: cassandra
+      app.kubernetes.io/app: apache-cassandra
   template:
     metadata:
       labels:
-        app.kubernetes.io/app: cassandra
+        app.kubernetes.io/app: apache-cassandra
         cassandra_cluster: operator-cassandra-cluster
     spec:
       containers:
-        - name: cassandra
+        - name: apache-cassandra
           image: docker.io/sample/apache-cassandra:0.0.1
           imagePullPolicy: Never
           env:
           - name: CASSANDRA_SEEDS
-            value: "cassandra-0.cassandra.cassandra.svc.cluster.local,cassandra-1.cassandra.cassandra.svc.cluster.local"
+            value: "apache-cassandra-0.apache-cassandra.apache-cassandra.svc.cluster.local,apache-cassandra-1.apache-cassandra.apache-cassandra.svc.cluster.local"
           - name: CASSANDRA_CLUSTER_NAME
             value: "operator-cassandra-cluster"
           - name: CASSANDRA_DC
@@ -76,13 +76,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: cassandra
-  namespace: cassandra
+  name: apache-cassandra
+  namespace: apache-cassandra
   labels:
-    app.kubernetes.io/service: cassandra
+    app.kubernetes.io/service: apache-cassandra
 spec:
   selector:
-    app.kubernetes.io/app: cassandra
+    app.kubernetes.io/app: apache-cassandra
   ports:
     - name: jmx
       protocol: TCP

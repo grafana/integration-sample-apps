@@ -29,11 +29,11 @@ sudo docker image save "sample/apache-cassandra:0.0.1" -o "apache-cassandra.tar"
 sudo k3s ctr -n=k8s.io images import "apache-cassandra.tar"
 
 # Create namespace
-kubectl create namespace cassandra --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace apache-cassandra --dry-run=client -o yaml | kubectl apply -f -
 
 # Apply the deployment && service
-kubectl apply -f /home/ubuntu/configs/deployment.yaml -n cassandra
+kubectl apply -f /home/ubuntu/configs/deployment.yaml -n apache-cassandra
 
 # Apply the cronjob
-kubectl apply -f /home/ubuntu/configs/cronjob.yaml -n cassandra
+kubectl apply -f /home/ubuntu/configs/cronjob.yaml -n apache-cassandra
 

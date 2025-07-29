@@ -1,5 +1,5 @@
 VM_NAME ?= apache-cassandra-sample-app
-VM_CLUSTER_MAIN := $(VM_NAME)-k3s-main
+VM_K3S_NAME := $(VM_NAME)-k3s-main
 CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE_VARS := $(CONFIG_FILE_DIR)/monitoring-config.yaml
 CONFIG_OUT_FILE := monitoring-config.yaml
@@ -21,8 +21,8 @@ run-ci: clean k3s-setup install-suo default-monitoring-config render-config inst
 stop: k3s-stop clean
 
 install-suo: transfer-configs
-	@multipass transfer ./scripts/suo_setup.sh $(VM_CLUSTER_MAIN):/home/ubuntu/suo_setup.sh;
-	@multipass exec $(VM_CLUSTER_MAIN) -- bash -c "chmod +x suo_setup.sh && ./suo_setup.sh"
+	@multipass transfer ./scripts/suo_setup.sh $(VM_K3S_NAME):/home/ubuntu/suo_setup.sh;
+	@multipass exec $(VM_K3S_NAME) -- bash -c "chmod +x suo_setup.sh && ./suo_setup.sh"
 
 render-config:
 	@docker run --rm -v $(shell pwd)/$(TEMPLATE_FILE_DIR):/templates -v $(shell pwd)/$(CONFIG_FILE_DIR):/variables dinutac/jinja2docker:latest /templates/monitoring-config-template.yaml /variables/monitoring-config.yaml --format=yaml > monitoring-config.yaml
@@ -39,12 +39,12 @@ default-monitoring-config:
 	@echo "prom_pass: your_prometheus_password" >> $(CONFIG_FILE_VARS)
 	
 transfer-configs: 
-	@multipass transfer --recursive configs/ $(VM_CLUSTER_MAIN):/home/ubuntu/
+	@multipass transfer --recursive configs/ $(VM_K3S_NAME):/home/ubuntu/
 
 install-monitoring: transfer-configs
-	@multipass transfer $(CONFIG_OUT_FILE) $(VM_CLUSTER_MAIN):/home/ubuntu/monitoring.yaml;
-	@multipass transfer ./scripts/install_monitoring.sh $(VM_CLUSTER_MAIN):/home/ubuntu/install_monitoring.sh;
-	@multipass exec $(VM_CLUSTER_MAIN) -- bash -c "chmod +x install_monitoring.sh && ./install_monitoring.sh"
+	@multipass transfer $(CONFIG_OUT_FILE) $(VM_K3S_NAME):/home/ubuntu/monitoring.yaml;
+	@multipass transfer ./scripts/install_monitoring.sh $(VM_K3S_NAME):/home/ubuntu/install_monitoring.sh;
+	@multipass exec $(VM_K3S_NAME) -- bash -c "chmod +x install_monitoring.sh && ./install_monitoring.sh"
 
 clean:
 	@rm -rf $(CONFIG_FILE_DIR)
