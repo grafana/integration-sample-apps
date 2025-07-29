@@ -1,0 +1,155 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required wildfly sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- curl
+- alloy
+
+write_files:
+# Alloy configuration
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "alloy_hostname"
+        replacement  = constants.hostname
+      }
+
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets    = discovery.relabel.alloy_check.output
+      forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.scrape "metrics_integrations_integrations_wildfly" {
+      targets = [{
+        __address__ = "localhost:9990",
+        instance    = constants.hostname,
+      }]
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/wildfly"
+    }
+
+    local.file_match "logs_integrations_integrations_wildfly" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/opt/wildfly/standalone/log/server.log",
+        instance    = constants.hostname,
+        job         = "integrations/wildfly",
+      }]
+    }
+
+    loki.process "logs_integrations_integrations_wildfly" {
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+      stage.multiline {
+        firstline     = "\\d+-\\d+-\\d+ \\d+:\\d+:\\d+,\\d+"
+        max_lines     = 0
+        max_wait_time = "3s"
+      }
+    }
+
+    loki.source.file "logs_integrations_integrations_wildfly" {
+      targets    = local.file_match.logs_integrations_integrations_wildfly.targets
+      forward_to = [loki.process.logs_integrations_integrations_wildfly.receiver]
+    }
+
+# WildFly systemd service file
+- owner: root:root
+  path: /etc/systemd/system/wildfly.service
+  content: |
+    [Unit]
+    Description=The WildFly Application Server
+    After=syslog.target network.target
+
+    [Service]
+    User=root
+    Group=root
+    LimitNOFILE=102642
+    Environment=LAUNCH_JBOSS_IN_BACKGROUND=1
+    ExecStart=/opt/wildfly/bin/launch.sh standalone standalone.xml 0.0.0.0
+
+    [Install]
+    WantedBy=multi-user.target
+
+- owner: root:root
+  path: /home/ubuntu/install.sh
+  content: |
+    {% filter indent(6) %}
+    {%- include 'scripts/install.sh' -%}
+    {% endfilter %}
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - sudo chmod +x /home/ubuntu/install.sh
+  - sudo /home/ubuntu/install.sh
+
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable wildfly
+  - sudo systemctl start wildfly
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
