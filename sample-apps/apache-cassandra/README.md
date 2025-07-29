@@ -14,7 +14,7 @@ Before you begin, ensure you have the following installed:
 
 To get started with the sample app, follow these steps:
 
-1. **Clone the repository**: 
+1. **Clone the repository**:
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
    cd integration-sample-apps/sample-apps/apache-cassandra-single-node
@@ -24,7 +24,7 @@ To get started with the sample app, follow these steps:
    Execute `make LOKI_INSTANCE=<loki_host>:<loki_port> PROMETHEUS_INSTANCE=<prom_host>:<prom_port> run-ci`, substituting the host and ports as required for your setup.
    This will take care of rendering the correct config and setup, as used in the Github Actions workflow on this repository.
 
-6. **Stop and clean Up**: 
+6. **Stop and clean Up**:
    Use `make stop` to clean up the k3s cluster and automatically clean up temporary files.
 
 ## Make commands

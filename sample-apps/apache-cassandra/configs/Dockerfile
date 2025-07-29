@@ -20,7 +20,7 @@ RUN apt-get update && \
 
 RUN sed -i 's/JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=true"/JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=false"/g' /etc/cassandra/cassandra-env.sh
 RUN sed -i '/password/d' /etc/cassandra/cassandra-env.sh
- 
+
 ## Disable auth requirements
 ENV LOCAL_JMX="no"
 ENV JVM_EXTRA_OPTS="-Djava.rmi.server.hostname=127.0.0.1 -javaagent:./jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar=${JMX_EXPORTER_PORT}:/cassandra-jmx-config.yaml"

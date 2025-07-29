@@ -26,7 +26,7 @@ install-suo: transfer-configs
 
 render-config:
 	@docker run --rm -v $(shell pwd)/$(TEMPLATE_FILE_DIR):/templates -v $(shell pwd)/$(CONFIG_FILE_DIR):/variables dinutac/jinja2docker:latest /templates/monitoring-config-template.yaml /variables/monitoring-config.yaml --format=yaml > monitoring-config.yaml
-	
+
 default-monitoring-config:
 	@mkdir -p $(CONFIG_FILE_DIR)
 	@echo "loki_host: http://$(LOKI_INSTANCE)" >> $(CONFIG_FILE_VARS)
@@ -37,8 +37,8 @@ default-monitoring-config:
 	@echo "prom_path: /api/v1/push" >> $(CONFIG_FILE_VARS)
 	@echo "prom_user: your_prometheus_username" >> $(CONFIG_FILE_VARS)
 	@echo "prom_pass: your_prometheus_password" >> $(CONFIG_FILE_VARS)
-	
-transfer-configs: 
+
+transfer-configs:
 	@multipass transfer --recursive configs/ $(VM_K3S_NAME):/home/ubuntu/
 
 install-monitoring: transfer-configs
