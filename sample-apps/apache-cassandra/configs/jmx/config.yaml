@@ -102,7 +102,7 @@ rules:
 - pattern: org.apache.cassandra.metrics<type=Keyspace(?:, ((?!scope)\S*)=(\S*))?(?:, scope=(\S*))?, name=((?:.+)?(?:)(?:Read|Write)Latency)><>Mean
   name: cassandra_keyspace_$4_seconds_average
   type: GAUGE
-  labels: 
+  labels:
     "$1": "$2"
   # Convert microseconds to seconds
   valueFactor: 0.000001
