@@ -1,5 +1,5 @@
 # jinja/templates/cloud-init-template.yaml
-# Cloud-init configuration for setting up Alloy and required <INTEGRATION_NAME> sample-app
+# Cloud-init configuration for setting up Alloy and required wildfly sample-app
 
 apt:
   sources:
