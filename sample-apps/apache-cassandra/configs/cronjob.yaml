@@ -3,9 +3,9 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: apache-cassandra-loadgen
-  namespace: cassandra
+  namespace: apache-cassandra
 spec:
-  schedule: "*/1 * * * *"  # Run every 5 minutes instead of every minute
+  schedule: "*/5 * * * *"
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -22,6 +22,6 @@ spec:
               command: ["/bin/bash", "-c"]
               args:
                 - |
-                  /opt/cassandra/tools/bin/cassandra-stress write n=1 -node cassandra -mode native cql3 -errors ignore &&
-                  /opt/cassandra/tools/bin/cassandra-stress mixed n=100 -node cassandra -mode native cql3 -errors ignore
+                  /opt/cassandra/tools/bin/cassandra-stress write n=1 -node apache-cassandra -mode native cql3 -errors ignore &&
+                  /opt/cassandra/tools/bin/cassandra-stress mixed n=100 -node apache-cassandra -mode native cql3 -errors ignore
           restartPolicy: Never

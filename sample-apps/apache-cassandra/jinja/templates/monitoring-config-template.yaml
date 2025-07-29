@@ -8,10 +8,10 @@ externalServices:
       username: "{{prom_user}}"
       password: "{{prom_pass}}"
     {% if prom_path -%}
-      writeEndpoint: "{{prom_path}}"
+    writeEndpoint: "{{prom_path}}"
     {%- endif %}
     {% if prom_query_path -%}
-      queryEndpoint: "{{prom_query_path}}"
+    queryEndpoint: "{{prom_query_path}}"
     {%- endif %}
   loki:
     host: "{{loki_host}}"
@@ -19,8 +19,21 @@ externalServices:
       username: "{{loki_user}}"
       password: "{{loki_pass}}"
     {% if loki_path -%}
-      writeEndpoint: "{{loki_path}}"
+    writeEndpoint: "{{loki_path}}"
     {%- endif %}
+
+metrics:
+  cost:
+    enabled: false
 
 opencost:
   enabled: false
+
+alloy:
+  alloy:
+    hostAliases:
+      - ip: "placeholder_dns_ip"
+        hostnames:
+          - "loki.k3d.localhost"
+          - "mimir.k3d.localhost"
+

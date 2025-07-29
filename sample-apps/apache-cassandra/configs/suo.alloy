@@ -3,16 +3,16 @@ prometheus.exporter.self "alloy_check" { }
 discovery.relabel "alloy_check" {
     targets = prometheus.exporter.self.alloy_check.targets
     rule {
-    target_label = "instance"
-    replacement  = constants.hostname
+      target_label = "instance"
+      replacement  = constants.hostname
     }
     rule {
-    target_label = "alloy_hostname"
-    replacement  = constants.hostname
+      target_label = "alloy_hostname"
+      replacement  = constants.hostname
     }
     rule {
-    target_label = "job"
-    replacement  = "integrations/alloy-check"
+      target_label = "job"
+      replacement  = "integrations/alloy-check"
     }
 }
 
@@ -34,7 +34,7 @@ discovery.kubernetes "apache_cassandra" {
   role = "pod"
   selectors {
     role = "pod"
-    label = "app.kubernetes.io/app=cassandra"
+    label = "app.kubernetes.io/app=apache-cassandra"
   }
 }
 
@@ -42,7 +42,7 @@ discovery.relabel "apache_cassandra" {
   targets = discovery.kubernetes.apache_cassandra.targets
   rule {
     source_labels = ["__meta_kubernetes_pod_name"]
-    regex = "cassandra-."
+    regex = "apache-cassandra-."
     action = "keep"
   }
 
@@ -73,7 +73,7 @@ discovery.relabel "apache_cassandra_logs" {
 
   rule {
     source_labels = ["__meta_kubernetes_pod_name"]
-    regex = "cassandra-."
+    regex = "apache-cassandra-."
     action = "keep"
   }
 

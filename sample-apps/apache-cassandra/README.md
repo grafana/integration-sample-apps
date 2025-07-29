@@ -1,6 +1,6 @@
 # Apache Cassandra Single Node sample app
 
-This sample application stands up a three node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full Apache Cassandra multi-node setup using a custom Docker image with built-in JMX monitoring. The sample app deploys a 2-replica StatefulSet of Cassandra nodes and is capable of running both in a `ubuntu-latest-8-core` Github Actions runner, and locally.
+This sample application stands up a single-node K3s cluster, with the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart applied, and then spawns a full Apache Cassandra multi-node setup using a custom Docker image with built-in JMX monitoring. The sample app deploys a 2-replica StatefulSet of Cassandra nodes and is capable of running both in a `ubuntu-latest-8-core` Github Actions runner, and locally.
 
 ## Prerequisites
 
@@ -59,13 +59,13 @@ Docker is installed and builds an image that properly sets the java agent so the
 ### Check Pod Status
 ```bash
 # Check if Cassandra pods are running
-multipass exec apache-cassandra-sample-app-k3s-main -- kubectl get pods -n cassandra
+multipass exec apache-cassandra-sample-app-k3s-main -- kubectl get pods -n apache-cassandra
 
 # Check pod details and events
-multipass exec apache-cassandra-sample-app-k3s-main -- kubectl describe pods -n cassandra
+multipass exec apache-cassandra-sample-app-k3s-main -- kubectl describe pods -n apache-cassandra
 
 # Check StatefulSet status
-multipass exec apache-cassandra-sample-app-k3s-main -- kubectl get statefulset -n cassandra
+multipass exec apache-cassandra-sample-app-k3s-main -- kubectl get statefulset -n apache-cassandra
 ```
 
 ### Check Cassandra Cluster Health
