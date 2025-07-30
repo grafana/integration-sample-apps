@@ -1,8 +1,11 @@
 ---
+# This is a sample service for the varnish cache.
+# It is also used to expose the varnish exporter to the outside world.
+# It is also used to expose the nginx service to the outside world.
 apiVersion: v1
 kind: Service
 metadata:
-  name: sample-varnish-cache
+  name: varnish-cache
   labels:
     helm.sh/chart: varnish-cache-0.1.0
     app.kubernetes.io/name: varnish-cache
