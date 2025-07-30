@@ -42,6 +42,8 @@ This sample app deploys Apache CouchDB in a Kubernetes cluster and configures mo
 
 The monitoring configuration targets the job label `integrations/apache-couchdb` and includes cluster identification for proper metric and log labeling.
 
+For version details, see the chart installation in [`suo_setup.sh`](./scripts/suo_setup.sh). The chart version used (e.g., 4.6.2) corresponds to the deployed Apache CouchDB version (e.g., 3.5.0).
+
 ## Make commands
 
 - `make default-monitoring-config`: Initializes the configuration file with default connection parameters used when applying the [k8s-monitoring-helm chart](https://github.com/grafana/k8s-monitoring-helm).
