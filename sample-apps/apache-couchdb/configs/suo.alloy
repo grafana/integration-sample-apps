@@ -1,0 +1,61 @@
+discovery.kubernetes "apache_couchdb" {
+	role = "endpointslice"
+}
+
+discovery.relabel "apache_couchdb" {
+	targets = discovery.kubernetes.apache_couchdb.targets
+
+	rule {
+		source_labels = ["__meta_kubernetes_endpointslice_name", "__meta_kubernetes_pod_container_port_number"]
+		separator     = ":"
+		regex         = ".*-svc-couchdb-.*:17986"
+		action        = "keep"
+	}
+
+	rule {
+		replacement  = "apache-couchdb-sample-app"
+		target_label = "couchdb_cluster"
+	}
+
+}
+
+prometheus.scrape "apache_couchdb" {
+	targets      = discovery.relabel.apache_couchdb.output
+	metrics_path = "/_node/_local/_prometheus"
+	forward_to   = [prometheus.relabel.metrics_service.receiver]
+	job_name     = "integrations/apache-couchdb"
+}
+
+discovery.kubernetes "apache_couchdb_logs" {
+	role = "pod"
+
+	namespaces {
+		names = ["apache-couchdb"]
+	}
+}
+
+discovery.relabel "apache_couchdb_logs" {
+	targets = discovery.kubernetes.apache_couchdb_logs.targets
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_name"]
+		separator     = ":"
+		regex         = ".*apache-couchdb-.*"
+		action        = "keep"
+	}
+
+	rule {
+		replacement  = "integrations/apache-couchdb"
+		target_label = "job"
+	}
+
+	rule {
+		replacement  = "apache-couchdb-sample-app"
+		target_label = "couchdb_cluster"
+	}
+}
+
+loki.source.kubernetes "apache_couchdb_logs" {
+	targets    = discovery.relabel.apache_couchdb_logs.output
+	forward_to = [loki.process.logs_service.receiver]
+}
