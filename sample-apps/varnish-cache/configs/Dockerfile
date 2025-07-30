@@ -1,4 +1,4 @@
-FROM debian:stable-slim as stage
+FROM debian:stable-slim AS stage
 
 WORKDIR /exporter
 ADD https://github.com/jonnenauha/prometheus_varnish_exporter/releases/download/1.6.1/prometheus_varnish_exporter-1.6.1.linux-amd64.tar.gz /exporter/exporter.tar.gz

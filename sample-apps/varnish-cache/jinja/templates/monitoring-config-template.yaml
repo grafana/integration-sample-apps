@@ -36,4 +36,3 @@ alloy:
         hostnames:
           - "loki.k3d.localhost"
           - "mimir.k3d.localhost"
-

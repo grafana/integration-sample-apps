@@ -64,14 +64,14 @@ The deployment includes proper security contexts, shared process namespaces for 
 
 - **Test cache functionality**: Test if Varnish is serving content.
   ```bash
-  kubectl port-forward -n varnish service/sample-varnish-cache 80:80
+  kubectl port-forward -n varnish service/varnish-cache 80:80
   curl localhost:80
   ```
 
 ### Prometheus Varnish Exporter
 - **Check metrics endpoint**: Verify metrics are being exposed.
   ```bash
-  kubectl port-forward -n varnish deployment/sample-varnish-cache 9131:9131
+  kubectl port-forward -n varnish deployment/varnish-cache 9131:9131
   curl localhost:9131/metrics
   ```
 

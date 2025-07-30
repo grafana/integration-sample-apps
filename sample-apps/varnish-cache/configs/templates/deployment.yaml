@@ -1,7 +1,11 @@
+---
+# This is a sample deployment of a varnish cache.
+# It uses a nginx service to generate logs, which are then forwarded to the varnish cache.
+# This is a sample deployment of a varnish cache.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sample-varnish-cache
+  name: varnish-cache
   labels:
     helm.sh/chart: varnish-cache-0.0.1
     app.kubernetes.io/name: varnish-cache
@@ -20,7 +24,7 @@ spec:
         app.kubernetes.io/name: varnish-cache
         app.kubernetes.io/instance: custom
     spec:            
-      serviceAccountName: sample-varnish-cache      
+      serviceAccountName: varnish-cache      
       securityContext:
         fsGroup: 101
       shareProcessNamespace: true
@@ -93,7 +97,7 @@ spec:
           image: {{ .Values.varnishImage }}
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
-          args: ["varnishncsa -n /var/lib/varnish -F '{\"Timestamp\": \"%t\", \"Varnish-Side\": \"%{Varnish:side}x\", \"Age\": %{age}o, \"Handling\": \"%{Varnish:handling}x\", \"Request\": \"%r\", \"Status\": \"%s\", \"Response-Reason\": \"%{VSL:RespReason}x\", \"Fetch-Error\": \"%{VSL:FetchError}x\", \"X-Forwarded-For\": \"%{x-forwarded-for}i\", \"Remote-User\": \"%u\", \"Bytes\": \"%b\", \"Time-To-Serve\": %D, \"User-Agent\": \"%{User-agent}i\", \"Referer\": \"%{Referer}i\", \"X-Varnish\": \"%{x-varnish}o\", \"X-Magento-Tags\": \"%{x-magento-tags}o\"}' -w /var/log/varnish/varnishncsa-frontend.log"]
+          args: ["varnishncsa -n /var/lib/varnish -F '{\"Timestamp\": \"%t\", \"Varnish-Side\": \"%{Varnish:side}x\", \"Age\": %{age}o, \"Handling\": \"%{Varnish:handling}x\", \"Request\": \"%r\", \"Status\": \"%s\", \"Response-Reason\": \"%{VSL:RespReason}x\", \"Fetch-Error\": \"%{VSL:FetchError}x\", \"X-Forwarded-For\": \"%{x-forwarded-for}i\", \"Remote-User\": \"%u\", \"Bytes\": \"%b\", \"Time-To-Serve\": %D, \"User-Agent\": \"%{User-agent}i\", \"Referer\": \"%{Referer}i\", \"X-Varnish\": \"%{x-varnish}o\", \"X-Magento-Tags\": \"%{x-magento-tags}o\"}' | tee /var/log/varnish/varnishncsa-frontend.log"]
           volumeMounts:
           - name: custom-varnish-vsm
             mountPath: /var/lib/varnish
@@ -110,7 +114,7 @@ spec:
           image: {{ .Values.varnishImage }}
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
-          args: ["varnishncsa -n /var/lib/varnish -b -F '{\"Timestamp\": \"%t\", \"Varnish-Side\": \"%{Varnish:side}x\", \"Handling\": \"%{Varnish:handling}x\", \"Request\": \"%r\", \"Status\": \"%s\", \"Response-Reason\": \"%{VSL:RespReason}x\", \"Fetch-Error\": \"%{VSL:FetchError}x\", \"Bytes\": \"%b\", \"Time-To-Serve\": %D}' -w /var/log/varnish/varnishncsa-backend.log"]
+          args: ["varnishncsa -n /var/lib/varnish -b -F '{\"Timestamp\": \"%t\", \"Varnish-Side\": \"%{Varnish:side}x\", \"Handling\": \"%{Varnish:handling}x\", \"Request\": \"%r\", \"Status\": \"%s\", \"Response-Reason\": \"%{VSL:RespReason}x\", \"Fetch-Error\": \"%{VSL:FetchError}x\", \"Bytes\": \"%b\", \"Time-To-Serve\": %D}' | tee /var/log/varnish/varnishncsa-backend.log"]
           volumeMounts:
           - name: custom-varnish-vsm
             mountPath: /var/lib/varnish

@@ -21,4 +21,4 @@ sudo k3s ctr image import /home/ubuntu/configs/varnish.tar
 sudo rm /home/ubuntu/configs/varnish.tar
 kubectl create namespace varnish --dry-run=client -o yaml | kubectl apply -f -
 
-helm upgrade --install sample-varnish . -n varnish --create-namespace --wait --values /home/ubuntu/configs/values.yaml
+helm upgrade --install varnish-cache-sample-app . -n varnish --create-namespace --wait --values /home/ubuntu/configs/values.yaml

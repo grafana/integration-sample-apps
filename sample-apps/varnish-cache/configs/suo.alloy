@@ -43,12 +43,12 @@ discovery.relabel "varnish_logs" {
     targets = discovery.kubernetes.varnish_logs.targets
     rule {
         source_labels = ["__meta_kubernetes_pod_container_name"]
-        regex = "varnish-cache"
+        regex = "(varnish-cache-ncsa-frontend|varnish-cache-ncsa-backend)"
         action = "keep"
     }
     
     rule {
-        replacement = "integrations/varnish"
+        replacement = "integrations/varnish-cache"
         target_label = "job"
     }
     
@@ -75,7 +75,7 @@ discovery.relabel "varnish_exporter" {
     targets = discovery.kubernetes.varnish_exporter.targets
     rule {
         source_labels = ["__meta_kubernetes_pod_name"]
-        regex = "sample-varnish-.*"
+        regex = "varnish-cache-.*"
         action = "keep"
     }
     // In order to get the correct address, we need to replace the port with the exporter port
@@ -95,7 +95,7 @@ discovery.relabel "varnish_exporter" {
         target_label = "varnish_cluster"
     }
     rule {
-        replacement = "integrations/varnish"
+        replacement = "integrations/varnish-cache"
         target_label = "job"
     }
 }
@@ -104,5 +104,5 @@ prometheus.scrape "varnish" {
     targets    = discovery.relabel.varnish_exporter.output
     forward_to = [prometheus.relabel.metrics_service.receiver]  
     scrape_interval = "30s"
-    job_name = "integrations/varnish"
+    job_name = "integrations/varnish-cache"
 }
