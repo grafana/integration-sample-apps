@@ -1,0 +1,85 @@
+discovery.kubernetes "apache_mesos" {
+	role = "pod"
+
+	namespaces {
+		names = ["apache-mesos"]
+	}
+}
+
+discovery.relabel "apache_mesos" {
+	targets = discovery.kubernetes.apache_mesos.targets
+    rule {
+        source_labels = ["__meta_kubernetes_pod_container_port_number", "__meta_kubernetes_pod_container_name"]
+        separator = ":"
+        action = "keep"
+        regex = "9105:mesos-master"
+    }
+
+	rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        action = "replace"
+        replacement = "$1:5050"
+        target_label = "instance"
+    }
+
+	rule {
+		replacement  = "integrations/apache-mesos"
+		target_label = "job"
+	}
+}
+
+discovery.relabel "apache_mesos_agent" {
+	targets = discovery.kubernetes.apache_mesos.targets
+    rule {
+        source_labels = ["__meta_kubernetes_pod_container_port_number", "__meta_kubernetes_pod_container_name"]
+        separator = ":"
+        action = "keep"
+        regex = "5051:mesos-agent"
+    }
+
+	rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        action = "replace"
+        replacement = "$1:5051"
+        target_label = "instance"
+    }
+
+	rule {
+		replacement  = "integrations/apache-mesos"
+		target_label = "job"
+	}
+}
+
+prometheus.scrape "apache_mesos" {
+	targets      = discovery.relabel.apache_mesos.output
+	forward_to   = [prometheus.relabel.metrics_service.receiver]
+	honor_labels = true
+}
+
+discovery.relabel "apache_mesos_logs" {
+	targets = discovery.kubernetes.apache_mesos.targets
+
+    rule {
+        source_labels = ["__meta_kubernetes_pod_container_port_number"]
+        action = "keep"
+        regex = "(5050|5051)"
+    }
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_name", "__meta_kubernetes_pod_container_port_number"]
+		separator     = ":"
+		regex         = ".*:(5050|5051)"
+		replacement   = "$1:$2"
+		target_label  = "instance"
+	}
+
+    rule {
+        replacement  = "integrations/apache-mesos"
+        target_label = "job"
+    }
+}
+
+loki.source.kubernetes "apache_mesos_logs" {
+	targets      = discovery.relabel.apache_mesos_logs.output
+	forward_to   = [loki.process.logs_service.receiver]
+}
