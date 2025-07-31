@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: apache-mesos
 spec:
-  replicas: { { .Values.replicas } }
+  replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/app: apache-mesos
@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: mesos-master
-          image: { { .Values.image } }
+          image: {{ .Values.image }}
           env:
             - name: LD_LIBRARY_PATH
               value: "/usr/local/lib"
@@ -29,7 +29,7 @@ spec:
               subPath: startup.sh
               name: master-start-script
         - name: mesos-agent
-          image: { { .Values.image } }
+          image: {{ .Values.image }}
           env:
             - name: LD_LIBRARY_PATH
               value: "/usr/local/lib"
