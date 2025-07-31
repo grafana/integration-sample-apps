@@ -45,6 +45,14 @@ discovery.relabel "apache_couchdb_logs" {
 	}
 
 	rule {
+		source_labels = ["__meta_kubernetes_pod_ip", "__meta_kubernetes_pod_container_port_number"]
+		separator   = ":"
+		regex        = "(.*):(.*)"
+		replacement  = "$1:$2"
+		target_label = "instance"
+	}
+
+	rule {
 		replacement  = "integrations/apache-couchdb"
 		target_label = "job"
 	}
