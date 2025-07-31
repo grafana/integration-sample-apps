@@ -17,7 +17,7 @@ discovery.relabel "apache_couchdb" {
 	}
 
 	rule {
-		source_labels = ["__meta_kubernetes_pod_ip"]
+		source_labels = ["__meta_kubernetes_pod_name"]
 		action        = "replace"
 		replacement   = "$1:5984"
 		target_label  = "instance"
@@ -37,26 +37,19 @@ prometheus.scrape "apache_couchdb" {
 	job_name     = "integrations/apache-couchdb"
 }
 
-discovery.kubernetes "apache_couchdb_logs" {
-	role = "pod"
-
-	namespaces {
-		names = ["apache-couchdb"]
-	}
-}
 
 discovery.relabel "apache_couchdb_logs" {
-	targets = discovery.kubernetes.apache_couchdb_logs.targets
+	targets = discovery.kubernetes.apache_couchdb.targets
 
 	rule {
 		source_labels = ["__meta_kubernetes_pod_name"]
 		separator     = ":"
-		regex         = ".*apache-couchdb-.*"
+		regex         = ".*-couchdb-.*"
 		action        = "keep"
 	}
 
 	rule {
-		source_labels = ["__meta_kubernetes_pod_ip", "__meta_kubernetes_pod_container_port_number"]
+		source_labels = ["__meta_kubernetes_pod_name", "__meta_kubernetes_pod_container_port_number"]
 		separator   = ":"
 		regex        = "(.*):(.*)"
 		replacement  = "$1:$2"
