@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: apache-mesos
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: { { .Values.replicas } }
   selector:
     matchLabels:
       app.kubernetes.io/app: apache-mesos
@@ -13,48 +13,48 @@ spec:
         app.kubernetes.io/app: apache-mesos
     spec:
       containers:
-      - name: mesos-master
-        image: {{ .Values.image }}
-        env:
-        - name: LD_LIBRARY_PATH
-          value: "/usr/local/lib"
-        command: ["/bin/bash", "/startup.sh"]
-        ports:
-          - name: exporter
-            containerPort: 9105
-          - name: master
-            containerPort: 5050
-        volumeMounts:
-        - mountPath: /startup.sh
-          subPath: startup.sh
-          name: master-start-script
-      - name: mesos-agent
-        image: {{ .Values.image }}
-        env:
-        - name: LD_LIBRARY_PATH
-          value: "/usr/local/lib"
-        command: ["/bin/bash", "/startup.sh"]
-        volumeMounts:
-        - mountPath: /startup.sh
-          subPath: startup.sh
-          name: agent-start-script
-        ports:
-          - name: exporter
-            containerPort: 9105
-          - name: agent
-            containerPort: 5051
+        - name: mesos-master
+          image: { { .Values.image } }
+          env:
+            - name: LD_LIBRARY_PATH
+              value: "/usr/local/lib"
+          command: ["/bin/bash", "/startup.sh"]
+          ports:
+            - name: exporter
+              containerPort: 9105
+            - name: master
+              containerPort: 5050
+          volumeMounts:
+            - mountPath: /startup.sh
+              subPath: startup.sh
+              name: master-start-script
+        - name: mesos-agent
+          image: { { .Values.image } }
+          env:
+            - name: LD_LIBRARY_PATH
+              value: "/usr/local/lib"
+          command: ["/bin/bash", "/startup.sh"]
+          volumeMounts:
+            - mountPath: /startup.sh
+              subPath: startup.sh
+              name: agent-start-script
+          ports:
+            - name: exporter
+              containerPort: 9105
+            - name: agent
+              containerPort: 5051
       volumes:
-      - name: master-start-script
-        configMap:
-          name: master-start-script
-          defaultMode: 0777
-          items:
-          - key: startup.sh
-            path: startup.sh
-      - name: agent-start-script
-        configMap:
-          name: agent-start-script
-          defaultMode: 0777
-          items:
-          - key: startup.sh
-            path: startup.sh
+        - name: master-start-script
+          configMap:
+            name: master-start-script
+            defaultMode: 0777
+            items:
+              - key: startup.sh
+                path: startup.sh
+        - name: agent-start-script
+          configMap:
+            name: agent-start-script
+            defaultMode: 0777
+            items:
+              - key: startup.sh
+                path: startup.sh
