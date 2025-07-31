@@ -1,15 +1,26 @@
 discovery.kubernetes "apache_couchdb" {
-	role = "endpointslice"
+	role = "pod"
+
+	namespaces {
+		names = ["apache-couchdb"]
+	}
 }
 
 discovery.relabel "apache_couchdb" {
 	targets = discovery.kubernetes.apache_couchdb.targets
 
 	rule {
-		source_labels = ["__meta_kubernetes_endpointslice_name", "__meta_kubernetes_pod_container_port_number"]
+		source_labels = ["__meta_kubernetes_pod_name", "__meta_kubernetes_pod_container_port_number"]
 		separator     = ":"
-		regex         = ".*-svc-couchdb-.*:17986"
+		regex         = ".*-couchdb-.*:17986"
 		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_ip"]
+		action        = "replace"
+		replacement   = "$1:5984"
+		target_label  = "instance"
 	}
 
 	rule {
