@@ -1,0 +1,27 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: apache-cassandra-loadgen
+  namespace: apache-cassandra
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 60
+      parallelism: 1
+      backoffLimit: 1
+      template:
+        spec:
+          containers:
+            - name: apache-cassandra-loadgen
+              image: docker.io/sample/apache-cassandra:0.0.1
+              imagePullPolicy: Never
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  /opt/cassandra/tools/bin/cassandra-stress write n=1 -node apache-cassandra -mode native cql3 -errors ignore &&
+                  /opt/cassandra/tools/bin/cassandra-stress mixed n=100 -node apache-cassandra -mode native cql3 -errors ignore
+          restartPolicy: Never
