@@ -206,5 +206,3 @@ sudo systemctl start hadoop-yarn-nodemanager
 
 sudo systemctl enable hadoop-yarn-resourcemanager
 sudo systemctl start hadoop-yarn-resourcemanager
-
-
