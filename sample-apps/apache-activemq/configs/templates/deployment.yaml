@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activemq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: activemq
+  template:
+    metadata:
+      labels:
+        app: activemq
+        activemq_cluster: activemq-cluster-1
+    spec:
+      containers:
+        - name: activemq
+          image: {{ .Values.image }}
+          ports:
+            - containerPort: 9000
+              name: jmx-exporter
+            - containerPort: 8161
+              name: web-ui
+            - containerPort: 5672
+              name: amqp
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: activemq-loadgen
+  namespace: {{ .Values.loadGeneratorNamespace }}
+spec:
+  schedule: "*/2 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      parallelism: 1
+      template:
+        spec:
+          containers:
+            - name: activemq-loadgen
+              image: {{ .Values.loadGeneratorImage }}
+              imagePullPolicy: IfNotPresent
+          restartPolicy: Never
