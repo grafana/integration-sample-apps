@@ -1,0 +1,26 @@
+---
+# This is a sample service for the varnish cache.
+# It is also used to expose the varnish exporter to the outside world.
+# It is also used to expose the nginx service to the outside world.
+apiVersion: v1
+kind: Service
+metadata:
+  name: varnish-cache
+  labels:
+    helm.sh/chart: varnish-cache-0.1.0
+    app.kubernetes.io/name: varnish-cache
+    app.kubernetes.io/instance: custom
+    app.kubernetes.io/version: "7.4.2"
+    app.kubernetes.io/managed-by: Helm      
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: varnish-exporter
+      port: 9131
+      targetPort: 9131
+  selector:
+    app.kubernetes.io/name: varnish-cache
+    app.kubernetes.io/instance: custom
