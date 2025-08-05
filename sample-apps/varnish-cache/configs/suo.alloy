@@ -1,0 +1,108 @@
+prometheus.exporter.self "alloy_check" { }
+
+discovery.relabel "alloy_check" {
+    targets = prometheus.exporter.self.alloy_check.targets
+    rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+    }
+    rule {
+    target_label = "alloy_hostname"
+    replacement  = constants.hostname
+    }
+    rule {
+    target_label = "job"
+    replacement  = "integrations/alloy-check"
+    }
+}
+
+prometheus.scrape "alloy_check" {
+    targets    = discovery.relabel.alloy_check.output
+    forward_to = [prometheus.relabel.alloy_check.receiver]  
+    scrape_interval = "60s"
+}
+
+prometheus.relabel "alloy_check" {
+    forward_to = [prometheus.relabel.metrics_service.receiver]
+    rule {
+      source_labels = ["__name__"]
+      regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+      action        = "keep"
+    }
+}
+
+discovery.kubernetes "varnish_logs" {
+  role = "pod"
+
+  namespaces {
+    names = ["varnish"]
+  }
+}
+
+discovery.relabel "varnish_logs" {
+    targets = discovery.kubernetes.varnish_logs.targets
+    rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        regex = "(varnish-cache-ncsa-frontend|varnish-cache-ncsa-backend)"
+        action = "keep"
+    }
+    
+    rule {
+        replacement = "integrations/varnish-cache"
+        target_label = "job"
+    }
+    
+    rule {
+        replacement = "varnish-sample-app-cluster"
+        target_label = "varnish_cluster"
+    }
+}
+
+loki.source.kubernetes "varnish_logs" {
+    targets = discovery.relabel.varnish_logs.output
+    forward_to = [loki.process.logs_service.receiver]
+}
+
+discovery.kubernetes "varnish_exporter" {
+    role = "pod"
+    selectors {
+        role = "pod"
+        label = "app.kubernetes.io/name=varnish-cache"
+    }
+}
+
+discovery.relabel "varnish_exporter" {
+    targets = discovery.kubernetes.varnish_exporter.targets
+    rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        regex = "varnish-cache-.*"
+        action = "keep"
+    }
+    // In order to get the correct address, we need to replace the port with the exporter port
+    rule {
+        source_labels = ["__address__"]
+        regex = "([^:]+)(?::\\d+)?"
+        replacement = "${1}:9131"
+        target_label = "__address__"
+    }
+    rule {
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+        separator = "-"
+        target_label = "instance"
+    }
+    rule {
+        replacement = "varnish-sample-app-cluster"
+        target_label = "varnish_cluster"
+    }
+    rule {
+        replacement = "integrations/varnish-cache"
+        target_label = "job"
+    }
+}
+
+prometheus.scrape "varnish" {
+    targets    = discovery.relabel.varnish_exporter.output
+    forward_to = [prometheus.relabel.metrics_service.receiver]  
+    scrape_interval = "30s"
+    job_name = "integrations/varnish-cache"
+}

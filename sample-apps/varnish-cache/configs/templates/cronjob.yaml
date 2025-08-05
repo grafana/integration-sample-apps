@@ -1,0 +1,49 @@
+
+---
+# This is a sample cronjob to generate load on the varnish cache.
+# This hits the nginx service, which is then forwarded to the varnish cache in order to 
+# generate logs.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: varnish-cache-load-generator
+  namespace: varnish
+  labels:
+    helm.sh/chart: varnish-cache-0.1.0
+    app.kubernetes.io/name: varnish-cache
+    app.kubernetes.io/instance: custom
+    app.kubernetes.io/version: "7.4.2"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: load-generator
+spec:
+  schedule: "*/1 * * * *"  # Every minute
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: varnish-cache-load-generator
+            app.kubernetes.io/instance: custom
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: load-generator
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Making request to varnish-cache service..."
+              curl -f -s -o /dev/null -w "HTTP Response: %{http_code}, Time: %{time_total}s\n" \
+                http://varnish-cache.varnish.svc.cluster.local:80/ || \
+              echo "Request failed with exit code $?"
+              
+              # Make a few more requests to generate some load
+              for i in $(seq 1 5); do
+                curl -f -s -o /dev/null http://varnish-cache.varnish.svc.cluster.local:80/ && \
+                echo "Request $i: Success" || echo "Request $i: Failed"
+                sleep 1
+              done
+          activeDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
