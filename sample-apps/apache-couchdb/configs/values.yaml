@@ -1,0 +1,17 @@
+extraEnv:
+  - name: COUCHDB_USER
+    value: "admin"
+  - name: COUCHDB_PASSWORD
+    value: "password"
+
+autoSetup:
+  enabled: true
+
+persistentVolume:
+  enabled: true
+  size: 3Gi
+
+prometheusPort:
+  enabled: true
+  bind_address: "0.0.0.0"
+  port: 17986

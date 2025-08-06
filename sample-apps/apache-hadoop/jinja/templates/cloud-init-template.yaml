@@ -1,0 +1,146 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required Apache Hadoop sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+  - git
+  - gpg
+  - alloy
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]  
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_integrations_apache_hadoop" {
+        targets = [{
+          __address__     = "localhost:8888",
+          hadoop_cluster  = "sample_hadoop_cluster",
+          instance        = constants.hostname,
+        },{
+          __address__     = "localhost:8889",
+          hadoop_cluster  = "sample_hadoop_cluster",
+          instance        = constants.hostname,
+        }, {
+          __address__     = "localhost:8887",
+          hadoop_cluster  = "sample_hadoop_cluster",
+          instance        = constants.hostname,
+        }, {
+          __address__     = "localhost:8886",
+          hadoop_cluster  = "sample_hadoop_cluster",
+          instance        = constants.hostname,
+        }]
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+        job_name = "integrations/apache-hadoop"
+      }
+
+      local.file_match "logs_integrations_integrations_apache_hadoop" {
+        path_targets = [{
+          __address__     = "localhost",
+          __path__        = "/opt/hadoop/logs/*.log",
+          hadoop_cluster  = "sample_hadoop_cluster",
+          instance        = constants.hostname,
+          job             = "integrations/apache-hadoop",
+        }]
+      }
+
+      loki.source.file "logs_integrations_integrations_apache_hadoop" {
+        targets     = local.file_match.logs_integrations_integrations_apache_hadoop.targets
+        forward_to  = [loki.write.grafana_cloud_loki.receiver]
+      }
+
+  - owner: root:root
+    path: /home/ubuntu/install.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/install.sh' -%}
+      {% endfilter %}
+
+  - owner: root:root
+    path: /home/ubuntu/install-jmx-prometheus-exporter.sh
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/install-jmx-prometheus-exporter.sh' -%}
+      {% endfilter %}
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - sudo chmod +x /home/ubuntu/install.sh
+  - sudo chmod +x /home/ubuntu/install-jmx-prometheus-exporter.sh
+  - sudo /home/ubuntu/install-jmx-prometheus-exporter.sh > /home/ubuntu/install-jmx-prometheus-exporter.log 2>&1
+  - sudo /home/ubuntu/install.sh > /home/ubuntu/install.log 2>&1
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
