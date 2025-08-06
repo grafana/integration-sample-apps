@@ -1,0 +1,103 @@
+prometheus.exporter.self "alloy_check" { }
+
+discovery.relabel "alloy_check" {
+    targets = prometheus.exporter.self.alloy_check.targets
+    rule {
+      target_label = "instance"
+      replacement  = constants.hostname
+    }
+    rule {
+      target_label = "alloy_hostname"
+      replacement  = constants.hostname
+    }
+    rule {
+      target_label = "job"
+      replacement  = "integrations/alloy-check"
+    }
+}
+
+prometheus.scrape "alloy_check" {
+    targets    = discovery.relabel.alloy_check.output
+    forward_to = [prometheus.relabel.alloy_check.receiver]  
+    scrape_interval = "60s"
+}
+
+prometheus.relabel "alloy_check" {
+    forward_to = [prometheus.relabel.metrics_service.receiver]
+    rule {
+      source_labels = ["__name__"]
+      regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+      action        = "keep"
+    }
+}
+
+discovery.kubernetes "presto" {
+  role = "pod"
+  selectors {
+    role = "pod"
+    label = "app.kubernetes.io/name=presto"
+  }
+}
+
+discovery.relabel "presto" {
+  targets = discovery.kubernetes.presto.targets
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name", "__meta_kubernetes_pod_container_port_number"]
+    separator = ":"
+    regex = "presto-.*:9090"
+    action = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    replacement = "$1"
+    target_label = "instance"
+  }
+  
+  rule {
+    replacement = "presto-sample-app-cluster"
+    target_label = "presto_cluster"
+  }
+  
+  rule {
+    replacement = "integrations/presto"
+    target_label = "job"
+  }
+}
+
+prometheus.scrape "metrics_presto" {
+  targets = discovery.relabel.presto.output
+  forward_to = [prometheus.relabel.metrics_service.receiver]
+  honor_labels = true
+}
+
+discovery.relabel "presto_logs" {
+  targets = discovery.kubernetes.presto.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    regex = "presto-(coordinator|worker)-.*"
+    action = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    replacement = "$1"
+    target_label = "instance"
+  }
+
+  rule {
+    replacement = "presto-sample-app-cluster"
+    target_label = "presto_cluster"
+  }
+
+  rule {
+    replacement = "integrations/presto"
+    target_label = "job"
+  }
+}
+
+loki.source.kubernetes "presto_logs" {
+  targets = discovery.relabel.presto_logs.output
+  forward_to = [loki.process.logs_service.receiver]
+}

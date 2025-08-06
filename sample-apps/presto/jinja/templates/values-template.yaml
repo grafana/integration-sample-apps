@@ -1,0 +1,80 @@
+{% set presto_image = presto_image | default("prestodb/presto") %}
+{% set presto_tag = presto_tag | default("0.293") %}
+
+---
+image:
+  repository: {{ presto_image }}
+  tag: {{ presto_tag }}
+
+metrics:
+  enabled: true
+  port: 9090
+  config:
+    rules:
+      - pattern: "com.facebook.presto.execution<name=TaskManager><>(.+): (.*)"
+        name: "presto_TaskManager_$1"
+        value: $2
+        type: UNTYPED
+        attrNameSnakeCase: false
+      - pattern: "com.facebook.presto.execution.executor<name=TaskExecutor><>(.+): (.*)"
+        name: "presto_TaskExecutor_$1"
+        value: $2
+        type: UNTYPED
+      - pattern: "com.facebook.presto.failureDetector<name=HeartbeatFailureDetector><>ActiveCount: (.*)"
+        name: "presto_HeartbeatDetector_ActiveCount"
+        value: $1
+        type: UNTYPED
+        attrNameSnakeCase: false
+      - pattern: "com.facebook.presto.metadata<name=DiscoveryNodeManager><>(.+): (.*)"
+        name: "presto_metadata_DiscoveryNodeManager_$1"
+        value: $2
+        type: UNTYPED
+        attrNameSnakeCase: false
+      - pattern: "com.facebook.presto.execution<name=QueryManager><>(.+): (.*)"
+        name: "presto_QueryManager_$1"
+        value: $2
+        type: UNTYPED
+      - pattern: "com.facebook.presto.execution<name=QueryExecution><>(.+): (.*)"
+        name: "presto_QueryExecution_$1"
+        value: $2
+        attrNameSnakeCase: false
+      - pattern: "com.facebook.presto.memory<name=ClusterMemoryManager><>(.+): (.*)"
+        name: "presto_ClusterMemoryManager_$1"
+        value: $2
+        type: UNTYPED
+        attrNameSnakeCase: false
+      - pattern: "com.facebook.presto.memory<type=ClusterMemoryPool, name=(.*)><>(.+): (.*)"
+        name: "presto_ClusterMemoryPool_$1_$2"
+        type: UNTYPED
+      - pattern: "com.facebook.presto.memory<type=MemoryPool, name=(.*)><>(.+): (.*)"
+        name: "presto_MemoryPool_$1_$2"
+        type: UNTYPED
+      - pattern: 'java.lang<name=([^>]+), type=GarbageCollector><LastGcInfo>duration: (\d+)'
+        name: jvm_gc_duration
+        value: $2
+        labels:
+          name: $1
+        type: UNTYPED
+      - pattern: 'java.lang<name=([^>]+), type=GarbageCollector><>CollectionCount: (\d+)'
+        name: jvm_gc_collection_count
+        value: $2
+        labels:
+          name: $1
+        type: UNTYPED
+      - pattern: "java.lang<type=Memory><HeapMemoryUsage>used"
+        name: jvm_heap_memory_used
+        type: UNTYPED
+      - pattern: "java.lang<type=Memory><HeapMemoryUsage>committed"
+        name: jvm_heap_memory_committed
+        type: UNTYPED
+      - pattern: "java.lang<type=Memory><NonHeapMemoryUsage>used"
+        name: jvm_nonheap_memory_used
+        type: UNTYPED
+      - pattern: "java.lang<type=Memory><NonHeapMemoryUsage>committed"
+        name: jvm_nonheap_memory_committed
+        type: UNTYPED
+
+# Catalog configurations
+catalog:
+  tpch: |-
+    connector.name=tpch

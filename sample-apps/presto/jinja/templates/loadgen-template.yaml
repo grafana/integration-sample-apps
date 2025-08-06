@@ -1,0 +1,26 @@
+{% set presto_image = presto_image | default("prestodb/presto") %}
+{% set presto_tag = presto_tag | default("0.293") %}
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: presto-loadgen
+  namespace: presto
+spec:
+  schedule: "*/1 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: loadgen
+              image: {{ presto_image }}:{{ presto_tag }}
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - ./opt/presto-cli --server presto.presto.svc.cluster.local:8080 --catalog tpch --schema sf100 --execute "SELECT * FROM tpch.sf1000.orders LIMIT 10"
+          restartPolicy: Never
