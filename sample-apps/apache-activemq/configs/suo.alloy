@@ -1,0 +1,86 @@
+discovery.kubernetes "activemq" {
+    role = "pod"
+    namespaces {
+        names = ["apache-activemq"]
+    }
+}
+
+discovery.relabel "activemq" {
+    targets = discovery.kubernetes.activemq.targets
+    rule {
+        source_labels = ["__meta_kubernetes_pod_container_port_number"]
+        regex = "9000"
+        action = "keep"
+    }
+    rule {
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_container_name"]
+        separator = "-"
+        target_label = "instance"
+    }
+    rule {
+        replacement = "apache-activemq-cluster"
+        target_label = "activemq_cluster"
+    }
+    rule {
+        replacement = "integrations/apache-activemq"
+        target_label = "job"
+    }
+}
+
+prometheus.scrape "activemq" {
+    targets = discovery.relabel.activemq.output
+    forward_to   = [prometheus.relabel.metrics_service.receiver]
+}
+
+discovery.relabel "activemq_logs" {
+    targets = discovery.kubernetes.activemq.targets
+    rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        regex = "apache-activemq"
+        action = "keep"
+    }
+    rule {
+        replacement = "apache-activemq"
+        target_label = "integration"
+    }
+}
+
+loki.source.kubernetes "activemq_logs" {
+    targets = discovery.relabel.activemq_logs.output
+    forward_to = [loki.process.activemq_logs.receiver]
+}
+
+loki.process "activemq_logs" {
+	forward_to = [loki.process.logs_service.receiver]
+    stage.match {
+        selector = "{integration = \"apache-activemq\"}"
+
+        stage.multiline {
+            firstline     = "(TRACE|DEBUG|INFO|WARN|ERROR|FATAL)"
+            max_lines     = 0
+            max_wait_time = "3s"
+        }
+
+        stage.regex {
+            expression = "(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\\s*[\\|:]\\s*(?P<message>.+)"
+        }
+
+        stage.template {
+            source = "instance"
+            template = "{{ .namespace }}-{{ .container }}"
+        }
+        stage.static_labels {
+            values = {
+                activemq_cluster = "apache-activemq-cluster",
+                job = "integrations/apache-activemq",
+            }
+        }
+
+        stage.labels {
+            values = {
+                instance = null,
+                level = null,
+            }
+        }
+    }
+}

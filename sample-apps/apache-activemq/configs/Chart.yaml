@@ -1,0 +1,4 @@
+apiVersion: v2
+appVersion: 1.0.0
+name: apache-activemq-sample-app
+version: 1.0.0
