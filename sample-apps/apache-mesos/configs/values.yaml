@@ -1,0 +1,2 @@
+image: sample/apache-mesos:0.0.1
+replicas: 2
