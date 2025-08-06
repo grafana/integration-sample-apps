@@ -23,5 +23,3 @@ Queues: ["queue://test-queue-1", "queue://test-queue-2"]
 ## Usage
 
 Built and deployed automatically by the parent sample app. Modify `defaultConfig()` in `main.go` to change behavior.
-
-Dependencies: `github.com/Azure/go-amqp`
