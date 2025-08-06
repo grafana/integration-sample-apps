@@ -18,7 +18,7 @@ run-ci: clean k3s-setup install-suo default-monitoring-config render-config inst
 
 stop: k3s-stop clean
 
-install-suo: transfer-configs
+install-suo: transfer-loadgen transfer-configs
 	@multipass transfer ./scripts/suo_setup.sh $(VM_K3S_NAME):/home/ubuntu/suo_setup.sh;
 	@multipass exec $(VM_K3S_NAME) -- bash -c "chmod +x suo_setup.sh && ./suo_setup.sh"
 
@@ -38,6 +38,9 @@ default-monitoring-config:
 	
 transfer-configs: 
 	@multipass transfer --recursive configs/ $(VM_K3S_NAME):/home/ubuntu/
+
+transfer-loadgen:
+	@multipass transfer --recursive loadgen/ $(VM_K3S_NAME):/home/ubuntu/
 
 install-monitoring: transfer-configs
 	@multipass transfer $(CONFIG_OUT_FILE) $(VM_K3S_NAME):/home/ubuntu/monitoring.yaml;
