@@ -12,7 +12,7 @@ sudo docker image save sample/loadgenerator:0.0.1 -o /home/ubuntu/loadgen/loadge
 
 cd /home/ubuntu/configs
 sudo docker build -t sample/apache-activemq:0.0.1 .
-sudo docker image save sample/apache-activemq:0.0.1 -o /home/ubuntu/configs/activemq.tar
+sudo docker image save sample/apache-activemq:0.0.1 -o /home/ubuntu/configs/apache-activemq.tar
 
 sudo k3s ctr -n=k8s.io images import /home/ubuntu/loadgen/loadgenerator.tar
 sudo k3s ctr -n=k8s.io images import /home/ubuntu/configs/apache-activemq.tar
