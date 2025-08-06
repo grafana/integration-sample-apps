@@ -1,0 +1,22 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-loadgen
+  namespace: influxdb
+spec:
+  schedule: "*/1 * * * *"
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: influxdb-loadgen
+        spec:
+          restartPolicy: OnFailure
+          activeDeadlineSeconds: 120
+          containers:
+            - name: influxdb-loadgen
+              image: sample/influxdb-loadgen:0.0.1
