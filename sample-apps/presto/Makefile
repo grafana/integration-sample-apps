@@ -12,9 +12,9 @@ PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
 # Import last to ensure expected parameters are set and available to import (e.g. VM_CLUSTER_MAIN)
 include ../Makefile
 
-.PHONY: run-ci stop install-suo default-monitoring-config render-config install-monitoring transfer-configs clean remove-suo remove-monitoring
+.PHONY: run-ci stop install-suo render-config install-monitoring transfer-configs clean remove-suo remove-monitoring
 
-run-ci: clean k3s-setup install-suo default-monitoring-config render-config install-monitoring
+run-ci: clean k3s-setup default-monitoring-config install-suo render-config install-monitoring
 
 stop: k3s-stop clean
 
