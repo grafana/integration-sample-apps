@@ -2,7 +2,7 @@
 
 This sample application demonstrates InfluxDB monitoring on a single-node K3s cluster. It deploys [InfluxDB 2.x](https://hub.docker.com/_/influxdb) using the official [InfluxData Helm chart](https://helm.influxdata.com/) with built-in Prometheus metrics endpoints, includes a custom containerized load generator that creates realistic time-series data workloads using sample datasets, and applies the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart for comprehensive observability. The setup supports both GitHub Actions runners and local development environments.
 
-Feel free to modify the [loadgen.sh](./configs/loadgen.sh) or [values.yaml](./configs/values.yaml) for your testing purposes.
+Feel free to modify the [loadgen.sh](./configs/loadgen.sh) or [values.yaml](./configs/values.yaml) for your testing purposes. Note that if you modify the token configuration, ensure that the `token` value in [values.yaml](./configs/values.yaml) matches the `--token` parameter in [loadgen.sh](./configs/loadgen.sh) for proper authentication.
 
 ## Prerequisites
 
