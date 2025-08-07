@@ -1,0 +1,12 @@
+---
+
+adminUser:
+  organization: "influxdata"
+  bucket: "default"
+  user: "admin"
+  password: "Evergreen8080!"
+  token: "nrlukwAn13XLMIlYeDTg7g47T28cEG4P"
+
+
+persistence:
+  enabled: false
