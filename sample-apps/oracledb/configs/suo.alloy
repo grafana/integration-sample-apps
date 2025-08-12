@@ -1,0 +1,67 @@
+// Oracle Database monitoring configuration for Alloy
+// This configures Alloy to connect directly to Oracle DB using mounted instant client
+
+// Oracle database connection using the mounted instant client
+prometheus.exporter.oracledb "integrations_oracledb" {
+  connection_string = "oracle://grafanau:r7DC98o8Op@oracledb.oracledb.svc.cluster.local:1521/FREEPDB1"
+}
+
+// Scrape Oracle metrics
+prometheus.scrape "integrations_oracledb" {
+  targets    = prometheus.exporter.oracledb.integrations_oracledb.targets
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
+  job_name   = "integrations/oracledb"
+}
+
+
+discovery.kubernetes "oracledb" {
+  role = "pod"
+  namespaces {
+      names = ["oracledb"]
+  }
+}
+
+discovery.relabel "oracledb" {
+    targets = discovery.kubernetes.oracledb.targets
+    rule {
+        source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+        separator     = ":"
+        regex         = "(oracledb:oracledb.*)"
+        replacement   = "oracledb"
+        target_label  = "integration"
+    }
+
+    rule {
+        source_labels = ["integration", "__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+        separator     = ":"
+        regex         = "oracledb:(.*):(\\w+).*"
+        replacement   = "$2.$1.svc.cluster.local:1521"
+        target_label  = "instance"
+    }
+
+    rule {
+        source_labels = ["integration", "__meta_kubernetes_pod_node_name"]
+        separator     = ":"
+        regex         = "oracledb:(.*)"
+        target_label  = "host"
+    }
+
+    rule {
+        source_labels = ["integration"]
+        regex        = "oracledb"
+        replacement  = "integrations/oracledb"
+        target_label = "job"
+    }
+
+    rule {
+        source_labels = ["integration"]
+        regex        = "oracledb"
+        replacement  = "oracledb"
+        target_label = "log_type"
+    }
+}
+
+loki.source.kubernetes "oracledb" {
+    targets = discovery.relabel.oracledb.output
+    forward_to = [loki.process.logs_service.receiver]
+}

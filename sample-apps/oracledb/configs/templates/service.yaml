@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracledb
+  namespace: oracledb
+  labels:
+    app.kubernetes.io/app: oracledb
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1521
+      targetPort: 1521
+      protocol: TCP
+      name: oracledb
+  selector:
+    app.kubernetes.io/app: oracledb
