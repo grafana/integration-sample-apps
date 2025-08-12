@@ -83,8 +83,11 @@ kubectl patch statefulset k8s-monitoring-alloy -n monitoring --type='strategic' 
 echo "Waiting for StatefulSet to roll out..."
 kubectl rollout status statefulset/k8s-monitoring-alloy -n monitoring --timeout=120s
 kubectl exec -n monitoring k8s-monitoring-alloy-0 -- ls -la /usr/lib/oracle/ || echo "Mount verification failed - checking pod status..."
-kubectl exec -n monitoring k8s-monitoring-alloy-0 -- ldd /usr/lib/oracle/instantclient/lib/libnnz.so | grep libaio || echo "libaio check failed"
 
+if ! kubectl exec -n monitoring k8s-monitoring-alloy-0 -- ldd /usr/lib/oracle/instantclient/lib/libnnz.so | grep libaio; then
+  echo "libaio check failed"
+  exit 1
+fi
 
 echo "Alloy StatefulSet patched successfully!"
 echo "Oracle Instant Client should now be available at /usr/lib/oracle/"
