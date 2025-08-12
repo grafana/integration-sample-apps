@@ -11,8 +11,18 @@ echo "Patching Alloy StatefulSet to add Oracle Instant Client volumes..."
 # Re-set the KUBECONFIG since multipass exec does not load .profile or .bashrc correctly
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
+# Detect architecture and map to GNU triplet
+DPKG_ARCH=$(dpkg --print-architecture)
+case $DPKG_ARCH in
+  arm64) GNU_ARCH=aarch64-linux-gnu;;
+  amd64) GNU_ARCH=x86_64-linux-gnu;;
+  *) GNU_ARCH=$DPKG_ARCH-linux-gnu;;
+esac
+
+echo "Detected architecture: $DPKG_ARCH (GNU: $GNU_ARCH)"
+
 # Create the patch for adding volumes and volume mounts with init container for dependencies
-cat << 'EOF' > /tmp/alloy-volumes-patch.json
+cat << EOF > /tmp/alloy-volumes-patch.json
 {
   "spec": {
     "template": {
@@ -23,7 +33,7 @@ cat << 'EOF' > /tmp/alloy-volumes-patch.json
             "image": "ubuntu:24.04",
             "command": ["sh", "-c"],
             "args": [
-              "apt-get update && apt-get install -y libaio1t64 && cp /usr/lib/aarch64-linux-gnu/libaio.so.1t64* /shared-libs/ && cd /shared-libs && ln -sf libaio.so.1t64 libaio.so.1 && echo 'Oracle dependencies copied to shared volume'"
+              "apt-get update && apt-get install -y libaio1t64 && cp /usr/lib/${GNU_ARCH}/libaio.so.1t64* /shared-libs/ && cd /shared-libs && ln -sf libaio.so.1t64 libaio.so.1 && echo 'Oracle dependencies copied to shared volume for architecture: ${DPKG_ARCH} (GNU: ${GNU_ARCH})'"
             ],
             "volumeMounts": [
               {
@@ -56,7 +66,7 @@ cat << 'EOF' > /tmp/alloy-volumes-patch.json
               },
               {
                 "name": "shared-libs",
-                "mountPath": "/usr/lib/aarch64-linux-gnu-extra"
+                "mountPath": "/usr/lib/oracle-extra-libs"
               }
             ],
             "env": [
@@ -66,7 +76,7 @@ cat << 'EOF' > /tmp/alloy-volumes-patch.json
               },
               {
                 "name": "LD_LIBRARY_PATH",
-                "value": "/usr/lib/oracle/instantclient/lib:/usr/lib/aarch64-linux-gnu-extra"
+                "value": "/usr/lib/oracle/instantclient/lib:/usr/lib/oracle-extra-libs"
               }
             ]
           }
