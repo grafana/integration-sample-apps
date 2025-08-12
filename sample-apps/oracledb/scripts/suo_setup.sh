@@ -18,6 +18,7 @@ cd /home/ubuntu/configs
 # Setup Oracle Instant Client with PVC
 /home/ubuntu/configs/scripts/setup_oracle_client.sh
 
+echo "Installing Oracle DB..."
 # Install Oracle DB
 helm install oracledb . --namespace oracledb \
     --create-namespace \
@@ -31,8 +32,6 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/app=oracledb -n orac
 
 kubectl exec -it -n oracledb deployment/oracledb -- sqlplus / as sysdba << 'EOF'
 ALTER SESSION SET CONTAINER = FREEPDB1;
-CREATE USER grafanau IDENTIFIED BY r7DC98o8Op;
-
 GRANT CONNECT TO grafanau;
 GRANT CREATE SESSION TO grafanau;
 
