@@ -3,7 +3,7 @@
 
 // Oracle database connection using the mounted instant client
 prometheus.exporter.oracledb "integrations_oracledb" {
-  connection_string = "oracle://grafanau:r7DC98o8Op@oracledb.oracledb.svc.cluster.local:1521/FREEPDB1"
+  connection_string = "oracle://C%23%23GRAFANAU:r7DC98o8Op@oracledb.oracledb.svc.cluster.local:1521"
 }
 
 // Scrape Oracle metrics

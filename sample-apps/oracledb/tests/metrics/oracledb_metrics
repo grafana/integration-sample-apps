@@ -1,3 +1,5 @@
+oracledb_resource_current_utilization
+oracledb_resource_limit_value
 oracledb_tablespace_bytes
 oracledb_tablespace_free
 oracledb_tablespace_max_bytes

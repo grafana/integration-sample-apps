@@ -35,7 +35,7 @@ This sample app provides:
 
 - **Oracle Database 23c Free**: Containerized Oracle Database instance with pre-configured monitoring user and permissions
 - **Oracle Instant Client**: Configured Oracle Instant Client libraries for database connectivity
-- **Oracle User**: A single standard monitoring user is setup `grafanau/r7DC98o8Op` which can be used to run the underlying queries of the prometheus exporter
+- **Oracle User**: A single standard common monitoring user is setup `C##GRAFANAU/r7DC98o8Op` which can be used to run the underlying queries of the prometheus exporter. This should have access to all PDBs of the deployment.
 - **Observability**: Grafana Alloy configuration with Oracle DB Prometheus exporter for metrics and logs collection
 
 ## Make commands
@@ -79,10 +79,27 @@ This sample app provides:
      `multipass exec oracledb-sample-app-k3s-main -- kubectl get pvc -n monitoring`
 
 4. *`Database connectivity issues`*
-   - Verify the monitoring user exists and has correct permissions:
-     ```sql
-     ALTER SESSION SET CONTAINER = FREEPDB1;
-     SELECT username FROM dba_users WHERE username = 'GRAFANAU';
+
+   - **Verify the monitoring user exists and has correct permissions:**
+
+     1. Connect to the Oracle Database as `sysdba`:
+        ```sh
+        multipass exec oracledb-sample-app-k3s-main -- bash -c "kubectl exec -it -n oracledb deployment/oracledb -- sqlplus / as sysdba"
+        ```
+
+     2. In the SQL*Plus prompt, switch to the correct PDB and check for the monitoring user:
+        ```sql
+        ALTER SESSION SET CONTAINER = FREEPDB1;
+        SELECT username FROM dba_users WHERE username LIKE '%GRAFANAU%';
+        ```
+
+     3. You should see output similar to:
+        ```
+        C##GRAFANAU
+        GRAFANAU
+        ```
+
+   - **Check if the database is accepting connections on port 1521:**
+     ```sh
+     multipass exec oracledb-sample-app-k3s-main -- kubectl get svc -n oracledb
      ```
-   - Check if the database is accepting connections on port 1521:
-     `multipass exec oracledb-sample-app-k3s-main -- kubectl get svc -n oracledb`
