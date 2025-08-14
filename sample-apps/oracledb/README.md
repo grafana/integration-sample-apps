@@ -1,6 +1,6 @@
 # Oracle Database sample app
 
-This sample application demonstrates Oracle Database monitoring on a single-node K3s cluster. It deploys [Oracle Database 23c Free](https://hub.docker.com/r/gvenzl/oracle-free) with the [Oracle DB Prometheus exporter](https://github.com/grafana/alloy/blob/main/docs/sources/reference/components/prometheus/prometheus.exporter.oracledb.md) integrated via Grafana Alloy, and applies the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart for comprehensive observability. The setup includes Oracle Instant Client configuration for database connectivity and supports both GitHub Actions runners and local development environments.
+This sample application demonstrates Oracle Database monitoring on a single-node K3s cluster. It deploys [Oracle Database 23c Free](https://www.oracle.com/database/free) with the [Oracle DB Prometheus exporter](https://github.com/grafana/alloy/blob/main/docs/sources/reference/components/prometheus/prometheus.exporter.oracledb.md) integrated via Grafana Alloy, and applies the [k8s-monitoring-helm](https://github.com/grafana/k8s-monitoring-helm) chart for comprehensive observability. The setup includes Oracle Instant Client configuration for database connectivity and supports both GitHub Actions runners and local development environments.
 
 ## Prerequisites
 
