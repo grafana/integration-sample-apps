@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oracledb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/app: oracledb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/app: oracledb
+    spec:
+      containers:
+        - name: oracledb
+          image: {{ .Values.image }}
+          resources:
+            requests:
+              memory: "3G"
+            limits:
+              memory: "3G"
+          env:
+            - name: ORACLE_PASSWORD
+              value: "r7DC98o8Op"
+            - name: ORACLE_DATABASE
+              value: "TESTDB"
+          ports:
+            - containerPort: 1521
+          startupProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "echo 'SELECT 1 FROM DUAL;' | sqlplus -S / as sysdba"
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 20
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "echo 'SELECT 1 FROM DUAL;' | sqlplus -S / as sysdba"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 1521
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3

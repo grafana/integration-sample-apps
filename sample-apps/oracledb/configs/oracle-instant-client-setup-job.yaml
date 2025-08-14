@@ -1,0 +1,36 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oracle-instant-client-setup
+  namespace: monitoring
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: download-oracle-client
+        image: oracle/oracle-client-installer:0.0.1
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Installing dependencies..."
+          cp -r /usr/lib/oracle/23/client64/ /oracle-client/instantclient
+        volumeMounts:
+        - name: oracle-instant-client-libs
+          mountPath: /oracle-client
+      containers:
+      # just a container to indicate that the job is complete
+      - name: setup-complete
+        image: alpine:latest
+        command: ['sh', '-c', 'echo "Oracle Instant Client setup job completed successfully"']
+        volumeMounts:
+        - name: oracle-instant-client-libs
+          mountPath: /oracle-client
+          readOnly: true
+      volumes:
+      - name: oracle-instant-client-libs
+        persistentVolumeClaim:
+          claimName: oracle-instant-client-libs
