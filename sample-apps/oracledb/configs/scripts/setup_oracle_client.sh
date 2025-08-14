@@ -21,7 +21,7 @@ echo "Running Oracle Instant Client setup job..."
 kubectl apply -f oracle-instant-client-setup-job.yaml -n monitoring
 
 echo "Waiting for Oracle Instant Client setup to complete..."
-kubectl wait --for=condition=complete job/oracle-instant-client-setup -n monitoring --timeout=300s
+kubectl wait --for=condition=complete job/oracle-instant-client-setup -n monitoring --timeout=90s
 
 echo "Checking setup status..."
 kubectl logs job/oracle-instant-client-setup -n monitoring

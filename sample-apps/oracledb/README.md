@@ -96,7 +96,6 @@ This sample app provides:
      3. You should see output similar to:
         ```
         C##GRAFANAU
-        GRAFANAU
         ```
 
    - **Check if the database is accepting connections on port 1521:**

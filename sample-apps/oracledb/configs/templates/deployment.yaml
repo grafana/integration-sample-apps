@@ -25,10 +25,6 @@ spec:
               value: "r7DC98o8Op"
             - name: ORACLE_DATABASE
               value: "TESTDB"
-            - name: APP_USER
-              value: "GRAFANAU"
-            - name: APP_USER_PASSWORD
-              value: "r7DC98o8Op"
           ports:
             - containerPort: 1521
           startupProbe:
