@@ -64,8 +64,13 @@ data:
     }
 
     sub vcl_recv {
-        # Force a cache miss to ensure backend requests
-        return (pass);
+        if (req.method != "GET" && req.method != "HEAD") {
+            return (pass);
+        }
+        if (req.url ~ "\?.*") {
+            set req.url = regsub(req.url, "\?.*", "");
+        }
+        return (hash);
     }
 
     sub vcl_backend_response {
@@ -75,7 +80,10 @@ data:
     sub vcl_deliver {
         if (obj.hits > 0) {
             set resp.http.X-Cache = "HIT";
+            set resp.http.X-Cache-Hits = obj.hits;
         } else {
             set resp.http.X-Cache = "MISS";
         }
+        set resp.http.X-Age = obj.age;
+        unset resp.http.X-Cache-TTL;
     }

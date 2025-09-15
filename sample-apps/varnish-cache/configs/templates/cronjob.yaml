@@ -39,10 +39,9 @@ spec:
               echo "Request failed with exit code $?"
               
               # Make a few more requests to generate some load
-              for i in $(seq 1 5); do
+              for i in $(seq 1 1000); do
                 curl -f -s -o /dev/null http://varnish-cache.varnish.svc.cluster.local:80/ && \
                 echo "Request $i: Success" || echo "Request $i: Failed"
-                sleep 1
               done
           activeDeadlineSeconds: 60
   successfulJobsHistoryLimit: 3
