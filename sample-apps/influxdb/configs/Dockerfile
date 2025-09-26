@@ -9,6 +9,10 @@ RUN apt-get update && \
 
 FROM debian:stable-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /influxdb2-sample-data-master /influxdb2-sample-data
 COPY --from=builder /influx /usr/local/bin/influx
 COPY loadgen.sh /
