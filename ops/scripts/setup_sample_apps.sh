@@ -19,6 +19,10 @@ elif [[ ${ENV} = "k3d" ]]; then
   echo "k3d mode selected"
   PROMETHEUS_INSTANCE="mimir.k3d.localhost:9999"
   LOKI_INSTANCE="loki.k3d.localhost:9999"
+elif [[ ${ENV} = "k3d-cortex" ]]; then
+    echo "k3d-cortex mode selected"
+    PROMETHEUS_INSTANCE="cortex.k3d.localhost:9999"
+    LOKI_INSTANCE="loki.k3d.localhost:9999"
 else
   echo "Invalid environment provided. Exiting."
   exit 1
