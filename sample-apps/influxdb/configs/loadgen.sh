@@ -1,11 +1,19 @@
 #!/bin/bash
 
+HOST_URL="http://influxdb-influxdb2.influxdb.svc.cluster.local:80"
+ORG_NAME="influxdata"
+AUTH_TOKEN="nrlukwAn13XLMIlYeDTg7g47T28cEG4P"
+
 # Create a config
-influx config create --config-name sample-config --host-url http://influxdb-influxdb2.influxdb.svc.cluster.local:80 --org influxdata --token nrlukwAn13XLMIlYeDTg7g47T28cEG4P --active
+influx config create --config-name sample-config --host-url "$HOST_URL" --org "$ORG_NAME" --token "$AUTH_TOKEN" --active
 
 # Create buckets
 influx bucket create --name loadgen-0
 influx bucket create --name loadgen-1
+
+# Create DBRP mappings so InfluxQL can resolve the buckets
+influx v1 dbrp create --db loadgen-0 --rp autogen --bucket loadgen-0 --org "$ORG_NAME" --default || true
+influx v1 dbrp create --db loadgen-1 --rp autogen --bucket loadgen-1 --org "$ORG_NAME" || true
 
 # Writing data to buckets
 if [ -f /influxdb2-sample-data/air-sensor-data/air-sensor-data.lp ]; then
@@ -38,6 +46,12 @@ while [ $SECONDS -lt $end ]
 do
     influx query 'from(bucket:"loadgen-0") |> range(start:-1h)'
     influx query 'from(bucket:"loadgen-1") |> range(start:-1h)'
+
+    # Generate InfluxQL traffic via the REST API
+    curl -s -H "Authorization: Token $AUTH_TOKEN" \
+        "$HOST_URL/query?q=SHOW+DATABASES" >/dev/null || true
+    curl -s -H "Authorization: Token $AUTH_TOKEN" \
+        "$HOST_URL/query?db=loadgen-0&q=SHOW+MEASUREMENTS" >/dev/null || true
 done
 
 # Delete buckets
