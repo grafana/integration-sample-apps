@@ -26,6 +26,11 @@ discovery.relabel "apache_mesos" {
 		replacement  = "integrations/apache-mesos"
 		target_label = "job"
 	}
+
+    rule {
+        replacement = "apache-mesos-sample-app-cluster"
+        target_label = "mesos_cluster"
+    }
 }
 
 discovery.relabel "apache_mesos_agent" {
