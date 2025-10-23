@@ -1,4 +1,4 @@
-FROM apache/activemq-classic:6.1.6
+FROM apache/activemq-classic:6.1.6@sha256:29349cf8efda51a02e5436652ea5806b42ae9157ace024db50fba97195d87455
 
 ARG JMX_EXPORTER_VERSION=1.3.0
 ARG JMX_EXPORTER_PORT=9000
