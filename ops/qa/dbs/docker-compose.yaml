@@ -1,7 +1,7 @@
 services:
 
   mimir:
-    image: grafana/mimir:latest
+    image: grafana/mimir:latest@sha256:f97a1a6885a0c8ee80bc8f14343183dd67e9786cfbc18198d9a4138354fda55e
     volumes:
       - ./configs/mimir:/etc/mimir-config
     entrypoint:
@@ -13,7 +13,7 @@ services:
       - dbs
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:latest@sha256:0eaee7bf39cc83aaef46914fb58f287d4f4c4be6ec96b86c2ed55719a75e49c8
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
