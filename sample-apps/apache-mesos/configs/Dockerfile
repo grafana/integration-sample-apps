@@ -1,4 +1,4 @@
-FROM ubuntu:jammy@sha256:09506232a8004baa32c47d68f1e5c307d648fdd59f5e7eaa42aaf87914100db3
+FROM ubuntu:noble@sha256:66460d557b25769b102175144d538d88219c077c678a49af4afca6fbfc1b5252
 
 RUN apt-get update && apt-get install -y \
     wget curl gnupg software-properties-common
