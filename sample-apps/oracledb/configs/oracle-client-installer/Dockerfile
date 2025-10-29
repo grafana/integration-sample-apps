@@ -1,4 +1,4 @@
-FROM oraclelinux:8@sha256:7a2401b216210c0670d8707a85f7e7a238c527b0e2280e732dd45a9103b2e29d
+FROM oraclelinux:10@sha256:753e18ae99854795a67768092f187e1a7b82a61a684ceceb9e060e3cf5d31805
 
 # Installing from oraclelinux:8 so that we can easily get the Oracle Instant Client
 RUN dnf install -y oracle-instantclient-release-23ai-el8 && \
