@@ -1,4 +1,4 @@
-FROM python:3.8-slim@sha256:1d52838af602b4b5a831beb13a0e4d073280665ea7be7f69ce2382f29c5a613f
+FROM python:3.14-slim@sha256:4ed33101ee7ec299041cc41dd268dae17031184be94384b1ce7936dc4e5dead3
 
 COPY requirements.txt ./requirements.txt
 # Install any needed packages specified in requirements.txt
