@@ -1,0 +1,396 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required Apache HBase sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+  - git
+  - gpg
+  - alloy
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "http://your-prometheus-instance:9090/api/v1/push"
+
+          basic_auth {
+            username = "your_prometheus_username"
+            password = "your_prometheus_password"
+          }
+        }
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "http://your-loki-instance:3100/loki/api/v1/push"
+
+          basic_auth {
+            username = "your_loki_username"
+            password = "your_loki_password"
+          }
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_integrations_apache_hbase" {
+        targets = [{
+          __address__     = "localhost:8888",
+          hbase_cluster   = "sample_hbase_cluster",
+          instance        = constants.hostname,
+        },{
+          __address__     = "localhost:8889",
+          hbase_cluster   = "sample_hbase_cluster",
+          instance        = constants.hostname,
+        }]
+        forward_to      = [prometheus.remote_write.metrics_service.receiver]
+        scrape_interval = "10s"
+        job_name        = "integrations/apache-hbase"
+      }
+
+      local.file_match "hbase_logs" {
+        path_targets = [{
+          __path__  = "/opt/hbase/logs/*.log",
+        }]
+      }
+
+      loki.source.file "hbase_logs" {
+        targets    = local.file_match.hbase_logs.targets
+        forward_to = [loki.process.hbase_logs.receiver]
+      }
+
+      loki.process "hbase_logs" {
+        stage.static_labels {
+          values = {
+            job            = "integrations/apache-hbase",
+            hbase_cluster  = "sample_hbase_cluster",
+            instance       = constants.hostname,
+          }
+        }
+
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+      }
+
+  # HBase installation script
+  - owner: root:root
+    path: /home/ubuntu/install_hbase.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+
+
+
+      set -e
+
+      sudo apt-get update
+      sudo apt-get install -y openjdk-11-jdk-headless
+
+      sudo mkdir -p /opt/hbase/logs \
+          /opt/volume/hbase
+
+      echo "Downloading HBase 3.0.0-beta-1..."
+      HBASE_URL="https://archive.apache.org/dist/hbase/3.0.0-beta-1/hbase-3.0.0-beta-1-bin.tar.gz"
+      sudo curl -L --progress-bar --retry 3 --retry-delay 5 "$HBASE_URL" -o /home/ubuntu/hbase.tar.gz
+
+      sudo mkdir -p /opt/hbase
+      sudo tar -xzf /home/ubuntu/hbase.tar.gz -C /opt/hbase --strip 1
+
+      ARCH=$(uname -m)
+      if [ "$ARCH" == "x86_64" ]; then
+          JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"
+      else
+          JAVA_HOME="/usr/lib/jvm/java-11-openjdk-arm64"
+      fi
+
+      sudo cat <<EOF | sudo tee /opt/hbase/env
+      export JAVA_HOME=$JAVA_HOME
+      export PATH=$PATH:$JAVA_HOME/bin
+      export HBASE_HOME=/opt/hbase
+      export PATH=$PATH:/opt/hbase/bin
+      EOF
+
+      # Create systemd-compatible environment file (without export statements)
+      sudo cat <<EOF | sudo tee /opt/hbase/hbase.env
+      JAVA_HOME=$JAVA_HOME
+      HBASE_HOME=/opt/hbase
+      EOF
+
+      source /opt/hbase/env
+
+      # Configure HBase for pseudo-distributed mode (single node with Master + RegionServer + embedded ZooKeeper)
+      sudo cat > /opt/hbase/conf/hbase-site.xml << 'EOF'
+      <?xml version="1.0"?>
+      <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+      <configuration>
+        <property>
+          <name>hbase.rootdir</name>
+          <value>file:///opt/volume/hbase</value>
+        </property>
+        <property>
+          <name>hbase.zookeeper.property.dataDir</name>
+          <value>/opt/volume/hbase/zookeeper</value>
+        </property>
+        <property>
+          <name>hbase.unsafe.stream.capability.enforce</name>
+          <value>false</value>
+        </property>
+        <property>
+          <name>hbase.cluster.distributed</name>
+          <value>true</value>
+        </property>
+        <property>
+          <name>hbase.zookeeper.quorum</name>
+          <value>localhost</value>
+        </property>
+        <property>
+          <name>hbase.zookeeper.property.clientPort</name>
+          <value>2181</value>
+        </property>
+      </configuration>
+      EOF
+
+      # Create regionservers file to ensure RegionServer starts on localhost
+      echo "localhost" | sudo tee /opt/hbase/conf/regionservers > /dev/null
+
+      # Disable SSH requirement by configuring HBase to use local process spawning
+      sudo cat >> /opt/hbase/conf/hbase-env.sh << 'EOFENV'
+
+      # Use local process spawning instead of SSH for single-node setup
+      export HBASE_MANAGES_ZK=true
+      EOFENV
+
+      # Configure HBase environment to use JMX exporter
+      # Note: JMX exporter should be installed separately via install-jmx-prometheus-exporter.sh
+      JMX_EXPORTER_VERSION=1.3.0
+      JMX_EXPORTER_DIR="/opt/jmx-prometheus-exporter"
+      JMX_EXPORTER_JAR="$JMX_EXPORTER_DIR/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
+      JMX_MASTER_CONFIG="$JMX_EXPORTER_DIR/apache-hbase-master-jmx-config.yml"
+      JMX_REGIONSERVER_CONFIG="$JMX_EXPORTER_DIR/apache-hbase-regionserver-jmx-config.yml"
+      JMX_MASTER_PORT=8888
+      JMX_REGIONSERVER_PORT=8889
+
+      sudo cat >> /opt/hbase/conf/hbase-env.sh << EOFENV
+
+      # JMX Prometheus Exporter configuration
+      # Master JMX exporter endpoint: http://localhost:${JMX_MASTER_PORT}/metrics
+      export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -javaagent:${JMX_EXPORTER_JAR}=${JMX_MASTER_PORT}:${JMX_MASTER_CONFIG}"
+
+      # RegionServer JMX exporter endpoint: http://localhost:${JMX_REGIONSERVER_PORT}/metrics
+      export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -javaagent:${JMX_EXPORTER_JAR}=${JMX_REGIONSERVER_PORT}:${JMX_REGIONSERVER_CONFIG}"
+      EOFENV
+
+      # Create hbase user
+      sudo useradd -r -s /bin/bash -d /opt/hbase hbase || true
+      sudo chown -R hbase:hbase /opt/hbase
+      sudo chown -R hbase:hbase /opt/volume/hbase
+      # Ensure logs directory is writable for PID files
+      sudo chmod 755 /opt/hbase/logs
+
+      # Create systemd service for HBase (starts ZooKeeper, Master, and RegionServer)
+      sudo tee /etc/systemd/system/hbase.service > /dev/null << EOF
+      [Unit]
+      Description=Apache HBase
+      After=network.target
+
+      [Service]
+      Type=forking
+      User=hbase
+      Group=hbase
+      EnvironmentFile=/opt/hbase/hbase.env
+      Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${JAVA_HOME}/bin:/opt/hbase/bin"
+      ExecStart=/bin/bash -c 'source /opt/hbase/env && /opt/hbase/bin/hbase-daemon.sh start zookeeper && sleep 5 && /opt/hbase/bin/start-hbase.sh'
+      ExecStop=/bin/bash -c 'source /opt/hbase/env && /opt/hbase/bin/stop-hbase.sh && /opt/hbase/bin/hbase-daemon.sh stop zookeeper'
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+
+      # Reload systemd and enable HBase service
+      sudo systemctl daemon-reload
+      sudo systemctl enable hbase.service
+
+      # Start HBase (don't fail if it doesn't start immediately - it may take time)
+      sudo systemctl start hbase.service || echo "HBase service start returned non-zero, but continuing..."
+
+      # Wait a moment for HBase to initialize
+      sleep 5
+
+      # Check if HBase is actually running
+      if sudo systemctl is-active --quiet hbase.service; then
+          echo "HBase service is running successfully!"
+      else
+          echo "WARNING: HBase service may not be fully started yet. Check logs with: sudo journalctl -u hbase.service"
+      fi
+
+      echo "HBase installation completed!"
+      echo "HBase Master Web UI: http://localhost:16010"
+      echo "HBase Master JMX Metrics: http://localhost:8888/metrics"
+      echo "HBase RegionServer Web UI: http://localhost:16030"
+      echo "HBase RegionServer JMX Metrics: http://localhost:8889/metrics"
+
+
+  # JMX Prometheus Exporter installation script
+  - owner: root:root
+    path: /home/ubuntu/install-jmx-prometheus-exporter.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+
+
+
+      # JMX Prometheus Exporter configuration
+      JMX_EXPORTER_VERSION=1.3.0
+      JMX_EXPORTER_DIR="/opt/jmx-prometheus-exporter"
+      JMX_EXPORTER_JAR="$JMX_EXPORTER_DIR/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
+      JMX_MASTER_CONFIG_FILE="$JMX_EXPORTER_DIR/apache-hbase-master-jmx-config.yml"
+      JMX_REGIONSERVER_CONFIG_FILE="$JMX_EXPORTER_DIR/apache-hbase-regionserver-jmx-config.yml"
+
+      sudo mkdir -p "$JMX_EXPORTER_DIR"
+
+      echo "Downloading JMX Prometheus Java Agent version $JMX_EXPORTER_VERSION..."
+      sudo wget -O "$JMX_EXPORTER_JAR" \
+          "https://github.com/prometheus/jmx_exporter/releases/download/${JMX_EXPORTER_VERSION}/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
+
+      # Create JMX exporter config for HBase Master
+      sudo cat > "$JMX_MASTER_CONFIG_FILE" <<'EOF'
+      lowercaseOutputName: true
+      lowercaseOutputLabelNames: true
+      rules:
+        - pattern: ".*"
+      EOF
+
+      # Create JMX exporter config for HBase RegionServer
+      sudo cat > "$JMX_REGIONSERVER_CONFIG_FILE" <<'EOF'
+      lowercaseOutputName: true
+      lowercaseOutputLabelNames: true
+      rules:
+        - pattern: ".*"
+      EOF
+
+      echo "JMX Prometheus Exporter installation completed!"
+      echo "JAR location: $JMX_EXPORTER_JAR"
+      echo "Master config: $JMX_MASTER_CONFIG_FILE"
+      echo "RegionServer config: $JMX_REGIONSERVER_CONFIG_FILE"
+
+
+  # Load generator script
+  - owner: root:root
+    path: /home/ubuntu/loadgen.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+
+      # Wait for HBase to be fully ready
+      sleep 60
+
+      # Create a test table and insert data periodically
+      while true; do
+        echo "Creating test table and inserting data..."
+        /opt/hbase/bin/hbase shell << 'EOFHBASE' || true
+
+        # Create table if it doesn't exist
+        if !exists('test_table')
+          create 'test_table', 'cf'
+        end
+
+        # Insert some test data
+        put 'test_table', 'row1', 'cf:col1', 'value1'
+        put 'test_table', 'row2', 'cf:col1', 'value2'
+        put 'test_table', 'row3', 'cf:col1', 'value3'
+
+        # Scan table
+        scan 'test_table', {LIMIT => 5}
+
+        exit
+      EOFHBASE
+
+        echo "Load generation cycle complete. Sleeping for 60 seconds..."
+        sleep 60
+      done
+
+  # Systemd service for load generator
+  - owner: root:root
+    path: /etc/systemd/system/hbase-loadgen.service
+    content: |
+      [Unit]
+      Description=HBase Load Generator
+      After=hbase.service
+      Requires=hbase.service
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory=/home/ubuntu
+      ExecStart=/home/ubuntu/loadgen.sh
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - sudo chmod +x /home/ubuntu/install_hbase.sh
+  - sudo chmod +x /home/ubuntu/install-jmx-prometheus-exporter.sh
+  
+  # Install JMX Prometheus Exporter (must be done before HBase installation)
+  - sudo /home/ubuntu/install-jmx-prometheus-exporter.sh > /home/ubuntu/install-jmx-prometheus-exporter.log 2>&1
+  
+  # Install HBase (redirect output to log file for debugging)
+  - nohup sudo /home/ubuntu/install_hbase.sh > /home/ubuntu/hbase-install.log 2>&1 || echo "HBase installation script completed with warnings or errors, check /home/ubuntu/hbase-install.log" &
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+  # Enable and start load generator
+  - sudo systemctl enable hbase-loadgen.service
+  - sudo systemctl start hbase-loadgen.service
