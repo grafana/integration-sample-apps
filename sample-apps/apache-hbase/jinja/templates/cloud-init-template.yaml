@@ -59,7 +59,6 @@ write_files:
       prometheus.remote_write "metrics_service" {
         endpoint {
           url = "{{ prom_url }}"
-
           {% if prom_user and prom_pass -%}
           basic_auth {
             username = "{{ prom_user }}"
@@ -72,7 +71,6 @@ write_files:
       loki.write "grafana_cloud_loki" {
         endpoint {
           url = "{{ loki_url }}"
-
           {% if loki_user and loki_pass -%}
           basic_auth {
             username = "{{ loki_user }}"
@@ -83,15 +81,20 @@ write_files:
       }
 
       prometheus.scrape "metrics_integrations_integrations_apache_hbase" {
-        targets = [{
-          __address__     = "localhost:8888",
-          hbase_cluster   = "sample_hbase_cluster",
-          instance        = constants.hostname,
-        },{
-          __address__     = "localhost:8889",
-          hbase_cluster   = "sample_hbase_cluster",
-          instance        = constants.hostname,
-        }]
+        targets = [
+          {
+            __address__     = "localhost:16010",
+            metrics_path    = "/prometheus",
+            hbase_cluster   = "sample_hbase_cluster",
+            instance        = constants.hostname,
+          },
+          {
+            __address__     = "localhost:16030",
+            metrics_path    = "/prometheus",
+            hbase_cluster   = "sample_hbase_cluster",
+            instance        = constants.hostname,
+          },
+        ]
         forward_to      = [prometheus.remote_write.metrics_service.receiver]
         scrape_interval = "{{ interval }}"
         job_name        = "integrations/apache-hbase"
@@ -127,15 +130,6 @@ write_files:
     content: |
       {% filter indent(6) %}
       {%- include 'scripts/install.sh' -%}
-      {% endfilter %}
-
-  # JMX Prometheus Exporter installation script
-  - owner: root:root
-    path: /home/ubuntu/install-jmx-prometheus-exporter.sh
-    permissions: '0755'
-    content: |
-      {% filter indent(6) %}
-      {%- include 'scripts/install-jmx-prometheus-exporter.sh' -%}
       {% endfilter %}
 
   # Load generator script
@@ -197,10 +191,6 @@ runcmd:
   # General setup
   - sudo apt-get update
   - sudo chmod +x /home/ubuntu/install_hbase.sh
-  - sudo chmod +x /home/ubuntu/install-jmx-prometheus-exporter.sh
-  
-  # Install JMX Prometheus Exporter (must be done before HBase installation)
-  - sudo /home/ubuntu/install-jmx-prometheus-exporter.sh > /home/ubuntu/install-jmx-prometheus-exporter.log 2>&1
   
   # Install HBase (redirect output to log file for debugging)
   - nohup sudo /home/ubuntu/install_hbase.sh > /home/ubuntu/hbase-install.log 2>&1 || echo "HBase installation script completed with warnings or errors, check /home/ubuntu/hbase-install.log" &

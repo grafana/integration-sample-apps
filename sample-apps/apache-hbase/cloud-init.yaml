@@ -58,8 +58,7 @@ write_files:
 
       prometheus.remote_write "metrics_service" {
         endpoint {
-          url = "http://your-prometheus-instance:9090/api/v1/push"
-
+          url = "http://192.168.64.3:9009/api/v1/push"
           basic_auth {
             username = "your_prometheus_username"
             password = "your_prometheus_password"
@@ -69,8 +68,7 @@ write_files:
 
       loki.write "grafana_cloud_loki" {
         endpoint {
-          url = "http://your-loki-instance:3100/loki/api/v1/push"
-
+          url = "http://192.168.64.3:3100/loki/api/v1/push"
           basic_auth {
             username = "your_loki_username"
             password = "your_loki_password"
@@ -79,15 +77,20 @@ write_files:
       }
 
       prometheus.scrape "metrics_integrations_integrations_apache_hbase" {
-        targets = [{
-          __address__     = "localhost:8888",
-          hbase_cluster   = "sample_hbase_cluster",
-          instance        = constants.hostname,
-        },{
-          __address__     = "localhost:8889",
-          hbase_cluster   = "sample_hbase_cluster",
-          instance        = constants.hostname,
-        }]
+        targets = [
+          {
+            __address__     = "localhost:16010",
+            metrics_path    = "/prometheus",
+            hbase_cluster   = "sample_hbase_cluster",
+            instance        = constants.hostname,
+          },
+          {
+            __address__     = "localhost:16030",
+            metrics_path    = "/prometheus",
+            hbase_cluster   = "sample_hbase_cluster",
+            instance        = constants.hostname,
+          },
+        ]
         forward_to      = [prometheus.remote_write.metrics_service.receiver]
         scrape_interval = "10s"
         job_name        = "integrations/apache-hbase"
@@ -123,6 +126,7 @@ write_files:
     content: |
       #!/bin/bash
 
+      # Integration only claims support for HBase 3.0+
 
 
       set -e
@@ -154,7 +158,6 @@ write_files:
       export PATH=$PATH:/opt/hbase/bin
       EOF
 
-      # Create systemd-compatible environment file (without export statements)
       sudo cat <<EOF | sudo tee /opt/hbase/hbase.env
       JAVA_HOME=$JAVA_HOME
       HBASE_HOME=/opt/hbase
@@ -162,7 +165,6 @@ write_files:
 
       source /opt/hbase/env
 
-      # Configure HBase for pseudo-distributed mode (single node with Master + RegionServer + embedded ZooKeeper)
       sudo cat > /opt/hbase/conf/hbase-site.xml << 'EOF'
       <?xml version="1.0"?>
       <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
@@ -204,25 +206,6 @@ write_files:
       export HBASE_MANAGES_ZK=true
       EOFENV
 
-      # Configure HBase environment to use JMX exporter
-      # Note: JMX exporter should be installed separately via install-jmx-prometheus-exporter.sh
-      JMX_EXPORTER_VERSION=1.3.0
-      JMX_EXPORTER_DIR="/opt/jmx-prometheus-exporter"
-      JMX_EXPORTER_JAR="$JMX_EXPORTER_DIR/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
-      JMX_MASTER_CONFIG="$JMX_EXPORTER_DIR/apache-hbase-master-jmx-config.yml"
-      JMX_REGIONSERVER_CONFIG="$JMX_EXPORTER_DIR/apache-hbase-regionserver-jmx-config.yml"
-      JMX_MASTER_PORT=8888
-      JMX_REGIONSERVER_PORT=8889
-
-      sudo cat >> /opt/hbase/conf/hbase-env.sh << EOFENV
-
-      # JMX Prometheus Exporter configuration
-      # Master JMX exporter endpoint: http://localhost:${JMX_MASTER_PORT}/metrics
-      export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -javaagent:${JMX_EXPORTER_JAR}=${JMX_MASTER_PORT}:${JMX_MASTER_CONFIG}"
-
-      # RegionServer JMX exporter endpoint: http://localhost:${JMX_REGIONSERVER_PORT}/metrics
-      export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -javaagent:${JMX_EXPORTER_JAR}=${JMX_REGIONSERVER_PORT}:${JMX_REGIONSERVER_CONFIG}"
-      EOFENV
 
       # Create hbase user
       sudo useradd -r -s /bin/bash -d /opt/hbase hbase || true
@@ -251,18 +234,14 @@ write_files:
       [Install]
       WantedBy=multi-user.target
       EOF
-
-      # Reload systemd and enable HBase service
       sudo systemctl daemon-reload
       sudo systemctl enable hbase.service
 
-      # Start HBase (don't fail if it doesn't start immediately - it may take time)
       sudo systemctl start hbase.service || echo "HBase service start returned non-zero, but continuing..."
 
       # Wait a moment for HBase to initialize
       sleep 5
 
-      # Check if HBase is actually running
       if sudo systemctl is-active --quiet hbase.service; then
           echo "HBase service is running successfully!"
       else
@@ -274,50 +253,6 @@ write_files:
       echo "HBase Master JMX Metrics: http://localhost:8888/metrics"
       echo "HBase RegionServer Web UI: http://localhost:16030"
       echo "HBase RegionServer JMX Metrics: http://localhost:8889/metrics"
-
-
-  # JMX Prometheus Exporter installation script
-  - owner: root:root
-    path: /home/ubuntu/install-jmx-prometheus-exporter.sh
-    permissions: '0755'
-    content: |
-      #!/bin/bash
-
-
-
-      # JMX Prometheus Exporter configuration
-      JMX_EXPORTER_VERSION=1.3.0
-      JMX_EXPORTER_DIR="/opt/jmx-prometheus-exporter"
-      JMX_EXPORTER_JAR="$JMX_EXPORTER_DIR/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
-      JMX_MASTER_CONFIG_FILE="$JMX_EXPORTER_DIR/apache-hbase-master-jmx-config.yml"
-      JMX_REGIONSERVER_CONFIG_FILE="$JMX_EXPORTER_DIR/apache-hbase-regionserver-jmx-config.yml"
-
-      sudo mkdir -p "$JMX_EXPORTER_DIR"
-
-      echo "Downloading JMX Prometheus Java Agent version $JMX_EXPORTER_VERSION..."
-      sudo wget -O "$JMX_EXPORTER_JAR" \
-          "https://github.com/prometheus/jmx_exporter/releases/download/${JMX_EXPORTER_VERSION}/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
-
-      # Create JMX exporter config for HBase Master
-      sudo cat > "$JMX_MASTER_CONFIG_FILE" <<'EOF'
-      lowercaseOutputName: true
-      lowercaseOutputLabelNames: true
-      rules:
-        - pattern: ".*"
-      EOF
-
-      # Create JMX exporter config for HBase RegionServer
-      sudo cat > "$JMX_REGIONSERVER_CONFIG_FILE" <<'EOF'
-      lowercaseOutputName: true
-      lowercaseOutputLabelNames: true
-      rules:
-        - pattern: ".*"
-      EOF
-
-      echo "JMX Prometheus Exporter installation completed!"
-      echo "JAR location: $JMX_EXPORTER_JAR"
-      echo "Master config: $JMX_MASTER_CONFIG_FILE"
-      echo "RegionServer config: $JMX_REGIONSERVER_CONFIG_FILE"
 
 
   # Load generator script
@@ -379,10 +314,6 @@ runcmd:
   # General setup
   - sudo apt-get update
   - sudo chmod +x /home/ubuntu/install_hbase.sh
-  - sudo chmod +x /home/ubuntu/install-jmx-prometheus-exporter.sh
-  
-  # Install JMX Prometheus Exporter (must be done before HBase installation)
-  - sudo /home/ubuntu/install-jmx-prometheus-exporter.sh > /home/ubuntu/install-jmx-prometheus-exporter.log 2>&1
   
   # Install HBase (redirect output to log file for debugging)
   - nohup sudo /home/ubuntu/install_hbase.sh > /home/ubuntu/hbase-install.log 2>&1 || echo "HBase installation script completed with warnings or errors, check /home/ubuntu/hbase-install.log" &

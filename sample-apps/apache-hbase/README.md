@@ -1,6 +1,8 @@
 # Apache HBase sample app
 
-This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of [Apache HBase](https://hbase.apache.org/) using the [JMX Prometheus Exporter](https://github.com/prometheus/jmx_exporter).
+> Note: this sample application takes a really long time to setup as the install for HBase takes near 20 minutes on good days. Feel free to run a `make tail-install` to track install progress. The install is triggered in the background so expect a long time for the metrics to show up.
+
+This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. It uses cloud-init and Make commands to ease setup, configuration, and monitoring of [Apache HBase](https://hbase.apache.org/), collecting HBase metrics and logs natively from HBase’s built-in `/prometheus` endpoints.
 
 ## Prerequisites
 
@@ -40,8 +42,8 @@ To get started with the sample app, follow these steps:
 - `make run-ci`: Runs in CI mode by cleaning, setting up default config, and launching the VM.
 - `make stop`: Stops and removes the VM, then purges multipass resources.
 - `make clean`: Removes generated configuration files and temporary resources.
-- `make master-metrics`: Fetches metrics from the HBase Master JMX endpoint.
-- `make regionserver-metrics`: Fetches metrics from the HBase RegionServer JMX endpoint.
+- `make master-metrics`: Fetches metrics from the HBase Master's `/prometheus` endpoint.
+- `make regionserver-metrics`: Fetches metrics from the HBase RegionServer's `/prometheus` endpoint.
 - `make system-status`: Shows the status of the HBase systemd service.
 
 ## Default configuration variables
@@ -54,7 +56,6 @@ To get started with the sample app, follow these steps:
 - `loki_pass`: Your Loki password.
 - `interval`: Metrics collection interval (default: `10s`).
 - `hbase_version`: Version of Apache HBase to install (default: `2.5.10`).
-- `jmx_exporter_version`: Version of JMX Prometheus Exporter to use (default: `1.3.0`).
 
 You can edit these variables in `jinja/variables/cloud-init.yaml` before rendering the configuration.
 
@@ -71,10 +72,11 @@ The sample app installs and configures Apache HBase in standalone mode:
 - **Web UI Ports**:
   - Master Web UI: port 16010
   - RegionServer Web UI: port 16030
-- **JMX Monitoring**:
-  - HBase Master: port 8888
-  - HBase RegionServer: port 8889
-  - JMX Prometheus Exporter version: 1.3.0
+- **Prometheus Metrics Endpoints**:
+  - HBase Master: `http://localhost:16010/prometheus`
+  - HBase RegionServer: `http://localhost:16030/prometheus`
+
+No JMX exporter or sidecar is needed: Alloy natively scrapes metrics from these `/prometheus` endpoints exposed by HBase.
 
 ## Validating services
 
@@ -118,14 +120,14 @@ The sample app installs and configures Apache HBase in standalone mode:
   sudo -u hbase tail -f /opt/hbase/logs/hbase-hbase-regionserver-*.log
   ```
 
-### JMX Prometheus Exporter
-- **Check Master metrics**: Verify Master metrics are exposed.
+### Metrics endpoints
+- **Check Master metrics**: Verify metrics are exposed by HBase Master at the `/prometheus` endpoint.
   ```bash
-  curl localhost:8888/metrics
+  curl localhost:16010/prometheus
   ```
-- **Check RegionServer metrics**: Verify RegionServer metrics are exposed.
+- **Check RegionServer metrics**: Verify metrics are exposed by the RegionServer at the `/prometheus` endpoint.
   ```bash
-  curl localhost:8889/metrics
+  curl localhost:16030/prometheus
   ```
 
 ### Load Generator
@@ -153,9 +155,10 @@ Common troubleshooting steps:
    echo $JAVA_HOME
    ```
 
-2. **Metrics not available**: Verify JMX exporter is loaded
+2. **Metrics not available**: Ensure the `/prometheus` endpoints are enabled and reachable. Try:
    ```bash
-   sudo -u hbase ps aux | grep jmx_prometheus
+   curl localhost:16010/prometheus
+   curl localhost:16030/prometheus
    ```
 
 3. **Permission issues**: Check file ownership
@@ -166,7 +169,7 @@ Common troubleshooting steps:
 
 4. **Port conflicts**: Verify ports are not in use
    ```bash
-   sudo netstat -tlnp | grep -E '(8888|8889|16010|16030)'
+   sudo netstat -tlnp | grep -E '(16010|16030)'
    ```
 
 ## Updating Versions
@@ -174,10 +177,6 @@ Common troubleshooting steps:
 ### Updating the Apache HBase Version
 
 To target a different version of HBase, simply replace the `hbase_version` (default=`2.5.10`) within your variables with your desired version.
-
-### Updating the JMX Prometheus Exporter Version
-
-To target a different version of the JMX Prometheus Exporter, simply update the `jmx_exporter_version` (default=`1.3.0`) with your desired version.
 
 Example `jinja/variables/cloud-init.yaml`:
 ```yaml
@@ -189,7 +188,6 @@ prom_url: http://your-prometheus-instance:9090/api/v1/push
 prom_user: your_prometheus_username
 prom_pass: your_prometheus_password
 hbase_version: 2.5.10
-jmx_exporter_version: 1.3.0
 ```
 
 ## Testing HBase

@@ -48,3 +48,6 @@ master-metrics:
 
 regionserver-metrics:
 	@multipass exec $(VM_NAME) -- curl -s http://localhost:8889/metrics || echo "HBase RegionServer metrics not available"
+
+tail-install:
+	@multipass exec $(VM_NAME) -- tail -f /home/ubuntu/hbase-install.log

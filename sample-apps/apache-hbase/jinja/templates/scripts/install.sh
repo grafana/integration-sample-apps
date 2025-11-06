@@ -80,25 +80,6 @@ sudo cat >> /opt/hbase/conf/hbase-env.sh << 'EOFENV'
 export HBASE_MANAGES_ZK=true
 EOFENV
 
-# Configure HBase environment to use JMX exporter
-# Note: JMX exporter should be installed separately via install-jmx-prometheus-exporter.sh
-JMX_EXPORTER_VERSION={{ jmx_exporter_version | default("1.3.0") }}
-JMX_EXPORTER_DIR="/opt/jmx-prometheus-exporter"
-JMX_EXPORTER_JAR="$JMX_EXPORTER_DIR/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar"
-JMX_MASTER_CONFIG="$JMX_EXPORTER_DIR/apache-hbase-master-jmx-config.yml"
-JMX_REGIONSERVER_CONFIG="$JMX_EXPORTER_DIR/apache-hbase-regionserver-jmx-config.yml"
-JMX_MASTER_PORT=8888
-JMX_REGIONSERVER_PORT=8889
-
-sudo cat >> /opt/hbase/conf/hbase-env.sh << EOFENV
-
-# JMX Prometheus Exporter configuration
-# Master JMX exporter endpoint: http://localhost:${JMX_MASTER_PORT}/metrics
-export HBASE_MASTER_OPTS="\$HBASE_MASTER_OPTS -javaagent:${JMX_EXPORTER_JAR}=${JMX_MASTER_PORT}:${JMX_MASTER_CONFIG}"
-
-# RegionServer JMX exporter endpoint: http://localhost:${JMX_REGIONSERVER_PORT}/metrics
-export HBASE_REGIONSERVER_OPTS="\$HBASE_REGIONSERVER_OPTS -javaagent:${JMX_EXPORTER_JAR}=${JMX_REGIONSERVER_PORT}:${JMX_REGIONSERVER_CONFIG}"
-EOFENV
 
 # Create hbase user
 sudo useradd -r -s /bin/bash -d /opt/hbase hbase || true
