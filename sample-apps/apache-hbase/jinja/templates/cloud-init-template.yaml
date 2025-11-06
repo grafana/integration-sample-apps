@@ -84,19 +84,18 @@ write_files:
         targets = [
           {
             __address__     = "localhost:16010",
-            metrics_path    = "/prometheus",
             hbase_cluster   = "sample_hbase_cluster",
             instance        = constants.hostname,
           },
           {
             __address__     = "localhost:16030",
-            metrics_path    = "/prometheus",
             hbase_cluster   = "sample_hbase_cluster",
             instance        = constants.hostname,
           },
         ]
         forward_to      = [prometheus.remote_write.metrics_service.receiver]
         scrape_interval = "{{ interval }}"
+        metrics_path    = "/prometheus",
         job_name        = "integrations/apache-hbase"
       }
 
