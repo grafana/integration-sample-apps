@@ -31,7 +31,7 @@ clean:
 	@rm -rf $(CONFIG_FILE_DIR)
 
 defaultconfig:
-	@mkdir $(CONFIG_FILE_DIR)
+	@mkdir -p $(CONFIG_FILE_DIR)
 	@echo "interval: \"10s\"" >> jinja/variables/cloud-init.yaml
 	@echo "loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
 	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml

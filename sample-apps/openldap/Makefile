@@ -51,7 +51,7 @@ clean:
 	@echo "Generated configs cleaned."
 
 defaultconfig:
-	@mkdir $(CONFIG_FILE_DIR)
+	@mkdir -p $(CONFIG_FILE_DIR)
 	@echo "exporter_repo: https://github.com/grafana/openldap_exporter.git" >> jinja/variables/cloud-init.yaml
 	@echo "exporter_dir: openldap_exporter" >> jinja/variables/cloud-init.yaml
 	@echo "prom_addr: \":8080\"" >> jinja/variables/cloud-init.yaml
