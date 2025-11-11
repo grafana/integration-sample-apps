@@ -26,7 +26,7 @@ render-config:
 	@docker run --rm -v $(shell pwd)/$(TEMPLATE_FILE_DIR):/templates -v $(shell pwd)/$(CONFIG_FILE_DIR):/variables dinutac/jinja2docker:latest /templates/monitoring-config-template.yaml /variables/monitoring-config.yaml --format=yaml > monitoring-config.yaml
 	
 default-monitoring-config:
-	@mkdir $(CONFIG_FILE_DIR)
+	@mkdir -p $(CONFIG_FILE_DIR)
 	@echo "loki_host: http://$(LOKI_INSTANCE)" >> $(CONFIG_FILE_VARS)
 	@echo "loki_path: /loki/api/v1/push" >> $(CONFIG_FILE_VARS)
 	@echo "loki_user: your_loki_username" >> $(CONFIG_FILE_VARS)
