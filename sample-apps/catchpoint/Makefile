@@ -1,5 +1,6 @@
 VM_NAME ?= catchpoint
 K8S_NAMESPACE := default
+CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := jinja/variables/cloud-init.yaml
 TEMPLATE_DIR := jinja/templates
 OUTPUT_DIR := generated_configs
@@ -51,6 +52,7 @@ clean: stop-catchpoint-multipass
 
 .PHONY: defaultconfig
 defaultconfig:
+	@mkdir -p $(CONFIG_FILE_DIR)
 	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
 	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
 	@echo "prom_host: https://prometheus-us-central1.grafana.net" >> jinja/variables/cloud-init.yaml
