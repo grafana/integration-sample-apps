@@ -1,0 +1,203 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up Alloy and required Apache HBase sample-app
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+  - git
+  - gpg
+  - alloy
+
+write_files:
+  # Alloy configuration
+  - owner: root:root
+    path: /etc/alloy/config.alloy
+    content: |
+      prometheus.exporter.self "alloy_check" { }
+
+      discovery.relabel "alloy_check" {
+        targets = prometheus.exporter.self.alloy_check.targets
+
+        rule {
+          target_label = "instance"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "alloy_hostname"
+          replacement  = constants.hostname
+        }
+
+        rule {
+          target_label = "job"
+          replacement  = "integrations/alloy-check"
+        }
+      }
+
+      prometheus.scrape "alloy_check" {
+        targets    = discovery.relabel.alloy_check.output
+        forward_to = [prometheus.relabel.alloy_check.receiver]
+
+        scrape_interval = "60s"
+      }
+
+      prometheus.relabel "alloy_check" {
+        forward_to = [prometheus.remote_write.metrics_service.receiver]
+
+        rule {
+          source_labels = ["__name__"]
+          regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+          action        = "keep"
+        }
+      }
+
+      prometheus.remote_write "metrics_service" {
+        endpoint {
+          url = "{{ prom_url }}"
+          {% if prom_user and prom_pass -%}
+          basic_auth {
+            username = "{{ prom_user }}"
+            password = "{{ prom_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      loki.write "grafana_cloud_loki" {
+        endpoint {
+          url = "{{ loki_url }}"
+          {% if loki_user and loki_pass -%}
+          basic_auth {
+            username = "{{ loki_user }}"
+            password = "{{ loki_pass }}"
+          }
+          {%- endif %}
+        }
+      }
+
+      prometheus.scrape "metrics_integrations_integrations_apache_hbase" {
+        targets = [
+          {
+            __address__     = "localhost:16010",
+            hbase_cluster   = "sample_hbase_cluster",
+            instance        = constants.hostname,
+          },
+          {
+            __address__     = "localhost:16030",
+            hbase_cluster   = "sample_hbase_cluster",
+            instance        = constants.hostname,
+          },
+        ]
+        forward_to      = [prometheus.remote_write.metrics_service.receiver]
+        scrape_interval = "{{ interval }}"
+        metrics_path    = "/prometheus",
+        job_name        = "integrations/apache-hbase"
+      }
+
+      local.file_match "hbase_logs" {
+        path_targets = [{
+          __path__  = "/opt/hbase/logs/*.log",
+        }]
+      }
+
+      loki.source.file "hbase_logs" {
+        targets    = local.file_match.hbase_logs.targets
+        forward_to = [loki.process.hbase_logs.receiver]
+      }
+
+      loki.process "hbase_logs" {
+        stage.static_labels {
+          values = {
+            job            = "integrations/apache-hbase",
+            hbase_cluster  = "sample_hbase_cluster",
+            instance       = constants.hostname,
+          }
+        }
+
+        forward_to = [loki.write.grafana_cloud_loki.receiver]
+      }
+
+  # HBase installation script
+  - owner: root:root
+    path: /home/ubuntu/install_hbase.sh
+    permissions: '0755'
+    content: |
+      {% filter indent(6) %}
+      {%- include 'scripts/install.sh' -%}
+      {% endfilter %}
+
+  # Load generator script
+  - owner: root:root
+    path: /home/ubuntu/loadgen.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+
+      # Wait for HBase to be fully ready
+      sleep 60
+
+      # Create a test table and insert data periodically
+      while true; do
+        echo "Creating test table and inserting data..."
+        /opt/hbase/bin/hbase shell << 'EOFHBASE' || true
+
+        # Create table if it doesn't exist
+        if !exists('test_table')
+          create 'test_table', 'cf'
+        end
+
+        # Insert some test data
+        put 'test_table', 'row1', 'cf:col1', 'value1'
+        put 'test_table', 'row2', 'cf:col1', 'value2'
+        put 'test_table', 'row3', 'cf:col1', 'value3'
+
+        # Scan table
+        scan 'test_table', {LIMIT => 5}
+
+        exit
+      EOFHBASE
+
+        echo "Load generation cycle complete. Sleeping for 60 seconds..."
+        sleep 60
+      done
+
+  # Systemd service for load generator
+  - owner: root:root
+    path: /etc/systemd/system/hbase-loadgen.service
+    content: |
+      [Unit]
+      Description=HBase Load Generator
+      After=hbase.service
+      Requires=hbase.service
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory=/home/ubuntu
+      ExecStart=/home/ubuntu/loadgen.sh
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # General setup
+  - sudo apt-get update
+  - sudo chmod +x /home/ubuntu/install_hbase.sh
+  
+  # Install HBase (redirect output to log file for debugging)
+  - nohup sudo /home/ubuntu/install_hbase.sh > /home/ubuntu/hbase-install.log 2>&1 || echo "HBase installation script completed with warnings or errors, check /home/ubuntu/hbase-install.log" &
+
+  # Configure Alloy
+  - sudo systemctl enable alloy.service
+  - sudo systemctl start alloy.service
+
+  # Enable and start load generator
+  - sudo systemctl enable hbase-loadgen.service
+  - sudo systemctl start hbase-loadgen.service
