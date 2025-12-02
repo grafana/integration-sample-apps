@@ -24,6 +24,10 @@ Before you begin, ensure you have the following installed:
 - Docker (for rendering cloud-init files using Jinja)
 - Git (for cloning the repository)
 
+#### macOS Local Network Permissions
+
+**Important for macOS users**: Ensure Multipass, Docker, and your terminal application have local network access permissions. To check or grant these permissions, go to System Settings → Privacy & Security → Local Network, and ensure these applications are enabled. Without these permissions, the sample apps may fail to communicate properly with the databases and services.
+
 ### Setup databases
 
 Ensure Multipass is running, then from the root of the repo execute:
