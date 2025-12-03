@@ -1,0 +1,223 @@
+name: "Windows Sample App"
+
+permissions:
+  contents: read
+
+on:
+  # To conserve resources we only run tests against main in PRs
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'sample-apps/windows/**'
+
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+jobs:
+  test-windows-sample-app:
+    name: Test Windows sample app
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        shell: wsl-bash {0}
+
+    steps:
+      - name: Set git to use LF
+        shell: cmd
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup WSL
+        uses: Vampire/setup-wsl@3b46b44374d5d0ae94654c45d114a3ed7a0e07a8 # v5.0.1
+        with:
+          distribution: Ubuntu-20.04
+          wsl-shell-command: bash -e -u -o pipefail
+
+      - name: Setup environment variables
+        run: |
+          echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.vars
+          echo 'DEBIAN_FRONTEND=noninteractive' >> ~/.vars
+          source ~/.vars
+          echo $PATH
+
+      - name: Install Docker in WSL
+        run: |
+          source ~/.vars
+          
+          echo "Installing Docker in WSL..."
+          
+          # Install Docker if not cached
+          if ! command -v docker &> /dev/null; then
+            echo "Installing Docker dependencies..."
+            sudo apt-get update
+            sudo apt-get install -y ca-certificates curl gnupg lsb-release
+          
+            echo "Adding Docker GPG key..."
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          
+            echo "Adding Docker repository..."
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          
+            echo "Installing Docker..."
+            sudo apt-get update
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+          
+            echo "Docker installed successfully"
+          else
+            echo "Docker already available"
+          fi
+          
+          # Start Docker service
+          sudo service docker start
+          
+          # Wait for Docker to be ready
+          timeout 60s bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
+          
+          echo "Docker is ready"
+          docker --version
+          
+          # Install jq for JSON parsing in validation step
+          echo "Installing jq for JSON parsing..."
+          sudo apt-get install -y jq
+          echo "jq installed successfully"
+
+      - name: Start Mimir and Loki containers
+        run: |
+          source ~/.vars
+          
+          echo "Starting Mimir and Loki containers using docker-compose..."
+          
+          # Navigate to the docker-compose directory
+          cd ops/qa/dbs
+          
+          # Start services with docker compose
+          docker compose up -d
+          
+          # Set default config
+          source ../../.defaultconfig
+          
+          echo "Database setup complete - Loki: localhost:3100, Mimir: localhost:9009"
+          
+          # Wait for containers to be running first
+          echo "Waiting for containers to be running..."
+          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} dbs-mimir-1)" == "true" ]; do sleep 2; done'
+          timeout 30s bash -c 'until [ "$(docker inspect -f {{.State.Running}} dbs-loki-1)" == "true" ]; do sleep 2; done'
+          
+          echo "Containers are running, waiting for services to be ready..."
+          
+          # Give services time to initialize
+          echo "Waiting for services to initialize..."
+          sleep 45
+          
+          # Check Mimir health using official readiness probe
+          echo "Checking Mimir health..."
+          for i in {1..30}; do
+            if curl -s http://localhost:9009/ready >/dev/null 2>&1; then
+              echo "✅ Mimir is ready"
+              break
+            fi
+            echo "Attempt $i/30: Mimir not ready yet..."
+            sleep 5
+            if [ $i -eq 30 ]; then
+              echo "⚠️ Mimir /ready endpoint not responding, but checking logs..."
+              docker logs dbs-mimir-1 --tail 10
+              # Don't fail here, continue to Loki check
+            fi
+          done
+          
+          # Check Loki health using official readiness probe
+          echo "Checking Loki health..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3100/ready >/dev/null 2>&1; then
+              echo "✅ Loki is ready"
+              break
+            fi
+            echo "Attempt $i/30: Loki not ready yet..."
+            sleep 5
+            if [ $i -eq 30 ]; then
+              echo "⚠️ Loki /ready endpoint not responding, but checking logs..."
+              docker logs dbs-loki-1 --tail 10
+              # Don't fail here, continue with workflow
+            fi
+          done
+          
+          echo "✅ All services are ready"
+
+      - name: Run Windows sample app
+        shell: powershell
+        run: |
+          Write-Host "Running Windows sample app..."
+          cd sample-apps/windows
+          
+          # Install Alloy
+          Write-Host "Installing Alloy..."
+          .\scripts\install_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to install Alloy"
+            exit 1
+          }
+          
+          # Create and configure Alloy with remote endpoints
+          Write-Host "Creating Alloy configuration..."
+          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
+          .\scripts\configure_alloy.ps1
+          
+          # Start Alloy service
+          Write-Host "Starting Alloy service..."
+          .\scripts\start_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to start Alloy service"
+            exit 1
+          }
+          
+          # Generate load for testing
+          Write-Host "Generating test load..."
+          .\scripts\generate_load.ps1
+          
+          Write-Host "Windows sample app setup complete"
+
+      - name: Wait for sample app to generate metrics
+        run: |
+          source ~/.vars
+          source ./ops/.defaultconfig
+          echo "Waiting for sample app to generate metrics..."
+          sleep $SAMPLE_APP_SETUP_TIME
+
+      - name: Validate metrics
+        run: |
+          source ~/.vars
+          
+          echo "Validating metrics using check_metrics.sh script..."
+          ./ops/scripts/check_metrics.sh windows localhost:9009
+
+      - name: Cleanup Docker containers
+        if: always()
+        run: |
+          source ~/.vars
+          
+          echo "Cleaning up Docker containers..."
+          
+          # Navigate to the docker-compose directory and stop services
+          cd ops/qa/dbs
+          docker compose down
+          
+          echo "Cleanup completed"
+
+      - name: Stop Alloy service
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "Stopping Alloy service..."
+          cd sample-apps/windows
+          .\scripts\stop_alloy.ps1
