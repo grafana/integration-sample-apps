@@ -199,7 +199,7 @@ jobs:
           source ~/.vars
           
           echo "Validating metrics using check_metrics.sh script..."
-          ./ops/scripts/check_metrics.sh windows localhost:9009
+          ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
 
       - name: Cleanup Docker containers
         if: always()
