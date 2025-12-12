@@ -1,0 +1,3 @@
+# Databricks is a cloud-hosted SaaS service that cannot be spun up locally.
+# This sample-app is excluded from CI runs.
+

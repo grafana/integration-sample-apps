@@ -1,0 +1,16 @@
+# Databricks Exporter Configuration
+# See README.md for instructions on obtaining these values
+
+# Grafana Cloud endpoints
+loki_url: http://your-loki-instance:3100/loki/api/v1/push
+loki_user: your_loki_username
+loki_pass: your_loki_password
+prom_url: http://your-prometheus-instance:9090/api/v1/push
+prom_user: your_prometheus_username
+prom_pass: your_prometheus_password
+
+# Databricks OAuth2 Service Principal credentials
+databricks_server_hostname: your-workspace.cloud.databricks.com
+databricks_warehouse_http_path: /sql/1.0/warehouses/your-warehouse-id
+databricks_client_id: your-service-principal-client-id
+databricks_client_secret: your-service-principal-client-secret
