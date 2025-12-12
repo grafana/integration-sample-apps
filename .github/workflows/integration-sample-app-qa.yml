@@ -14,7 +14,7 @@ jobs:
     name: Check for changed sample apps
     runs-on: ubuntu-latest
     outputs:
-      changed-sample-apps: ${{ steps.changed-files.outputs.all_changed_files }}
+      changed-sample-apps: ${{ steps.filtered-changes.outputs.filtered-dirs }}
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -32,10 +32,18 @@ jobs:
           dir_names_max_depth: 1
           matrix: true
 
-      - name: List all changed sample app dir_names
+      - name: Filter out windows
+        id: filtered-changes
+        run: |
+          ALL_CHANGED_DIRS='${{ steps.changed-files.outputs.all_changed_files }}'
+          # Remove windows from the JSON array
+          FILTERED_DIRS=$(echo "$ALL_CHANGED_DIRS" | jq -r '. - ["windows"]')
+          echo "filtered-dirs=$FILTERED_DIRS" >> $GITHUB_OUTPUT
+
+      - name: List all changed sample app dir_names (filtered)
         # NOTE: this is referred to as a file by the action, despite technically being a chunk of the directory in use
         env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          ALL_CHANGED_FILES: ${{ steps.filtered-changes.outputs.filtered-dirs }}
         run: echo "${ALL_CHANGED_FILES}"
 
   sample-app-testing:
