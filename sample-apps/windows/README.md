@@ -17,11 +17,11 @@ To get started with the sample app, follow these steps:
 1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
-   cd integration-sample-apps/windows-node
+   cd sample-apps/windows
    ```
 
 2. **Set up default config**: 
-   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `config/alloy-config.yaml` to connect Alloy to an external Prometheus compatible TSDB and/or Loki server.
+   Execute `make defaultconfig` to create a template file with default configuration variables. Modify `config/alloy-config.alloy` to connect Alloy to an external Prometheus compatible TSDB and/or Loki server.
 
 3. **Run the sample app**: 
    Use `make run` to start the Windows sample app.
