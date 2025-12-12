@@ -31,6 +31,12 @@ runcmd:
   # Configure local user password, needed for Alloy access
   - sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'sekret';"
 
+  # Create pg_stat_statements extension
+  - sudo -u postgres psql -c "CREATE EXTENSION pg_stat_statements;"
+
+  # Grant pg_monitor to postgres user
+  - sudo -u postgres psql -c "GRANT pg_monitor to postgres;"
+
   # Restart Alloy for good measure
   - sudo systemctl restart alloy.service
 
@@ -104,6 +110,7 @@ write_files:
     }
     prometheus.exporter.postgres "integrations_postgres_exporter" {
       data_source_names = ["postgresql://postgres:sekret@localhost:5432/postgres?sslmode=disable"]
+      enabled_collectors = ["stat_statements", "postmaster", "statio_user_indexes", "long_running_transactions", "database", "locks", "replication", "stat_bgwriter", "stat_database", "stat_user_tables"]
     }
     discovery.relabel "integrations_postgres_exporter" {
       targets = prometheus.exporter.postgres.integrations_postgres_exporter.targets
