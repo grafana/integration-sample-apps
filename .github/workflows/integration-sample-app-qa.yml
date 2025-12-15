@@ -17,7 +17,7 @@ jobs:
       changed-sample-apps: ${{ steps.filtered-changes.outputs.filtered-dirs }}
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -63,7 +63,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
 
@@ -115,7 +115,7 @@ jobs:
 
       - name: Checkout repo
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
 
