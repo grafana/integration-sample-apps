@@ -23,7 +23,7 @@ engine: gotpl
 home: https://github.com/observiq/application-helm-charts/tree/main/charts/apache-airflow
 dependencies:
   - name: postgresql
-    version: 18.1.10
+    version: 18.2.0
     repository: https://charts.bitnami.com/bitnami
     condition: postgresql.enabled
 keywords:
