@@ -242,15 +242,6 @@ The exporter collects 18 metrics across four categories:
 - Review metric cardinality with `databricks_*` queries in Prometheus
 - Consider metric relabeling to drop high-cardinality labels (see `alloy-advanced.alloy` for examples)
 
-## Make Commands
-
-This runbook provides validation commands:
-
-- `make validate-config` - Validate Alloy configuration syntax
-- `make test` - Run metric validation tests
-- `make clean` - Clean up temporary files
-- `make help` - Show available commands
-
 ## Additional Resources
 
 - [Databricks OAuth2 M2M Documentation](https://docs.databricks.com/en/dev-tools/auth/oauth-m2m.html)
