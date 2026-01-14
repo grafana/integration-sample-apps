@@ -37,7 +37,7 @@ jobs:
         run: |
           ALL_CHANGED_DIRS='${{ steps.changed-files.outputs.all_changed_files }}'
           # Remove windows from the JSON array
-          FILTERED_DIRS=$(echo "$ALL_CHANGED_DIRS" | jq -r '. - ["windows"]')
+          FILTERED_DIRS=$(echo "$ALL_CHANGED_DIRS" | jq -c '. - ["windows"]')
           echo "filtered-dirs=$FILTERED_DIRS" >> $GITHUB_OUTPUT
 
       - name: List all changed sample app dir_names (filtered)
