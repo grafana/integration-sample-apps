@@ -1,0 +1,43 @@
+// Simple Databricks monitoring configuration for Grafana Alloy
+//
+// This configuration:
+// - Scrapes metrics from Databricks System Tables using the built-in exporter
+// - Forwards metrics to Grafana Cloud (or any Prometheus-compatible endpoint)
+// - Uses environment variables for sensitive credentials
+//
+// Prerequisites:
+// - Databricks workspace with Unity Catalog enabled
+// - Service Principal with OAuth2 credentials
+// - SQL Warehouse configured and accessible
+//
+// Set environment variables before starting Alloy:
+//   export DATABRICKS_CLIENT_ID="your-application-id"
+//   export DATABRICKS_CLIENT_SECRET="your-client-secret"
+//   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+//   export PROMETHEUS_USER="your-prometheus-username"
+//   export PROMETHEUS_PASS="your-prometheus-password"
+
+prometheus.exporter.databricks "example" {
+  server_hostname     = "dbc-abc123-def456.cloud.databricks.com"  // Replace with your workspace hostname
+  warehouse_http_path = "/sql/1.0/warehouses/abc123def456"         // Replace with your SQL Warehouse HTTP path
+  client_id           = env("DATABRICKS_CLIENT_ID")
+  client_secret       = env("DATABRICKS_CLIENT_SECRET")
+}
+
+prometheus.scrape "databricks" {
+  targets         = prometheus.exporter.databricks.example.targets
+  forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+  scrape_interval = "10m"
+  scrape_timeout  = "9m"
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("PROMETHEUS_USER")
+      password = env("PROMETHEUS_PASS")
+    }
+  }
+}

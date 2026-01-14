@@ -1,0 +1,74 @@
+// Advanced Databricks monitoring configuration for Grafana Alloy
+//
+// This configuration includes all optional parameters and tuning options.
+// Use this as a reference for customizing your setup.
+//
+// Prerequisites:
+// - Databricks workspace with Unity Catalog enabled
+// - Service Principal with OAuth2 credentials
+// - SQL Warehouse configured and accessible
+//
+// Set environment variables before starting Alloy:
+//   export DATABRICKS_CLIENT_ID="your-application-id"
+//   export DATABRICKS_CLIENT_SECRET="your-client-secret"
+//   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+//   export PROMETHEUS_USER="your-prometheus-username"
+//   export PROMETHEUS_PASS="your-prometheus-password"
+
+prometheus.exporter.databricks "example" {
+  // Required parameters
+  server_hostname     = "dbc-abc123-def456.cloud.databricks.com"  // Replace with your workspace hostname
+  warehouse_http_path = "/sql/1.0/warehouses/abc123def456"         // Replace with your SQL Warehouse HTTP path
+  client_id           = env("DATABRICKS_CLIENT_ID")
+  client_secret       = env("DATABRICKS_CLIENT_SECRET")
+
+  // Optional tuning parameters
+  query_timeout          = "5m"    // Timeout for individual SQL queries
+  billing_lookback       = "24h"   // How far back to query billing data (Databricks billing has 24-48h lag)
+  jobs_lookback          = "3h"    // How far back to query job runs
+  pipelines_lookback     = "3h"    // How far back to query pipeline runs
+  queries_lookback       = "2h"    // How far back to query SQL warehouse queries
+  sla_threshold_seconds  = 3600    // Duration threshold (seconds) for job SLA miss detection
+  collect_task_retries   = false   // ⚠️ HIGH CARDINALITY: Collect task-level retry metrics (adds task_key label)
+}
+
+prometheus.scrape "databricks" {
+  targets         = prometheus.exporter.databricks.example.targets
+  forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+  scrape_interval = "10m"  // Recommended: 10-30 minutes (queries can be slow and costly)
+  scrape_timeout  = "9m"   // Must be < scrape_interval; typical scrapes take 90-120s
+
+  // Optional: Enable clustering for high availability
+  clustering {
+    enabled = true
+  }
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("PROMETHEUS_USER")
+      password = env("PROMETHEUS_PASS")
+    }
+  }
+}
+
+// Optional: Add metric relabeling to reduce cardinality or filter metrics
+prometheus.relabel "databricks_metrics" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+
+  // Example: Drop high-cardinality labels if needed
+  // rule {
+  //   source_labels = ["task_key"]
+  //   action        = "labeldrop"
+  // }
+
+  // Example: Keep only specific metrics
+  // rule {
+  //   source_labels = ["__name__"]
+  //   regex         = "databricks_(up|billing_.*|job_run_status_total)"
+  //   action        = "keep"
+  // }
+}
