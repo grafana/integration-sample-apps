@@ -6,16 +6,16 @@
 // - Uses environment variables for sensitive credentials
 //
 // Prerequisites:
-// - Databricks workspace with Unity Catalog enabled
-// - Service Principal with OAuth2 credentials
-// - SQL Warehouse configured and accessible
+// - Databricks workspace with Unity Catalog and System Tables enabled
+// - Service Principal with OAuth2 M2M authentication configured
+// - SQL Warehouse for querying System Tables (serverless recommended for cost efficiency)
 //
 // Set environment variables before starting Alloy:
-//   export DATABRICKS_CLIENT_ID="your-application-id"
-//   export DATABRICKS_CLIENT_SECRET="your-client-secret"
+//   export DATABRICKS_CLIENT_ID="<your-service-principal-client-id>"
+//   export DATABRICKS_CLIENT_SECRET="<your-service-principal-client-secret>"
 //   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
-//   export PROMETHEUS_USER="your-prometheus-username"
-//   export PROMETHEUS_PASS="your-prometheus-password"
+//   export PROMETHEUS_USER="<your-prometheus-username>"
+//   export PROMETHEUS_PASS="<your-prometheus-password>"
 
 prometheus.exporter.databricks "example" {
   server_hostname     = "dbc-abc123-def456.cloud.databricks.com"  // Replace with your workspace hostname
@@ -24,11 +24,12 @@ prometheus.exporter.databricks "example" {
   client_secret       = env("DATABRICKS_CLIENT_SECRET")
 }
 
+// Configure a prometheus.scrape component to collect databricks metrics.
 prometheus.scrape "databricks" {
   targets         = prometheus.exporter.databricks.example.targets
   forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
-  scrape_interval = "10m"
-  scrape_timeout  = "9m"
+  scrape_interval = "10m"  // Recommended: 10-30 minutes
+  scrape_timeout  = "9m"   // Must be < scrape_interval
 }
 
 prometheus.remote_write "grafana_cloud" {
