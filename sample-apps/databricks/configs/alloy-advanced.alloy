@@ -1,0 +1,83 @@
+// Advanced Databricks monitoring configuration for Grafana Alloy
+//
+// This configuration includes all optional parameters and tuning options.
+// Use this as a reference for customizing your setup.
+//
+// Prerequisites:
+// - Databricks workspace with Unity Catalog and System Tables enabled
+// - Service Principal with OAuth2 M2M authentication configured
+// - SQL Warehouse for querying System Tables (serverless recommended for cost efficiency)
+//
+// Tuning recommendations:
+// - Lookback windows should be at least 2x the scrape_interval to ensure data continuity
+// - With a 10-minute scrape interval, use at least 20 minutes of lookback
+// - Increase scrape_interval to 20-30 minutes to reduce SQL Warehouse costs
+//
+// Set environment variables before starting Alloy:
+//   export DATABRICKS_CLIENT_ID="<your-service-principal-client-id>"
+//   export DATABRICKS_CLIENT_SECRET="<your-service-principal-client-secret>"
+//   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+//   export PROMETHEUS_USER="<your-prometheus-username>"
+//   export PROMETHEUS_PASS="<your-prometheus-password>"
+
+prometheus.exporter.databricks "example" {
+  // Required parameters
+  server_hostname     = "dbc-abc123-def456.cloud.databricks.com"  // Replace with your workspace hostname
+  warehouse_http_path = "/sql/1.0/warehouses/abc123def456"         // Replace with your SQL Warehouse HTTP path
+  client_id           = env("DATABRICKS_CLIENT_ID")
+  client_secret       = env("DATABRICKS_CLIENT_SECRET")
+
+  // Optional tuning parameters (all have defaults)
+  query_timeout          = "5m"    // Timeout for individual SQL queries (default: 5m)
+  billing_lookback       = "24h"   // How far back to query billing data (default: 24h, Databricks billing has 24-48h lag)
+  jobs_lookback          = "3h"    // How far back to query job runs (default: 3h)
+  pipelines_lookback     = "3h"    // How far back to query pipeline runs (default: 3h)
+  queries_lookback       = "2h"    // How far back to query SQL warehouse queries (default: 2h)
+  sla_threshold_seconds  = 3600    // Duration threshold in seconds for job SLA miss detection (default: 3600)
+  collect_task_retries   = false   // Collect task retry metrics (default: false) ⚠️ HIGH CARDINALITY: adds task_key label
+}
+
+// Configure a prometheus.scrape component to collect databricks metrics.
+prometheus.scrape "databricks" {
+  targets         = prometheus.exporter.databricks.example.targets
+  forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+  scrape_interval = "10m"  // Recommended: 10-30 minutes (System Table queries can be slow and costly)
+  scrape_timeout  = "9m"   // Must be < scrape_interval (typical scrapes take 90-120s)
+
+  // Optional: Enable clustering for high availability
+  clustering {
+    enabled = true
+  }
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("PROMETHEUS_USER")
+      password = env("PROMETHEUS_PASS")
+    }
+  }
+}
+
+// Optional: Add metric relabeling to reduce cardinality or filter metrics
+// To use this, change the prometheus.scrape forward_to to:
+//   forward_to = [prometheus.relabel.databricks_metrics.receiver]
+//
+// prometheus.relabel "databricks_metrics" {
+//   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+//
+//   // Example: Drop high-cardinality labels if needed
+//   rule {
+//     source_labels = ["task_key"]
+//     action        = "labeldrop"
+//   }
+//
+//   // Example: Keep only specific metrics
+//   rule {
+//     source_labels = ["__name__"]
+//     regex         = "databricks_(up|billing_.*|job_run_status_total)"
+//     action        = "keep"
+//   }
+// }
