@@ -1,0 +1,3 @@
+# Pinecone is a cloud-hosted SaaS service that cannot be spun up locally.
+# This runbook provides manual setup instructions for existing Pinecone projects.
+# Configuration validation tests can still run in CI.

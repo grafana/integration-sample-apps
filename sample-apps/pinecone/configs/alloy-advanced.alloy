@@ -1,0 +1,73 @@
+// Advanced Pinecone monitoring configuration for Grafana Alloy
+//
+// This configuration includes:
+// - Relabeling to add project_id labels for metric distinction
+// - All optional parameters and tuning options
+//
+// Prerequisites:
+// - Pinecone account with Standard or Enterprise plan
+// - API key with access to your Pinecone project
+//
+// Tuning recommendations:
+// - refresh_interval: Use 1 minute to keep up with dynamic index changes
+// - scrape_interval: Use 15 seconds (as recommended by Pinecone docs)
+// - scrape_timeout: Set to 30 seconds for most use cases
+//
+// Set environment variables before starting Alloy:
+//   export PINECONE_API_KEY="<your-api-key>"
+//   export PINECONE_PROJECT_ID="<your-project-id>"
+//   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+//   export PROMETHEUS_USER="<your-prometheus-username>"
+//   export PROMETHEUS_PASS="<your-prometheus-password>"
+
+discovery.http "pinecone" {
+  url = "https://api.pinecone.io/prometheus/projects/" + env("PINECONE_PROJECT_ID") + "/metrics/discovery"
+  refresh_interval = "1m"
+  
+  authorization {
+    type        = "Bearer"
+    credentials = env("PINECONE_API_KEY")
+  }
+}
+
+// Relabel discovery targets to add project_id label for metric distinction
+discovery.relabel "pinecone" {
+  targets = discovery.http.pinecone.targets
+  
+  // Add project_id label extracted from the discovery URL
+  rule {
+    source_labels = ["__meta_http_sd_url"]
+    regex         = ".*/projects/([^/]+)/.*"
+    target_label  = "project_id"
+    replacement   = "${1}"
+  }
+}
+
+prometheus.scrape "pinecone" {
+  targets    = discovery.relabel.pinecone.output
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+  
+  scrape_interval = "15s"
+  scrape_timeout  = "30s"
+  
+  // Authorization for scraping discovered targets
+  authorization {
+    type        = "Bearer"
+    credentials = env("PINECONE_API_KEY")
+  }
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("PROMETHEUS_USER")
+      password = env("PROMETHEUS_PASS")
+    }
+  }
+}
+
+// To monitor multiple projects, duplicate the discovery.http, discovery.relabel, and
+// prometheus.scrape blocks above with different component names and environment variables.
+// The project_id label will automatically distinguish metrics from different projects.

@@ -1,0 +1,53 @@
+// Simple Pinecone monitoring configuration for Grafana Alloy
+//
+// This configuration:
+// - Discovers and scrapes metrics from Pinecone's built-in Prometheus exporter
+// - Monitors all serverless indexes in a single project
+// - Forwards metrics to Grafana Cloud
+// - Uses environment variables for sensitive credentials
+//
+// Prerequisites:
+// - Pinecone account with Standard or Enterprise plan
+// - API key with access to your Pinecone project
+//
+// Set environment variables before starting Alloy:
+//   export PINECONE_API_KEY="<your-api-key>"
+//   export PINECONE_PROJECT_ID="<your-project-id>"
+//   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+//   export PROMETHEUS_USER="<your-prometheus-username>"
+//   export PROMETHEUS_PASS="<your-prometheus-password>"
+
+discovery.http "pinecone" {
+  url = "https://api.pinecone.io/prometheus/projects/" + env("PINECONE_PROJECT_ID") + "/metrics/discovery"
+  refresh_interval = "1m"
+  
+  authorization {
+    type        = "Bearer"
+    credentials = env("PINECONE_API_KEY")
+  }
+}
+
+prometheus.scrape "pinecone" {
+  targets    = discovery.http.pinecone.targets
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+  
+  scrape_interval = "15s"
+  scrape_timeout  = "30s"
+  
+  // Authorization for scraping discovered targets
+  authorization {
+    type        = "Bearer"
+    credentials = env("PINECONE_API_KEY")
+  }
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("PROMETHEUS_URL")
+
+    basic_auth {
+      username = env("PROMETHEUS_USER")
+      password = env("PROMETHEUS_PASS")
+    }
+  }
+}
