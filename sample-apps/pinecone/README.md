@@ -155,6 +155,17 @@ sum by (index_name) (rate(pinecone_db_read_unit_count[5m]))
 sum (rate(pinecone_db_write_unit_count{index_name="docs-example"}[5m]))
 ```
 
+### Load Generation
+
+Generate test data with the [load generator](scripts/README.md):
+
+```bash
+export PINECONE_API_KEY="your-api-key"
+cd scripts
+go mod download
+go run loadgen.go
+```
+
 ## Metrics Collected
 
 Pinecone's built-in Prometheus exporter provides the following metrics as documented in the [official Pinecone documentation](https://docs.pinecone.io/guides/production/monitoring#monitor-with-prometheus):
