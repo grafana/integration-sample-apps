@@ -190,7 +190,7 @@ Each metric contains the following labels:
 - `capacity_mode` - Type of index: `serverless` or `byoc`
 - `instance` - Server instance (only available for counter metrics)
 
-**Note:** Some metric names changed on December 19, 2025. The current names listed above are the latest. For historical reference, see the [Pinecone monitoring documentation](https://docs.pinecone.io/guides/production/monitoring#monitor-with-prometheus).
+**Note:** Some metric names changed on December 19, 2025.The metrics listed are accurate as of writing. For historical reference, see the [Pinecone monitoring documentation](https://docs.pinecone.io/guides/production/monitoring#monitor-with-prometheus).
 
 ## Troubleshooting
 
