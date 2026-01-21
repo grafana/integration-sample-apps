@@ -16,7 +16,7 @@
 // Set environment variables before starting Alloy:
 //   export PINECONE_API_KEY="<your-api-key>"
 //   export PINECONE_PROJECT_ID="<your-project-id>"
-//   export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+//   export PROMETHEUS_URL="<your-prom-host>"
 //   export PROMETHEUS_USER="<your-prometheus-username>"
 //   export PROMETHEUS_PASS="<your-prometheus-password>"
 
@@ -47,8 +47,8 @@ prometheus.scrape "pinecone" {
   targets    = discovery.relabel.pinecone.output
   forward_to = [prometheus.remote_write.grafana_cloud.receiver]
   
-  scrape_interval = "15s"
-  scrape_timeout  = "30s"
+  scrape_interval = "1m"
+  scrape_timeout  = "2m"
   
   // Authorization for scraping discovered targets
   authorization {

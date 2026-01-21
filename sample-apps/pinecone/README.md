@@ -79,7 +79,7 @@ Store sensitive credentials as environment variables:
 ```bash
 export PINECONE_API_KEY="your-api-key"
 export PINECONE_PROJECT_ID="your-project-id"
-export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+export PROMETHEUS_URL="your-prom-host"
 export PROMETHEUS_USER="your-prometheus-username"
 export PROMETHEUS_PASS="your-prometheus-password"
 ```
@@ -88,17 +88,17 @@ export PROMETHEUS_PASS="your-prometheus-password"
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `url` | Required | Pinecone discovery endpoint URL (e.g., `https://api.pinecone.io/prometheus/projects/<project-ID>/metrics/discovery`) |
+| `url` | Required | Pinecone discovery endpoint URL (e.g., `https://api.pinecone.io/prometheus/projects/<your-project-ID>/metrics/discovery`) |
 | `api_key` | Required | Pinecone API key for authentication |
 | `refresh_interval` | `1m` | How often to refresh the service discovery targets |
-| `scrape_interval` | `15s` | How often to scrape metrics from Pinecone (recommended: 15s-1m) |
-| `scrape_timeout` | `30s` | Timeout for individual metric scrapes |
+| `scrape_interval` | `1m` | How often to scrape metrics from Pinecone (recommended:1m) |
+| `scrape_timeout` | `2m` | Timeout for individual metric scrapes |
 
 ### Tuning Recommendations
 
 - **`refresh_interval`**: Use 1 minute. Pinecone's service discovery endpoint provides dynamic target information that may change as indexes are created or deleted.
-- **`scrape_interval`**: The [Pinecone documentation](https://docs.pinecone.io/guides/production/monitoring#monitor-with-prometheus) recommends 15 seconds, but you can adjust based on your needs (15s-1m). More frequent scraping provides better granularity but increases API usage.
-- **`scrape_timeout`**: Set to 30 seconds. Most scrapes complete quickly, but allow time for multiple index endpoints.
+- **`scrape_interval`**: The [Pinecone documentation](https://docs.pinecone.io/guides/production/monitoring#monitor-with-prometheus) recommends 1 minute.
+- **`scrape_timeout`**: Set to 2 minutes. Most scrapes complete quickly, but allow time for multiple index endpoints.
 
 ### Multiple Projects
 
@@ -209,7 +209,7 @@ Each metric contains the following labels:
 **Symptom**: `pinecone_db_record_total` returns no data
 
 **Solution**:
-- Verify the discovery endpoint is accessible: `curl -H "Authorization: Bearer <key>" "https://api.pinecone.io/prometheus/projects/<project-ID>/metrics/discovery"`
+- Verify the discovery endpoint is accessible: `curl -H "Authorization: Bearer <key>" "https://api.pinecone.io/prometheus/projects/<your-project-ID>/metrics/discovery"`
 - Check that you have at least one index in your project (empty projects may not expose metrics)
 - Verify your Pinecone plan supports Prometheus monitoring
 - Check Alloy logs for service discovery errors
