@@ -96,7 +96,7 @@ Store sensitive credentials as environment variables:
 ```bash
 export DATABRICKS_CLIENT_ID="your-application-id"
 export DATABRICKS_CLIENT_SECRET="your-client-secret"
-export PROMETHEUS_URL="https://prometheus-prod-us-central1.grafana.net/api/prom/push"
+export PROMETHEUS_URL="your-prom-host"
 export PROMETHEUS_USER="your-prometheus-username"
 export PROMETHEUS_PASS="your-prometheus-password"
 ```
