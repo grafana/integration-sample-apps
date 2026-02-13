@@ -5,14 +5,6 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 sudo apt-get update && sudo apt-get install -y docker.io 
 
-cd /home/ubuntu/configs/oracle-client-installer
-sudo docker build -t oracle/oracle-client-installer:0.0.1 .
-sudo docker image save -o oracle-client-installer.tar oracle/oracle-client-installer:0.0.1
-sudo ctr images import oracle-client-installer.tar
-
-rm -rf /home/ubuntu/configs/oracle-client-installer/oracle-client-installer.tar
-
-
 cd /home/ubuntu/configs
 
 # Setup Oracle Instant Client with PVC
