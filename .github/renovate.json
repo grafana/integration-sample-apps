@@ -12,8 +12,8 @@
       "description": "Group all updates by sample-app subfolder",
       "matchPaths": ["sample-apps/**"],
       "matchFileNames": ["sample-apps/**/*"],
-      "groupName": "sample-app updates",
-      "groupSlug": "sample-app-updates"
+      "additionalBranchPrefix": "{{#if isGroup }}{{ else }}{{packageFileDir}}/{{/if}}",
+      "commitMessageSuffix": "{{#if isGroup }}{{ else }} ({{packageFileDir}}){{/if}}"
     }
   ]
 }
