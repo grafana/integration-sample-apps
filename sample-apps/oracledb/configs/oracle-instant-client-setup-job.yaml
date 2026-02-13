@@ -10,7 +10,7 @@ spec:
       restartPolicy: OnFailure
       initContainers:
       - name: download-oracle-client
-        image: oracle/oracle-client-installer:0.0.1
+        image: ghcr.io/oracle/oraclelinux9-instantclient:23
         command:
         - /bin/sh
         - -c
