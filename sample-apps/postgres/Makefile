@@ -1,47 +1,90 @@
-VM_NAME ?= postgres-sample-app
-CONFIG_FILE_DIR := jinja/variables
-CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
-LOKI_INSTANCE ?= your-loki-instance:3100
+PRIMARY_VM_NAME   ?= postgres-primary
+SECONDARY_VM_NAME ?= postgres-secondary
+CONFIG_FILE_DIR   := jinja/variables
+CONFIG_FILE       := $(CONFIG_FILE_DIR)/cloud-init.yaml
+LOKI_INSTANCE     ?= your-loki-instance:3100
 PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
 
 # Import last to ensure expected parameters are set and available to import from this file
 include ../Makefile
 
-.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
+.PHONY: run run-primary run-secondary run-ci stop wait-primary \
+        render-primary-config render-secondary-config \
+        launch-primary launch-secondary \
+        load-gen fetch-prometheus-metrics clean defaultconfig
 
-run: launch-vm
-	@echo "VM $(VM_NAME) launched and configured."
+# Launch the full primary + secondary cluster
+run: launch-primary wait-primary launch-secondary
+	@echo "Cluster ready: primary=$(PRIMARY_VM_NAME) secondary=$(SECONDARY_VM_NAME)"
 
-run-ci: clean defaultconfig launch-vm load-gen
+run-primary: launch-primary wait-primary
+	@echo "Primary $(PRIMARY_VM_NAME) is ready."
+
+run-secondary: launch-secondary
+	@echo "Secondary $(SECONDARY_VM_NAME) is ready."
+
+run-ci: clean defaultconfig run load-gen
 	@echo "Running in CI mode"
 
+# Poll until the primary has finished its cloud-init postgres setup
+wait-primary:
+	@echo "Waiting for primary postgres initialization..."
+	@until multipass exec $(PRIMARY_VM_NAME) -- test -f /tmp/postgres-initialized 2>/dev/null; do \
+		printf '.'; sleep 5; \
+	done
+	@echo " ready."
+
 stop:
-	@multipass stop $(VM_NAME)
-	@multipass delete $(VM_NAME)
+	@multipass stop $(PRIMARY_VM_NAME) $(SECONDARY_VM_NAME) 2>/dev/null || true
+	@multipass delete $(PRIMARY_VM_NAME) $(SECONDARY_VM_NAME) 2>/dev/null || true
 	@multipass purge
 
 fetch-prometheus-metrics:
-	@multipass exec $(VM_NAME) -- curl http://localhost:9127/metrics > prometheus_metrics
+	@multipass exec $(PRIMARY_VM_NAME) -- curl -s http://localhost:9187/metrics > prometheus_metrics
 
 load-gen:
-	@multipass exec $(VM_NAME) -- sudo bash -c "sudo su postgres -c 'pgbench -i -s 10; pgbench -c 50 -T 60; exit;'"
+	@multipass exec $(PRIMARY_VM_NAME) -- bash -c \
+		"nohup sudo -u postgres bash /opt/traffic/load.sh 86400 > /tmp/traffic.log 2>&1 &"
+	@echo "Traffic generator started on $(PRIMARY_VM_NAME)."
 
-render-config:
-	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
+render-primary-config:
+	@docker run --rm \
+		-v $(shell pwd)/jinja/templates:/templates \
+		-v $(shell pwd)/jinja/variables:/variables \
+		dinutac/jinja2docker:latest \
+		/templates/cloud-init-primary-template.yaml \
+		/variables/cloud-init.yaml \
+		--format=yaml > cloud-init-primary.yaml
 
-launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --cloud-init cloud-init.yaml
+render-secondary-config:
+	@PRIMARY_IP=$$(multipass info $(PRIMARY_VM_NAME) 2>/dev/null | grep IPv4 | awk '{print $$2}') && \
+	cp jinja/variables/cloud-init.yaml jinja/variables/cloud-init-secondary.yaml && \
+	echo "primary_ip: '$$PRIMARY_IP'" >> jinja/variables/cloud-init-secondary.yaml && \
+	docker run --rm \
+		-v $(shell pwd)/jinja/templates:/templates \
+		-v $(shell pwd)/jinja/variables:/variables \
+		dinutac/jinja2docker:latest \
+		/templates/cloud-init-secondary-template.yaml \
+		/variables/cloud-init-secondary.yaml \
+		--format=yaml > cloud-init-secondary.yaml && \
+	rm -f jinja/variables/cloud-init-secondary.yaml
+
+launch-primary: render-primary-config
+	@multipass launch -n $(PRIMARY_VM_NAME) --cloud-init cloud-init-primary.yaml
+
+launch-secondary: render-secondary-config
+	@multipass launch -n $(SECONDARY_VM_NAME) --cloud-init cloud-init-secondary.yaml
 
 clean:
-	@rm -f cloud-init.yaml
+	@rm -f cloud-init.yaml cloud-init-primary.yaml cloud-init-secondary.yaml
 	@rm -rf $(CONFIG_FILE_DIR)
 
 defaultconfig:
 	@mkdir -p $(CONFIG_FILE_DIR)
-	@echo "interval: \"10s\"" >> jinja/variables/cloud-init.yaml
-	@echo "loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
-	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
-	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
-	@echo "prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push" >> jinja/variables/cloud-init.yaml
-	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml
-	@echo "prom_pass: your_prometheus_password" >> jinja/variables/cloud-init.yaml
+	@printf 'interval: "10s"\n\
+loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push\n\
+loki_user: your_loki_username\n\
+loki_pass: your_loki_password\n\
+prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push\n\
+prom_user: your_prometheus_username\n\
+prom_pass: your_prometheus_password\n' > jinja/variables/cloud-init.yaml

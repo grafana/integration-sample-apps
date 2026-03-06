@@ -1,0 +1,153 @@
+# jinja/templates/cloud-init-secondary-template.yaml
+# Cloud-init for the PostgreSQL secondary (hot standby) node
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+
+runcmd:
+  - sudo apt-get update
+  - sudo apt install postgresql postgresql-contrib -y
+  - sudo bash /opt/setup-secondary.sh
+  - sudo systemctl enable alloy.service
+  - sudo systemctl restart alloy.service
+
+write_files:
+- owner: root:root
+  path: /opt/setup-secondary.sh
+  permissions: '0755'
+  content: |
+    #!/bin/bash
+    set -e
+
+    PRIMARY_IP="{{ primary_ip }}"
+    PG_VERSION=$(ls /etc/postgresql/ | head -1)
+    PG_DATA="/var/lib/postgresql/${PG_VERSION}/main"
+
+    # Stop postgres and clear the data directory for basebackup
+    systemctl stop postgresql
+
+    rm -rf ${PG_DATA}
+    mkdir -p ${PG_DATA}
+    chown postgres:postgres ${PG_DATA}
+    chmod 700 ${PG_DATA}
+
+    # Store replication password so pg_basebackup and the standby can authenticate
+    echo "${PRIMARY_IP}:5432:replication:replicator:replication_secret" \
+        > /var/lib/postgresql/.pgpass
+    chmod 600 /var/lib/postgresql/.pgpass
+    chown postgres:postgres /var/lib/postgresql/.pgpass
+
+    # Basebackup: -R writes standby.signal + primary_conninfo into postgresql.auto.conf
+    sudo -u postgres pg_basebackup \
+        -h ${PRIMARY_IP} \
+        -U replicator \
+        -D ${PG_DATA} \
+        -Fp -Xs -P -R
+
+    # Start postgres as a hot standby
+    systemctl start postgresql
+
+    # Signal that initialization is complete
+    touch /tmp/postgres-initialized
+
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets         = discovery.relabel.alloy_check.output
+      forward_to      = [prometheus.relabel.alloy_check.receiver]
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+        {% if prom_user and prom_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.exporter.postgres "integrations_postgres_exporter" {
+      data_source_names  = ["postgresql://postgres:sekret@localhost:5432/postgres?sslmode=disable"]
+      enabled_collectors = ["database", "locks", "long_running_transactions", "postmaster", "replication", "stat_bgwriter", "stat_database", "stat_statements", "stat_user_tables", "statio_user_indexes"]
+    }
+
+    discovery.relabel "integrations_postgres_exporter" {
+      targets = prometheus.exporter.postgres.integrations_postgres_exporter.targets
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+      rule {
+        target_label = "job"
+        replacement  = "integrations/postgres_exporter"
+      }
+    }
+
+    prometheus.scrape "integrations_postgres_exporter" {
+      targets    = discovery.relabel.integrations_postgres_exporter.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/postgres_exporter"
+    }
+
+    local.file_match "logs_integrations_postgres_exporter" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/postgresql/postgresql-*.log",
+        instance    = constants.hostname,
+        job         = "integrations/postgres_exporter",
+      }]
+    }
+
+    loki.source.file "logs_integrations_postgres_exporter" {
+      targets    = local.file_match.logs_integrations_postgres_exporter.targets
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+    }

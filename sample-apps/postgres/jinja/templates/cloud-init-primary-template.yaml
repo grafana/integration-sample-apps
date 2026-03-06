@@ -1,0 +1,407 @@
+# jinja/templates/cloud-init-primary-template.yaml
+# Cloud-init for the PostgreSQL primary node (streaming replication cluster)
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+- bc
+
+runcmd:
+  - sudo apt-get update
+  - sudo apt install postgresql postgresql-contrib -y
+  - sudo systemctl start postgresql.service
+  - sudo bash /opt/setup-primary.sh
+  - sudo systemctl enable alloy.service
+  - sudo systemctl restart alloy.service
+
+write_files:
+- owner: root:root
+  path: /opt/setup-primary.sh
+  permissions: '0755'
+  content: |
+    #!/bin/bash
+    set -e
+
+    PG_VERSION=$(ls /etc/postgresql/ | head -1)
+    PG_HBA="/etc/postgresql/${PG_VERSION}/main/pg_hba.conf"
+
+    # Set postgres user password for Alloy access
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'sekret';"
+
+    # Create dedicated replication user
+    sudo -u postgres psql -c "CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD 'replication_secret';"
+
+    # Configure replication and observability settings
+    sudo -u postgres psql -c "ALTER SYSTEM SET listen_addresses = '*';"
+    sudo -u postgres psql -c "ALTER SYSTEM SET wal_level = 'replica';"
+    sudo -u postgres psql -c "ALTER SYSTEM SET max_wal_senders = 5;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET max_replication_slots = 5;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET hot_standby = on;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
+
+    # Allow replication and general connections from any host (dev environment)
+    echo "host replication replicator 0.0.0.0/0 md5" >> ${PG_HBA}
+    echo "host all all 0.0.0.0/0 md5" >> ${PG_HBA}
+
+    # Restart to apply all settings
+    systemctl restart postgresql
+
+    # Create pg_stat_statements extension and grant monitoring role
+    sudo -u postgres psql -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+    sudo -u postgres psql -c "GRANT pg_monitor TO postgres;"
+
+    # Install traffic generation scripts
+    mkdir -p /opt/traffic
+    cp /opt/traffic-src/schema.sql /opt/traffic/schema.sql
+    cp /opt/traffic-src/load.sh /opt/traffic/load.sh
+    chmod +x /opt/traffic/load.sh
+    sudo -u postgres psql -f /opt/traffic/schema.sql
+
+    # Signal that initialization is complete
+    touch /tmp/postgres-initialized
+
+- owner: root:root
+  path: /opt/traffic-src/schema.sql
+  content: |
+    CREATE TABLE IF NOT EXISTS users (
+        id          SERIAL PRIMARY KEY,
+        email       TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL,
+        status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'banned')),
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT NOT NULL,
+        category    TEXT NOT NULL,
+        price       NUMERIC(10, 2) NOT NULL,
+        stock       INTEGER NOT NULL DEFAULT 0,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER NOT NULL REFERENCES users(id),
+        status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
+        total       NUMERIC(10, 2) NOT NULL DEFAULT 0,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS order_items (
+        id          SERIAL PRIMARY KEY,
+        order_id    INTEGER NOT NULL REFERENCES orders(id),
+        product_id  INTEGER NOT NULL REFERENCES products(id),
+        quantity    INTEGER NOT NULL,
+        unit_price  NUMERIC(10, 2) NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_orders_user_id   ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
+    CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS idx_users_status      ON users(status);
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+
+    INSERT INTO users (email, name, status)
+    SELECT
+        'user' || i || '@example.com',
+        'User ' || i,
+        (ARRAY['active','active','active','inactive','banned'])[1 + (random()*4)::int]
+    FROM generate_series(1, 500) AS i
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO products (name, category, price, stock)
+    SELECT
+        'Product ' || i,
+        (ARRAY['electronics','clothing','food','books','sports'])[1 + (random()*4)::int],
+        (random() * 500 + 1)::numeric(10,2),
+        (random() * 1000)::int
+    FROM generate_series(1, 200) AS i
+    ON CONFLICT DO NOTHING;
+
+    DO $$
+    DECLARE
+        v_user_id    INTEGER;
+        v_order_id   INTEGER;
+        v_product_id INTEGER;
+        v_qty        INTEGER;
+        v_price      NUMERIC(10,2);
+        v_total      NUMERIC(10,2);
+    BEGIN
+        FOR i IN 1..300 LOOP
+            SELECT id INTO v_user_id FROM users ORDER BY random() LIMIT 1;
+            INSERT INTO orders (user_id, status, created_at)
+            VALUES (
+                v_user_id,
+                (ARRAY['pending','processing','shipped','delivered','cancelled'])[1 + (random()*4)::int],
+                NOW() - (random() * interval '30 days')
+            )
+            RETURNING id INTO v_order_id;
+
+            v_total := 0;
+            FOR j IN 1..(1 + (random()*4)::int) LOOP
+                SELECT id, price INTO v_product_id, v_price FROM products ORDER BY random() LIMIT 1;
+                v_qty := 1 + (random()*5)::int;
+                INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+                VALUES (v_order_id, v_product_id, v_qty, v_price);
+                v_total := v_total + v_qty * v_price;
+            END LOOP;
+
+            UPDATE orders SET total = v_total WHERE id = v_order_id;
+        END LOOP;
+    END;
+    $$;
+
+- owner: root:root
+  path: /opt/traffic-src/load.sh
+  permissions: '0755'
+  content: |
+    #!/usr/bin/env bash
+    # Continuous realistic PostgreSQL traffic generator.
+    # Usage: sudo -u postgres bash /opt/traffic/load.sh [duration_seconds]
+
+    set -euo pipefail
+
+    PGDB="${PGDB:-postgres}"
+    PGUSER="${PGUSER:-postgres}"
+    DURATION="${1:-3600}"
+
+    psql() { command psql -U "$PGUSER" -d "$PGDB" -q "$@"; }
+    psql_out() { command psql -U "$PGUSER" -d "$PGDB" -tAq "$@"; }
+
+    END=$((SECONDS + DURATION))
+    echo "Starting traffic generator. Running for ${DURATION}s against db=${PGDB} user=${PGUSER}"
+
+    workload_new_order() {
+        local user_id product_id qty price order_id total
+        user_id=$(psql_out -c "SELECT id FROM users WHERE status='active' ORDER BY random() LIMIT 1;")
+        [ -z "$user_id" ] && return
+        order_id=$(psql_out -c "INSERT INTO orders (user_id, status) VALUES ($user_id, 'pending') RETURNING id;")
+        total=0
+        for _ in $(seq 1 $((1 + RANDOM % 4))); do
+            read -r product_id price < <(psql_out -c "SELECT id, price FROM products WHERE stock > 0 ORDER BY random() LIMIT 1;" | tr '|' ' ')
+            [ -z "$product_id" ] && continue
+            qty=$((1 + RANDOM % 5))
+            psql -c "
+                INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+                VALUES ($order_id, $product_id, $qty, $price);
+                UPDATE products SET stock = GREATEST(0, stock - $qty) WHERE id = $product_id;
+            "
+            total=$(echo "$total + $qty * $price" | bc)
+        done
+        psql -c "UPDATE orders SET total = $total WHERE id = $order_id;"
+    }
+
+    workload_process_orders() {
+        psql -c "
+            UPDATE orders SET status = 'processing', updated_at = NOW()
+            WHERE status = 'pending'
+              AND created_at < NOW() - interval '1 minute'
+              AND id IN (SELECT id FROM orders WHERE status='pending' ORDER BY random() LIMIT 5);
+        "
+        psql -c "
+            UPDATE orders SET status = 'shipped', updated_at = NOW()
+            WHERE status = 'processing'
+              AND id IN (SELECT id FROM orders WHERE status='processing' ORDER BY random() LIMIT 3);
+        "
+        psql -c "
+            UPDATE orders SET status = 'delivered', updated_at = NOW()
+            WHERE status = 'shipped'
+              AND id IN (SELECT id FROM orders WHERE status='shipped' ORDER BY random() LIMIT 3);
+        "
+    }
+
+    workload_cancel_orders() {
+        psql -c "
+            UPDATE orders SET status = 'cancelled', updated_at = NOW()
+            WHERE status = 'pending'
+              AND id IN (SELECT id FROM orders WHERE status='pending' ORDER BY random() LIMIT 2);
+        "
+    }
+
+    workload_reads() {
+        local user_id
+        user_id=$(psql_out -c "SELECT id FROM users ORDER BY random() LIMIT 1;")
+        [ -z "$user_id" ] && return
+        psql -c "
+            SELECT o.id, o.status, o.total, COUNT(oi.id) AS items
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            WHERE o.user_id = $user_id
+            GROUP BY o.id, o.status, o.total
+            ORDER BY o.created_at DESC LIMIT 10;
+        " > /dev/null
+        psql -c "
+            SELECT category, COUNT(*) AS products, AVG(price)::numeric(10,2) AS avg_price, SUM(stock) AS total_stock
+            FROM products GROUP BY category ORDER BY total_stock DESC;
+        " > /dev/null
+        psql -c "
+            SELECT u.name, COUNT(DISTINCT o.id) AS orders, SUM(o.total)::numeric(10,2) AS revenue
+            FROM users u
+            JOIN orders o ON o.user_id = u.id
+            WHERE o.status = 'delivered' AND o.created_at > NOW() - interval '7 days'
+            GROUP BY u.name ORDER BY revenue DESC LIMIT 20;
+        " > /dev/null
+    }
+
+    workload_user_churn() {
+        psql -c "UPDATE users SET status = 'inactive', updated_at = NOW()
+            WHERE id IN (SELECT id FROM users WHERE status='active' ORDER BY random() LIMIT 2);"
+        psql -c "UPDATE users SET status = 'active', updated_at = NOW()
+            WHERE id IN (SELECT id FROM users WHERE status='inactive' ORDER BY random() LIMIT 3);"
+    }
+
+    workload_restock() {
+        psql -c "UPDATE products SET stock = stock + (50 + (random()*200)::int)
+            WHERE id IN (SELECT id FROM products WHERE stock < 50 ORDER BY random() LIMIT 10);"
+    }
+
+    workload_deadlock_safe() {
+        psql -c "
+            BEGIN;
+            UPDATE products SET stock = stock + 1
+              WHERE id IN (SELECT id FROM products ORDER BY id LIMIT 5) FOR UPDATE;
+            UPDATE products SET stock = stock - 1
+              WHERE id IN (SELECT id FROM products ORDER BY id LIMIT 5) FOR UPDATE;
+            COMMIT;
+        "
+    }
+
+    workload_cleanup() {
+        psql -c "
+            DELETE FROM order_items WHERE order_id IN (
+                SELECT id FROM orders WHERE status='cancelled'
+                AND created_at < NOW() - interval '15 minutes' LIMIT 5
+            );"
+        psql -c "
+            DELETE FROM orders WHERE status='cancelled'
+              AND created_at < NOW() - interval '15 minutes'
+              AND id NOT IN (SELECT DISTINCT order_id FROM order_items)
+              LIMIT 5;"
+    }
+
+    WORKLOADS=(
+        workload_reads workload_reads workload_reads workload_reads workload_reads
+        workload_new_order workload_new_order workload_new_order
+        workload_process_orders workload_process_orders
+        workload_cancel_orders
+        workload_user_churn
+        workload_restock
+        workload_deadlock_safe
+        workload_cleanup
+    )
+
+    i=0
+    while [ $SECONDS -lt $END ]; do
+        fn="${WORKLOADS[$((RANDOM % ${#WORKLOADS[@]}))]}"
+        $fn 2>/dev/null || true
+        i=$((i + 1))
+        if [ $((i % 50)) -eq 0 ]; then
+            echo "[$(date -u +%H:%M:%S)] $i ops completed, $((END - SECONDS))s remaining"
+        fi
+        if [ $((RANDOM % 10)) -eq 0 ]; then sleep $((1 + RANDOM % 3)); else sleep 0.2; fi
+    done
+    echo "Traffic generator finished after $i operations."
+
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets         = discovery.relabel.alloy_check.output
+      forward_to      = [prometheus.relabel.alloy_check.receiver]
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+        {% if prom_user and prom_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.exporter.postgres "integrations_postgres_exporter" {
+      data_source_names  = ["postgresql://postgres:sekret@localhost:5432/postgres?sslmode=disable"]
+      enabled_collectors = ["database", "locks", "long_running_transactions", "postmaster", "replication", "stat_bgwriter", "stat_database", "stat_statements", "stat_user_tables", "statio_user_indexes"]
+    }
+
+    discovery.relabel "integrations_postgres_exporter" {
+      targets = prometheus.exporter.postgres.integrations_postgres_exporter.targets
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+      rule {
+        target_label = "job"
+        replacement  = "integrations/postgres_exporter"
+      }
+    }
+
+    prometheus.scrape "integrations_postgres_exporter" {
+      targets    = discovery.relabel.integrations_postgres_exporter.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/postgres_exporter"
+    }
+
+    local.file_match "logs_integrations_postgres_exporter" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/postgresql/postgresql-*.log",
+        instance    = constants.hostname,
+        job         = "integrations/postgres_exporter",
+      }]
+    }
+
+    loki.source.file "logs_integrations_postgres_exporter" {
+      targets    = local.file_match.logs_integrations_postgres_exporter.targets
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+    }
