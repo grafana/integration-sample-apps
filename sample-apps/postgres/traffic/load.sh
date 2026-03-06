@@ -155,6 +155,54 @@ workload_cleanup() {
     "
 }
 
+# Hold a lock for ~2s to create visible contention on high-traffic rows
+workload_lock_contention() {
+    psql -c "
+        BEGIN;
+        SELECT id FROM products ORDER BY id LIMIT 10 FOR UPDATE;
+        SELECT pg_sleep(2);
+        UPDATE products SET stock = GREATEST(0, stock - 1)
+          WHERE id IN (SELECT id FROM products ORDER BY id LIMIT 10);
+        COMMIT;
+    " 2>/dev/null || true
+}
+
+# Slow sequential scan simulating a missing-index query
+workload_slow_scan() {
+    psql -c "
+        SELECT COUNT(*), SUM(total)
+        FROM orders
+        WHERE created_at > NOW() - interval '60 days'
+          AND total > (SELECT AVG(total) * 1.5 FROM orders);
+    " > /dev/null
+    psql -c "
+        SELECT u.email, COUNT(DISTINCT o.id) AS order_count,
+               SUM(oi.quantity * oi.unit_price)::numeric(12,2) AS lifetime_value
+        FROM users u
+        JOIN orders o ON o.user_id = u.id
+        JOIN order_items oi ON oi.order_id = o.id
+        GROUP BY u.email
+        ORDER BY lifetime_value DESC NULLS LAST
+        LIMIT 50;
+    " > /dev/null
+}
+
+# Long-running read that stays open to show up in long_running_transactions
+workload_long_read() {
+    psql -c "
+        BEGIN;
+        SELECT pg_sleep(3);
+        SELECT o.id, o.status, u.email, SUM(oi.unit_price * oi.quantity) AS total
+        FROM orders o
+        JOIN users u ON u.id = o.user_id
+        JOIN order_items oi ON oi.order_id = o.id
+        GROUP BY o.id, o.status, u.email
+        ORDER BY total DESC
+        LIMIT 20;
+        COMMIT;
+    " > /dev/null 2>&1 || true
+}
+
 # Weights: higher = more frequent
 WORKLOADS=(
     workload_reads workload_reads workload_reads workload_reads workload_reads
@@ -163,8 +211,11 @@ WORKLOADS=(
     workload_cancel_orders
     workload_user_churn
     workload_restock
-    workload_deadlock_safe
+    workload_deadlock_safe workload_deadlock_safe
     workload_cleanup
+    workload_lock_contention workload_lock_contention
+    workload_slow_scan workload_slow_scan
+    workload_long_read
 )
 
 i=0
@@ -177,11 +228,9 @@ while [ $SECONDS -lt $END ]; do
         echo "[$(date -u +%H:%M:%S)] $i ops completed, $((END - SECONDS))s remaining"
     fi
 
-    # Variable sleep: mostly fast, occasional pause
-    if [ $((RANDOM % 10)) -eq 0 ]; then
-        sleep $((1 + RANDOM % 3))
-    else
-        sleep 0.2
+    # Variable sleep: mostly no pause, occasional brief rest
+    if [ $((RANDOM % 20)) -eq 0 ]; then
+        sleep 1
     fi
 done
 

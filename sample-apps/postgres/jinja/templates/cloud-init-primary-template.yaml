@@ -303,7 +303,7 @@ write_files:
 
     i=0
     while [ $SECONDS -lt $END ]; do
-        fn="${WORKLOADS[$((RANDOM % ${#WORKLOADS[@]}))]}"
+{% raw %}        fn="${WORKLOADS[$((RANDOM % ${#WORKLOADS[@]}))]}"{% endraw %}
         $fn 2>/dev/null || true
         i=$((i + 1))
         if [ $((i % 50)) -eq 0 ]; then
@@ -383,6 +383,10 @@ write_files:
       rule {
         target_label = "job"
         replacement  = "integrations/postgres_exporter"
+      }
+      rule {
+        target_label = "cluster"
+        replacement  = "postgres-cluster"
       }
     }
 

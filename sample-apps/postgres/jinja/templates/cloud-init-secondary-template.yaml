@@ -130,6 +130,10 @@ write_files:
         target_label = "job"
         replacement  = "integrations/postgres_exporter"
       }
+      rule {
+        target_label = "cluster"
+        replacement  = "postgres-cluster"
+      }
     }
 
     prometheus.scrape "integrations_postgres_exporter" {
