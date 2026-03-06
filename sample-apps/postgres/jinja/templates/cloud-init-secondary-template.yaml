@@ -131,7 +131,7 @@ write_files:
         replacement  = "integrations/postgres_exporter"
       }
       rule {
-        target_label = "cluster"
+        target_label = "postgres_cluster"
         replacement  = "postgres-cluster"
       }
     }
