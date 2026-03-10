@@ -47,7 +47,7 @@ SELECT
     'user' || i || '@example.com',
     'User ' || i,
     (ARRAY['active','active','active','inactive','banned'])[1 + (random()*4)::int]
-FROM generate_series(1, 500) AS i
+FROM generate_series(1, 2000) AS i
 ON CONFLICT DO NOTHING;
 
 INSERT INTO products (name, category, price, stock)
@@ -56,20 +56,20 @@ SELECT
     (ARRAY['electronics','clothing','food','books','sports'])[1 + (random()*4)::int],
     (random() * 500 + 1)::numeric(10,2),
     (random() * 1000)::int
-FROM generate_series(1, 200) AS i
+FROM generate_series(1, 500) AS i
 ON CONFLICT DO NOTHING;
 
--- Seed some orders
+-- Seed orders
 DO $$
 DECLARE
-    v_user_id   INTEGER;
-    v_order_id  INTEGER;
+    v_user_id    INTEGER;
+    v_order_id   INTEGER;
     v_product_id INTEGER;
-    v_qty       INTEGER;
-    v_price     NUMERIC(10,2);
-    v_total     NUMERIC(10,2);
+    v_qty        INTEGER;
+    v_price      NUMERIC(10,2);
+    v_total      NUMERIC(10,2);
 BEGIN
-    FOR i IN 1..300 LOOP
+    FOR i IN 1..2000 LOOP
         SELECT id INTO v_user_id FROM users ORDER BY random() LIMIT 1;
         INSERT INTO orders (user_id, status, created_at)
         VALUES (

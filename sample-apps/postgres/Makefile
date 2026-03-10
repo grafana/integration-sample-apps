@@ -11,10 +11,10 @@ include ../Makefile
 .PHONY: run run-primary run-secondary run-ci stop wait-primary \
         render-primary-config render-secondary-config \
         launch-primary launch-secondary \
-        load-gen fetch-prometheus-metrics clean defaultconfig
+        setup-traffic load-gen fetch-prometheus-metrics clean defaultconfig
 
 # Launch the full primary + secondary cluster
-run: launch-primary wait-primary launch-secondary load-gen
+run: launch-primary wait-primary setup-traffic launch-secondary load-gen
 	@echo "Cluster ready: primary=$(PRIMARY_VM_NAME) secondary=$(SECONDARY_VM_NAME)"
 
 run-primary: launch-primary wait-primary
@@ -41,6 +41,16 @@ stop:
 
 fetch-prometheus-metrics:
 	@multipass exec $(PRIMARY_VM_NAME) -- curl -s http://localhost:9187/metrics > prometheus_metrics
+
+setup-traffic:
+	@multipass transfer traffic/schema.sql $(PRIMARY_VM_NAME):/tmp/schema.sql
+	@multipass transfer traffic/load.sh $(PRIMARY_VM_NAME):/tmp/load.sh
+	@multipass exec $(PRIMARY_VM_NAME) -- sudo mkdir -p /opt/traffic
+	@multipass exec $(PRIMARY_VM_NAME) -- sudo mv /tmp/schema.sql /opt/traffic/schema.sql
+	@multipass exec $(PRIMARY_VM_NAME) -- sudo mv /tmp/load.sh /opt/traffic/load.sh
+	@multipass exec $(PRIMARY_VM_NAME) -- sudo chmod +x /opt/traffic/load.sh
+	@multipass exec $(PRIMARY_VM_NAME) -- sudo -u postgres psql -f /opt/traffic/schema.sql
+	@echo "Traffic schema applied on $(PRIMARY_VM_NAME)."
 
 load-gen:
 	@multipass exec $(PRIMARY_VM_NAME) -- bash -c \
