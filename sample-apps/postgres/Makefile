@@ -14,7 +14,7 @@ include ../Makefile
         load-gen fetch-prometheus-metrics clean defaultconfig
 
 # Launch the full primary + secondary cluster
-run: launch-primary wait-primary launch-secondary
+run: launch-primary wait-primary launch-secondary load-gen
 	@echo "Cluster ready: primary=$(PRIMARY_VM_NAME) secondary=$(SECONDARY_VM_NAME)"
 
 run-primary: launch-primary wait-primary
@@ -44,7 +44,7 @@ fetch-prometheus-metrics:
 
 load-gen:
 	@multipass exec $(PRIMARY_VM_NAME) -- bash -c \
-		"nohup sudo -u postgres bash /opt/traffic/load.sh 86400 > /tmp/traffic.log 2>&1 &"
+		"nohup sudo -u postgres bash /opt/traffic/load.sh 86400 10 > /tmp/traffic.log 2>&1 &"
 	@echo "Traffic generator started on $(PRIMARY_VM_NAME)."
 
 render-primary-config:
