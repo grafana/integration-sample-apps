@@ -81,10 +81,10 @@ clean:
 
 defaultconfig:
 	@mkdir -p $(CONFIG_FILE_DIR)
-	@printf 'interval: "10s"\n\
-loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push\n\
-loki_user: your_loki_username\n\
-loki_pass: your_loki_password\n\
-prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push\n\
-prom_user: your_prometheus_username\n\
-prom_pass: your_prometheus_password\n' > jinja/variables/cloud-init.yaml
+	@printf 'interval: "10s"\n'                                                  > jinja/variables/cloud-init.yaml
+	@printf 'loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push\n'             >> jinja/variables/cloud-init.yaml
+	@printf 'loki_user: your_loki_username\n'                                  >> jinja/variables/cloud-init.yaml
+	@printf 'loki_pass: your_loki_password\n'                                  >> jinja/variables/cloud-init.yaml
+	@printf 'prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push\n'            >> jinja/variables/cloud-init.yaml
+	@printf 'prom_user: your_prometheus_username\n'                            >> jinja/variables/cloud-init.yaml
+	@printf 'prom_pass: your_prometheus_password\n'                            >> jinja/variables/cloud-init.yaml
