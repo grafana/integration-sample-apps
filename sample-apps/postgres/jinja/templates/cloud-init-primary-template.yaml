@@ -1,0 +1,170 @@
+# jinja/templates/cloud-init-primary-template.yaml
+# Cloud-init for the PostgreSQL primary node (streaming replication cluster)
+
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- git
+- gpg
+- alloy
+- bc
+
+runcmd:
+  - sudo apt-get update
+  - sudo apt install postgresql postgresql-contrib -y
+  - sudo systemctl start postgresql.service
+  - sudo bash /opt/setup-primary.sh
+  - sudo systemctl enable alloy.service
+  - sudo systemctl restart alloy.service
+
+write_files:
+- owner: root:root
+  path: /opt/setup-primary.sh
+  permissions: '0755'
+  content: |
+    #!/bin/bash
+    set -e
+
+    PG_VERSION=$(ls /etc/postgresql/ | head -1)
+    PG_HBA="/etc/postgresql/${PG_VERSION}/main/pg_hba.conf"
+
+    # Set postgres user password for Alloy access
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'sekret';"
+
+    # Create dedicated replication user
+    sudo -u postgres psql -c "CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD 'replication_secret';"
+
+    # Configure replication and observability settings
+    sudo -u postgres psql -c "ALTER SYSTEM SET listen_addresses = '*';"
+    sudo -u postgres psql -c "ALTER SYSTEM SET wal_level = 'replica';"
+    sudo -u postgres psql -c "ALTER SYSTEM SET max_wal_senders = 5;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET max_replication_slots = 5;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET hot_standby = on;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
+
+    # Logging: slow queries, connections, lock waits, temp files, DDL
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_min_duration_statement = 200;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_connections = on;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_disconnections = on;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_lock_waits = on;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_temp_files = 0;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_checkpoints = on;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_autovacuum_min_duration = 250;"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_statement = 'ddl';"
+    sudo -u postgres psql -c "ALTER SYSTEM SET log_line_prefix = '%t [%p]: user=%u,db=%d,app=%a,client=%h ';"
+
+    # Allow replication and general connections from any host (dev environment)
+    echo "host replication replicator 0.0.0.0/0 md5" >> ${PG_HBA}
+    echo "host all all 0.0.0.0/0 md5" >> ${PG_HBA}
+
+    # Restart to apply all settings (including loading auto_explain via shared_preload_libraries)
+    systemctl restart postgresql
+
+    # Create pg_stat_statements extension and grant monitoring role
+    sudo -u postgres psql -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+    sudo -u postgres psql -c "GRANT pg_monitor TO postgres;"
+
+    # Signal that initialization is complete (traffic setup handled by Makefile)
+    touch /tmp/postgres-initialized
+
+- owner: root:root
+  path: /etc/alloy/config.alloy
+  content: |
+    prometheus.exporter.self "alloy_check" { }
+
+    discovery.relabel "alloy_check" {
+      targets = prometheus.exporter.self.alloy_check.targets
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+      rule {
+        target_label = "job"
+        replacement  = "integrations/alloy-check"
+      }
+    }
+
+    prometheus.scrape "alloy_check" {
+      targets         = discovery.relabel.alloy_check.output
+      forward_to      = [prometheus.relabel.alloy_check.receiver]
+      scrape_interval = "60s"
+    }
+
+    prometheus.relabel "alloy_check" {
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      rule {
+        source_labels = ["__name__"]
+        regex         = "(prometheus_target_sync_length_seconds_sum|prometheus_target_scrapes_.*|prometheus_target_interval.*|prometheus_sd_discovered_targets|alloy_build.*|prometheus_remote_write_wal_samples_appended_total|process_start_time_seconds)"
+        action        = "keep"
+      }
+    }
+
+    prometheus.remote_write "metrics_service" {
+      endpoint {
+        url = "{{ prom_url }}"
+        {% if prom_user and prom_pass -%}
+        basic_auth {
+          username = "{{ prom_user }}"
+          password = "{{ prom_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    loki.write "grafana_cloud_loki" {
+      endpoint {
+        url = "{{ loki_url }}"
+        {% if loki_user and loki_pass -%}
+        basic_auth {
+          username = "{{ loki_user }}"
+          password = "{{ loki_pass }}"
+        }
+        {%- endif %}
+      }
+    }
+
+    prometheus.exporter.postgres "integrations_postgres_exporter" {
+      data_source_names  = ["postgresql://postgres:sekret@localhost:5432/postgres?sslmode=disable"]
+      enabled_collectors = ["database", "locks", "long_running_transactions", "postmaster", "replication", "stat_bgwriter", "stat_database", "stat_statements", "stat_user_tables", "statio_user_indexes"]
+    }
+
+    discovery.relabel "integrations_postgres_exporter" {
+      targets = prometheus.exporter.postgres.integrations_postgres_exporter.targets
+      rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+      }
+      rule {
+        target_label = "job"
+        replacement  = "integrations/postgres_exporter"
+      }
+      rule {
+        target_label = "postgres_cluster"
+        replacement  = "postgres-cluster"
+      }
+    }
+
+    prometheus.scrape "integrations_postgres_exporter" {
+      targets    = discovery.relabel.integrations_postgres_exporter.output
+      forward_to = [prometheus.remote_write.metrics_service.receiver]
+      job_name   = "integrations/postgres_exporter"
+    }
+
+    local.file_match "logs_integrations_postgres_exporter" {
+      path_targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/postgresql/postgresql-*.log",
+        instance    = constants.hostname,
+        job         = "integrations/postgres_exporter",
+      }]
+    }
+
+    loki.source.file "logs_integrations_postgres_exporter" {
+      targets    = local.file_match.logs_integrations_postgres_exporter.targets
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+    }
