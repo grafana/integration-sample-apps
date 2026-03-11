@@ -23,7 +23,7 @@ run-primary: launch-primary wait-primary
 run-secondary: launch-secondary
 	@echo "Secondary $(SECONDARY_VM_NAME) is ready."
 
-run-ci: clean defaultconfig run load-gen
+run-ci: clean defaultconfig run
 	@echo "Running in CI mode"
 
 # Poll until the primary has finished its cloud-init postgres setup
