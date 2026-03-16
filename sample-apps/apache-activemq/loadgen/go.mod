@@ -2,4 +2,4 @@ module github.com/grafana/integration-sample-apps/sample-apps/apache-activemq/lo
 
 go 1.24.5
 
-require github.com/Azure/go-amqp v1.5.0
+require github.com/Azure/go-amqp v1.5.1
