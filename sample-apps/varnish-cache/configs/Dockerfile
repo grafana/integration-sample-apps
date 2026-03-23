@@ -6,7 +6,7 @@ RUN tar -xvf exporter.tar.gz
 RUN chmod +x /exporter/prometheus_varnish_exporter-1.6.1.linux-amd64/prometheus_varnish_exporter
 RUN dpkg --add-architecture amd64  && apt-get update && apt-get install -y libc6-dev
 
-FROM varnish:stable@sha256:7f2565f220dda0e42af7f1e02427405db4b647230304a4f2a3759eb01523fc25
+FROM varnish:stable@sha256:855d6c2d3b99ab239649829f016c29217dc4fcb7e0372a2555e236036eae5195
 
 COPY --from=stage /exporter/prometheus_varnish_exporter-1.6.1.linux-amd64/prometheus_varnish_exporter /prometheus_varnish_exporter
 ENTRYPOINT [ "/prometheus_varnish_exporter" ]
