@@ -13,7 +13,7 @@ services:
       - dbs
 
   loki:
-    image: grafana/loki:latest@sha256:00981fd9455db8589c3aa6d06744af3138c4b2c32fdec62101e92c7a704b2642
+    image: grafana/loki:latest@sha256:3c8fd3570dd9219951a60d3f919c7f31923d10baee578b77bc26c4a0b32d092d
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
