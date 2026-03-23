@@ -1,4 +1,4 @@
-FROM debian:stable-slim@sha256:e0249870a90044494c01e74fbfc8b77ab14e6f47cece844d1e1737f7828a7e1e AS builder
+FROM debian:stable-slim@sha256:99fc6d2a0882fcbcdc452948d2d54eab91faafc7db037df82425edcdcf950e1f AS builder
 
 RUN apt-get update && \
     apt-get install -y curl unzip && \
@@ -7,7 +7,7 @@ RUN apt-get update && \
     curl -L https://dl.influxdata.com/influxdb/releases/influxdb2-client-2.7.3-linux-amd64.tar.gz -o influxdb2-client-2.7.3-linux-amd64.tar.gz && \
     tar -xvf influxdb2-client-2.7.3-linux-amd64.tar.gz
 
-FROM debian:stable-slim@sha256:e0249870a90044494c01e74fbfc8b77ab14e6f47cece844d1e1737f7828a7e1e
+FROM debian:stable-slim@sha256:99fc6d2a0882fcbcdc452948d2d54eab91faafc7db037df82425edcdcf950e1f
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
