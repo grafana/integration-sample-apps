@@ -2,7 +2,7 @@ module github.com/grafana/integration-sample-apps/pinecone/scripts/loadgen
 
 go 1.24.0
 
-require github.com/pinecone-io/go-pinecone/v5 v5.0.0
+require github.com/pinecone-io/go-pinecone/v5 v5.4.1
 
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
