@@ -70,7 +70,7 @@ write_files:
       }
      
       prometheus.exporter.mssql "integrations_mssql" {
-        connection_string = "sqlserver://SA:reallyStrongPwd123@localhost:1433?TrustServerCertificate=true"
+        connection_string = "sqlserver://SA:reallyStrongPwd123@localhost:1433?TrustServerCertificate=true&encrypt=disable"
       }
 
       discovery.relabel "integrations_mssql" {
