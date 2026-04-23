@@ -1,0 +1,133 @@
+name: "macOS Sample App"
+
+permissions:
+  contents: read
+
+on:
+  # To conserve resources we only run tests against main in PRs
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '../../sample-apps/macos-node/**'
+
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+jobs:
+  test-macos-sample-app:
+    name: Test macOS sample app
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Colima and Docker CLI
+        run: |
+          echo "Installing Colima and Docker CLI via Homebrew"
+          brew install colima docker docker-compose
+          echo "Starting Colima VM..."
+          colima start --cpu 2 --memory 4 --disk 20
+          docker info
+          docker --version
+          docker compose version
+
+      - name: Start Mimir and Loki containers
+        run: |
+          echo "Starting Mimir and Loki containers"
+          
+          # Note we just reuse the QA docker-compose here.
+          cd ops/qa/dbs
+          docker compose up -d
+
+          source ../../.defaultconfig
+
+          echo "DBs spawning as Loki: localhost:3100, Mimir: localhost:9009"
+
+          echo "Waiting for containers to be running..."
+          timeout 30 bash -c 'until [ "$(docker inspect -f {{.State.Running}} dbs-mimir-1)" = "true" ]; do sleep 2; done'
+          timeout 30 bash -c 'until [ "$(docker inspect -f {{.State.Running}} dbs-loki-1)" = "true" ]; do sleep 2; done'
+
+          echo "Containers are running, waiting for services to initialize..."
+          sleep 30
+
+          # Check Mimir health using official readiness probe
+          echo "Checking Mimir health..."
+          for i in {1..30}; do
+            if curl -s http://localhost:9009/ready >/dev/null 2>&1; then
+              echo "✅ Mimir is ready"
+              break
+            fi
+            echo "Attempt $i/30: Mimir not ready yet..."
+            sleep 5
+            if [ $i -eq 30 ]; then
+              echo "⚠️ Mimir /ready endpoint not responding, but checking logs..."
+              docker logs dbs-mimir-1 --tail 10
+              # Don't fail here, continue to Loki check
+            fi
+          done
+          
+          # Check Loki health using official readiness probe
+          echo "Checking Loki health..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3100/ready >/dev/null 2>&1; then
+              echo "✅ Loki is ready"
+              break
+            fi
+            echo "Attempt $i/30: Loki not ready yet..."
+            sleep 5
+            if [ $i -eq 30 ]; then
+              echo "⚠️ Loki /ready endpoint not responding, but checking logs..."
+              docker logs dbs-loki-1 --tail 10
+              # Don't fail here, continue with workflow
+            fi
+          done
+
+          echo "All services are ready"
+
+      - name: Run macOS sample app
+        run: |
+          echo "Running macOS sample app..."
+          make -C sample-apps/macos run-ci \
+            LOKI_INSTANCE=localhost:3100 \
+            PROMETHEUS_INSTANCE=localhost:9009
+
+      - name: Wait for sample app to generate metrics
+        run: |
+          source ./ops/.defaultconfig
+          echo "Waiting for sample app to generate metrics (${SAMPLE_APP_SETUP_TIME})..."
+          # SAMPLE_APP_SETUP_TIME is a value like '180s'; sleep(1) on macOS accepts the suffix.
+          sleep "${SAMPLE_APP_SETUP_TIME}"
+
+      - name: Validate metrics
+        run: |
+          echo "Validating metrics using test_sample_app_metrics.sh..."
+          # This step intentionally has no conditional guard: the validator
+          # exits non-zero if sample-apps/macos-node/tests/metrics/ is empty, which
+          # forces any PR touching sample-apps/macos-node/** to author Alloy config
+          # and test expectations together.
+          ./ops/scripts/test_sample_app_metrics.sh macos localhost:9009
+
+      - name: Cleanup Docker containers
+        if: always()
+        run: |
+          echo "Cleaning up Docker containers..."
+          cd ops/qa/dbs
+          docker compose down || true
+          echo "Cleanup completed"
+
+      - name: Stop Alloy service
+        if: always()
+        run: |
+          echo "Stopping Alloy service..."
+          bash sample-apps/macos-node/scripts/stop_alloy.sh || true
+
+      - name: Stop Colima
+        if: always()
+        run: |
+          echo "Stopping Colima VM..."
+          colima stop || true
