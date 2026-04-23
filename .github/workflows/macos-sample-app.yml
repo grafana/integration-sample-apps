@@ -100,16 +100,12 @@ jobs:
         run: |
           source ./ops/.defaultconfig
           echo "Waiting for sample app to generate metrics (${SAMPLE_APP_SETUP_TIME})..."
-          # SAMPLE_APP_SETUP_TIME is a value like '180s'; sleep(1) on macOS accepts the suffix.
           sleep "${SAMPLE_APP_SETUP_TIME}"
 
       - name: Validate metrics
         run: |
           echo "Validating metrics using test_sample_app_metrics.sh..."
-          # This step intentionally has no conditional guard: the validator
-          # exits non-zero if sample-apps/macos-node/tests/metrics/ is empty, which
-          # forces any PR touching sample-apps/macos-node/** to author Alloy config
-          # and test expectations together.
+
           ./ops/scripts/test_sample_app_metrics.sh macos localhost:9009
 
       - name: Cleanup Docker containers
