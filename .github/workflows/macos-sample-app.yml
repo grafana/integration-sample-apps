@@ -89,7 +89,7 @@ jobs:
       - name: Run macOS sample app
         run: |
           echo "Running macOS sample app..."
-          make -C sample-apps/macos run-ci \
+          make -C sample-apps/macos-node run-ci \
             LOKI_INSTANCE=localhost:3100 \
             PROMETHEUS_INSTANCE=localhost:9009
 
