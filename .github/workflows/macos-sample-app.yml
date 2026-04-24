@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - '../../sample-apps/macos-node/**'
+      - 'sample-apps/macos-node/**'
 
   # Allow manual triggering for testing
   workflow_dispatch:
@@ -54,7 +54,8 @@ jobs:
 
           echo "Containers are running, waiting for services to initialize..."
           sleep 30
-
+          
+          # Largely copied from windows-sample-app.yml workflow
           # Check Mimir health using official readiness probe
           echo "Checking Mimir health..."
           for i in {1..30}; do
