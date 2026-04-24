@@ -48,10 +48,6 @@ jobs:
 
           echo "DBs spawning as Loki: localhost:3100, Mimir: localhost:9009"
 
-          echo "Waiting for containers to be running..."
-          timeout 30 bash -c 'until [ "$(docker inspect -f {{.State.Running}} dbs-mimir-1)" = "true" ]; do sleep 2; done'
-          timeout 30 bash -c 'until [ "$(docker inspect -f {{.State.Running}} dbs-loki-1)" = "true" ]; do sleep 2; done'
-
           echo "Containers are running, waiting for services to initialize..."
           sleep 30
           
