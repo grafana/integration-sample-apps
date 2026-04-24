@@ -7,13 +7,13 @@ if ! command -v brew >/dev/null 2>&1; then
 fi
 
 echo "Starting Alloy service..."
-brew services start alloy
+brew services start grafana/grafana/alloy
 
 SERVICE_MAX_RETRIES=5
 SERVICE_RETRY_DELAY=10
 
 for attempt in $(seq 1 "${SERVICE_MAX_RETRIES}"); do
-  STATUS="$(brew services list | awk '$1 == "alloy" { print $2 }' || true)"
+  STATUS="$(brew services list | awk '$1 == "grafana/grafana/alloy" { print $2 }' || true)"
   echo "Checking service status... attempt ${attempt}/${SERVICE_MAX_RETRIES} (status: ${STATUS:-unknown})"
   if [[ "${STATUS}" == "started" ]]; then
     echo "Alloy service is running."

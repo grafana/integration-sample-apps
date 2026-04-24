@@ -6,7 +6,7 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 0
 fi
 
-STATUS="$(brew services list | awk '$1 == "alloy" { print $2 }' || true)"
+STATUS="$(brew services list | awk '$1 == "grafana/grafana/alloy" { print $2 }' || true)"
 
 if [[ -z "${STATUS}" ]]; then
   echo "Alloy service is not registered with Homebrew. Nothing to stop."
@@ -15,7 +15,7 @@ fi
 
 if [[ "${STATUS}" == "started" ]]; then
   echo "Stopping Alloy service..."
-  brew services stop alloy
+  brew services stop grafana/grafana/alloy
   echo "Alloy service stopped."
 else
   echo "Alloy service is not running (status: ${STATUS}). Nothing to stop."

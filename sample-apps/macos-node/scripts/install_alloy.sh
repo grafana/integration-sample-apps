@@ -10,10 +10,9 @@ fi
 
 if brew list --formula alloy >/dev/null 2>&1; then
   echo "Alloy already installed; upgrading to the latest version..."
-  brew upgrade alloy || true
+  brew upgrade grafana/grafana/alloy || true
 else
-  brew tap grafana/grafana
-  brew install alloy
+  brew install grafana/grafana/alloy
 fi
 
 alloy --version || {
