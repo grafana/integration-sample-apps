@@ -31,7 +31,7 @@ jobs:
           echo "Installing Colima and Docker CLI via Homebrew"
           brew install colima docker docker-compose
           echo "Starting Colima VM..."
-          colima start --cpu 2 --memory 4 --disk 20
+          colima start --cpu 5 --memory 8 --disk 40
           docker info
           docker --version
           docker compose version
