@@ -70,7 +70,7 @@ write_files:
       }
      
       prometheus.exporter.mssql "integrations_mssql" {
-        connection_string = "sqlserver://SA:reallyStrongPwd123@localhost:1433?TrustServerCertificate=true"
+        connection_string = "sqlserver://SA:reallyStrongPwd123@localhost:1433?TrustServerCertificate=true&encrypt=disable"
       }
 
       discovery.relabel "integrations_mssql" {
@@ -185,7 +185,7 @@ runcmd:
   # Wait for SQL Server to be ready and set up monitoring user
   - |
     # Wait for SQL Server to be ready (up to 60 seconds)
-    for i in {1..60}; do
+    for i in {1..120}; do
       if docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "SELECT 1" &> /dev/null; then
         break
       fi
