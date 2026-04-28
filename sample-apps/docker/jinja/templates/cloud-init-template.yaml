@@ -195,7 +195,7 @@ write_files:
       endpoint {
         url = "{{ prom_url }}"
 
-        {% if loki_user and loki_pass -%}
+        {% if prom_user and prom_pass -%}
         basic_auth {
           username = "{{ prom_user }}"
           password = "{{ prom_pass }}"
