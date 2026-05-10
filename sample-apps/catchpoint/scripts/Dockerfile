@@ -17,7 +17,7 @@ RUN go mod tidy
 
 # Build the application as a static binary
 RUN go build -ldflags '-extldflags "-static"' -o catchpoint-exporter ./cmd/catchpoint-exporter/main.go
-FROM --platform=linux/arm64 alpine:latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659 as final
+FROM --platform=linux/arm64 alpine:latest@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 as final
 WORKDIR /root/
 
 COPY --from=builder /app/catchpoint-exporter .
