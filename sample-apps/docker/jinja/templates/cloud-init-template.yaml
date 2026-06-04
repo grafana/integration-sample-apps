@@ -134,7 +134,7 @@ runcmd:
       --restart=always \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -v portainer_data:/data \
-      portainer/portainer-ce
+      portainer/portainer-ce:2.39.3@sha256:d27f76194b719bfe2a34779d51798a7adf02510cfba69ebcb538267f75aa4f47
 
   - |
     # apt cleanup

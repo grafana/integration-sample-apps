@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: grafana-agent
-        image: grafana/agent:latest
+        image: grafana/agent:v0.44.8@sha256:bba59e1229303b658e19b08b91c7d520d3d3f0fb5dc66e04e2d515456f3ab4d6
         args: ["-config.file=/etc/grafana-agent/grafana-agent.yaml"]
         volumeMounts:
         - name: config

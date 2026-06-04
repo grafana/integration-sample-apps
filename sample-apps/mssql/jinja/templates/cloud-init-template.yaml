@@ -177,23 +177,23 @@ runcmd:
   - systemctl enable docker
   - systemctl start docker
   
-  - docker run --privileged --rm tonistiigi/binfmt --install all
+  - docker run --privileged --rm tonistiigi/binfmt:latest@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3 --install all
   - systemctl restart docker
 
-  - docker run -e "ACCEPT_EULA=1" -e "MSSQL_SA_PASSWORD=reallyStrongPwd123" -e "MSSQL_PID=Developer" -e "MSSQL_USER=SA" -p 1433:1433 -d --name=mssql-sample-app mcr.microsoft.com/azure-sql-edge
+  - docker run -e "ACCEPT_EULA=1" -e "MSSQL_SA_PASSWORD=reallyStrongPwd123" -e "MSSQL_PID=Developer" -e "MSSQL_USER=SA" -p 1433:1433 -d --name=mssql-sample-app mcr.microsoft.com/azure-sql-edge:2.0.0@sha256:52605ea3251cbc4a7e03eccd458e775ae8a626a3afb4019bec66520a81e78170
 
   # Wait for SQL Server to be ready and set up monitoring user
   - |
     # Wait for SQL Server to be ready (up to 60 seconds)
     for i in {1..120}; do
-      if docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "SELECT 1" &> /dev/null; then
+      if docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools:latest@sha256:62556500522072535cb3df2bb5965333dded9be47000473e9e0f84118e248642 /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "SELECT 1" &> /dev/null; then
         break
       fi
       sleep 1
     done
 
     # Create monitoring user and grant permissions
-    docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "
+    docker run --rm --platform linux/amd64 --network host mcr.microsoft.com/mssql-tools:latest@sha256:62556500522072535cb3df2bb5965333dded9be47000473e9e0f84118e248642 /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P reallyStrongPwd123 -Q "
     IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'monitor')
     BEGIN
       CREATE LOGIN [monitor] WITH PASSWORD = 'reallyStrongPwd123';

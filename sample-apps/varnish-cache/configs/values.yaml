@@ -1,4 +1,4 @@
 replicas: 1
-varnishImage: varnish:stable
+varnishImage: varnish:stable@sha256:65de4db75b40ab26fe1b769b3fecafe12ecc0312310d2a8a557a1958683fa279
 exporterImage: sample/varnish:0.0.1
-nginxImage: nginx:1.25.1
+nginxImage: nginx:1.25.1@sha256:67f9a4f10d147a6e04629340e6493c9703300ca23a2f7f3aa56fe615d75d31ca
