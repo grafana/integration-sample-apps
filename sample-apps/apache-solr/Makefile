@@ -7,9 +7,9 @@ run: create-vms setup-zookeeper setup-solr load-test fetch-prometheus-metrics se
 
 create-vms:
 	# Create VMs
-	multipass launch --name $(VM_PREFIX)-1 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
-	multipass launch --name $(VM_PREFIX)-2 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
-	multipass launch --name $(VM_PREFIX)-3 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
+	multipass launch 24.04 --name $(VM_PREFIX)-1 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
+	multipass launch 24.04 --name $(VM_PREFIX)-2 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
+	multipass launch 24.04 --name $(VM_PREFIX)-3 --cpus 4 --memory 4G --disk 10G --cloud-init jinja/variables/cloud-init.yaml
 	# Run the script to collect IP addresses
 	./scripts/collect_ips.sh
 	# Read IP addresses from the file and print them

@@ -3,7 +3,7 @@ run: run-multipass
 
 .PHONY: run-multipass
 run-multipass: resources/user-inputs.yaml
-	@multipass launch -n istio-sample-app --memory 14G --disk 10G --cpus 4; \
+	@multipass launch 24.04 -n istio-sample-app --memory 14G --disk 10G --cpus 4; \
 		# These commands are to allow external network access
 		multipass exec istio-sample-app -- sudo mkdir /etc/systemd/resolved.conf.d/; \
 		multipass exec istio-sample-app -- sudo touch /etc/systemd/resolved.conf.d/dns_servers.conf; \

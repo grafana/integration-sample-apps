@@ -80,10 +80,10 @@ render-secondary-config:
 	rm -f jinja/variables/cloud-init-secondary.yaml
 
 launch-primary: render-primary-config
-	@multipass launch -n $(PRIMARY_VM_NAME) --cloud-init cloud-init-primary.yaml
+	@multipass launch 24.04 -n $(PRIMARY_VM_NAME) --cloud-init cloud-init-primary.yaml
 
 launch-secondary: render-secondary-config
-	@multipass launch -n $(SECONDARY_VM_NAME) --cloud-init cloud-init-secondary.yaml
+	@multipass launch 24.04 -n $(SECONDARY_VM_NAME) --cloud-init cloud-init-secondary.yaml
 
 clean:
 	@rm -f cloud-init.yaml cloud-init-primary.yaml cloud-init-secondary.yaml
