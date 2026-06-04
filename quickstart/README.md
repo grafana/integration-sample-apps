@@ -10,6 +10,6 @@ Currently supported are:
 ## Repository structure
 | Sample-app example             | Notes         |
 |-----------------------|-------------------|
-|[`linux-standalone/`](linux-standalone/) | This example contains a simple standalone sample-app, providing a single Linux (Ubuntu-latest) node to build your sample app on|
+|[`linux-standalone/`](linux-standalone/) | This example contains a simple standalone sample-app, providing a single Linux (Ubuntu 24.04) node to build your sample app on|
 |[`k3s-clustered/`](k3s-clustered/) | This example contains a three-node k3s cluster, and instructions to apply a helm chart and configuration for your sample app. Alloy is provided via the K8s-monitoring-helm chart. |
 |[`k3s-singlenode/`](k3s-singlenode/) | This example contains a single-node k3s deployment, and instructions to apply a helm chart and configuration for your sample app. Alloy is provided via the K8s-monitoring-helm chart. |

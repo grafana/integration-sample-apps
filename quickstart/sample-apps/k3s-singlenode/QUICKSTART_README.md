@@ -27,5 +27,8 @@ The following files require manual review or modification, and is where logic fo
 A quick note here, the [configs/](configs/) folder will be copied wholesale to the k3s node, so you can supply any additional configs here, if you need them on the host machine. 
 This could include things like JMX configs or subcomponent configs needed for a reliable setup.
 
+## 4 - VM image
+The k3s VM is launched by [`ops/scripts/k3s_setup.sh`](https://github.com/grafana/integration-sample-apps/blob/main/ops/scripts/k3s_setup.sh) (invoked via the shared `include ../Makefile`), which uses Ubuntu `24.04` as the image tag for the main node and both workers.
+
 Once the sample-app has been completed and validated, update the README to reflect to end-users how to use it. As a final step, delete the QUICKSTART_README.md file (this file)
 # --- QUICKSTART INSTRUCTIONS END ---
