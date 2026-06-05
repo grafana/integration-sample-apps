@@ -685,7 +685,7 @@ workers:
   # container finishes so Airflow can continue the worker shutdown process!
   extraContainers:
     - name: alloy
-      image: grafana/alloy:latest
+      image: grafana/alloy:v1.16.2@sha256:32913cbfac652d15fa84d256a74e5ee3f71575961bb19d34796ce3838bfba693
       volumeMounts:
       - name: alloy-task-logs-config
         mountPath: /etc/alloy/config.alloy
@@ -909,7 +909,7 @@ scheduler:
   # Launch additional containers into scheduler.
   extraContainers:
   - name: alloy
-    image: grafana/alloy:latest
+    image: grafana/alloy:v1.16.2@sha256:32913cbfac652d15fa84d256a74e5ee3f71575961bb19d34796ce3838bfba693
     volumeMounts:
     - name: alloy-scheduler-logs-config
       mountPath: /etc/alloy/config.alloy

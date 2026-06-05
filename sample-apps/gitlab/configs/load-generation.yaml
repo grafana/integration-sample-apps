@@ -47,7 +47,7 @@ spec:
         spec:
           containers:
           - name: k6-load-test
-            image: grafana/k6:latest
+            image: grafana/k6:2.0.0@sha256:a33a0cfdc4d2483d6b7a3a22e726a499ff2831a671a49239104cd34a9937523c
             command: ["k6", "run", "/scripts/load-test.js"]
             volumeMounts:
             - name: script-volume

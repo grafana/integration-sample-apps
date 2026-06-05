@@ -8,7 +8,7 @@ GRAFANA_FLOW_VALUES := $(OUTPUT_DIR)/grafana-flow-k8s-template.yaml
 
 .PHONY: run-catchpoint-multipass
 run-catchpoint-multipass: render-config
-	@multipass launch -n $(VM_NAME) --memory 14G --disk 10G --cpus 4
+	@multipass launch 24.04 -n $(VM_NAME) --memory 14G --disk 10G --cpus 4
 	@multipass mount ./generated_configs/ $(VM_NAME):/catchpoint/config
 	@multipass mount ./scripts $(VM_NAME):/catchpoint/scripts
 	@multipass exec $(VM_NAME) -- bash /catchpoint/scripts/setup_docker.sh

@@ -167,10 +167,10 @@ redis:
 
 minio:
   image: minio/minio
-  imageTag: RELEASE.2025-06-13T11-33-47Z-cpuv1
+  imageTag: RELEASE.2025-06-13T11-33-47Z-cpuv1@sha256:ad8a8318847c0bb7dcfe59caf407f12fad6f387bb66386ee772c4704f0a48d50
   minioMc:
     image: minio/mc
-    tag: RELEASE.2024-11-21T17-21-54Z-cpuv1
+    tag: RELEASE.2024-11-21T17-21-54Z-cpuv1@sha256:7421f69fcfb318a81886ffa31fd46670ad486f4eacf8cba5944d89148711fc8f
   defaultBuckets:
     - name: public
       policy: public

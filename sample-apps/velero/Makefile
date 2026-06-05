@@ -20,7 +20,7 @@ render-config:
 
 
 launch-vm: render-config
-	@multipass launch --name $(VM_NAME) --memory 14G --disk 10G --cpus 4 --cloud-init cloud-init.yaml; \
+	@multipass launch 24.04 --name $(VM_NAME) --memory 14G --disk 10G --cpus 4 --cloud-init cloud-init.yaml; \
 		multipass mount ./scripts/ $(VM_NAME):/velero/scripts; \
 		multipass exec $(VM_NAME) -- bash /velero/scripts/setup-docker.sh; \
 		multipass mount ./jinja/variables/ $(VM_NAME):/home/ubuntu/jinja/variables; \

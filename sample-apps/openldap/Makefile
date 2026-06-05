@@ -41,7 +41,7 @@ render-config2:
 	@docker run --rm -it -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --cloud-init generated_configs/cloud-init-template.yaml
+	@multipass launch 24.04 -n $(VM_NAME) --cloud-init generated_configs/cloud-init-template.yaml
 
 clean:
 	@echo "Cleaning generated configs..."

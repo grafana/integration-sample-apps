@@ -24,13 +24,13 @@ fi
 
 echo "-- Spinning up k3s environment for $1 --"
 # Launch the primary k3s node with configurable hardware requirements
-multipass launch -n $1-k3s-main -c ${PRIMARY_CPU} -m ${PRIMARY_MEMORY}G -d ${PRIMARY_DISK}G --cloud-init ../qa/k3s-main-cloud-init.yaml
+multipass launch 24.04 -n $1-k3s-main -c ${PRIMARY_CPU} -m ${PRIMARY_MEMORY}G -d ${PRIMARY_DISK}G --cloud-init ../qa/k3s-main-cloud-init.yaml
 
 if [[ "$2" = "cluster" ]]; then
     echo "-- Cluster mode, spawning worker nodes --"
     # Launch worker nodes with fixed hardware requirements
-    multipass launch -n $1-k3s-worker-1 -c ${WORKER_CPU} -m ${WORKER_MEMORY}G -d ${WORKER_DISK}G
-    multipass launch -n $1-k3s-worker-2 -c ${WORKER_CPU} -m ${WORKER_MEMORY}G -d ${WORKER_DISK}G
+    multipass launch 24.04 -n $1-k3s-worker-1 -c ${WORKER_CPU} -m ${WORKER_MEMORY}G -d ${WORKER_DISK}G
+    multipass launch 24.04 -n $1-k3s-worker-2 -c ${WORKER_CPU} -m ${WORKER_MEMORY}G -d ${WORKER_DISK}G
 fi
 
 

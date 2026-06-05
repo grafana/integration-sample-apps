@@ -1,2 +1,2 @@
 ---
-image: container-registry.oracle.com/database/free:latest-lite
+image: container-registry.oracle.com/database/free:23.26.2.0-lite@sha256:b97a43b16688df49582698cc5d2e81c50e6d4f663141366ee101af54413e8758

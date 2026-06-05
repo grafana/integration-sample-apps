@@ -26,7 +26,7 @@ spec:
       shareProcessNamespace: true
       initContainers:
       - name: init-script
-        image: alpine:latest
+        image: alpine:3.22@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601
         securityContext:
           runAsNonRoot: true
           runAsUser: 103
@@ -121,7 +121,7 @@ spec:
           - name: varnish-log
             mountPath: /var/log/varnish
         - name: alloy-varnish-logs
-          image: grafana/alloy:latest
+          image: grafana/alloy:v1.16.2@sha256:32913cbfac652d15fa84d256a74e5ee3f71575961bb19d34796ce3838bfba693
           volumeMounts:
           - name: varnish-log
             mountPath: /var/log/varnish

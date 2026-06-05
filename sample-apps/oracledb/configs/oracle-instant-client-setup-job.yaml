@@ -10,7 +10,7 @@ spec:
       restartPolicy: OnFailure
       initContainers:
       - name: download-oracle-client
-        image: ghcr.io/oracle/oraclelinux9-instantclient:23
+        image: ghcr.io/oracle/oraclelinux9-instantclient:23@sha256:b0bf76cc1355642bfa85e0ecaf317c11681ea415bff203caadf899fcc8a2dd79
         command:
         - /bin/sh
         - -c
@@ -24,7 +24,7 @@ spec:
       containers:
       # just a container to indicate that the job is complete
       - name: setup-complete
-        image: alpine:latest
+        image: alpine:3.22@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601
         command: ['sh', '-c', 'echo "Oracle Instant Client setup job completed successfully"']
         volumeMounts:
         - name: oracle-instant-client-libs

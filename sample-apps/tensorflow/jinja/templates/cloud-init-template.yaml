@@ -257,7 +257,7 @@ runcmd:
   - systemctl start docker
 
   # Configure Docker for QEMU
-  - docker run --privileged --rm tonistiigi/binfmt --install all
+  - docker run --privileged --rm tonistiigi/binfmt:latest@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3 --install all
   - systemctl restart docker
 
   # Run init.sh

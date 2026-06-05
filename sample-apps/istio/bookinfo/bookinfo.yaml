@@ -72,7 +72,7 @@ spec:
       serviceAccountName: bookinfo-details
       containers:
       - name: details
-        image: docker.io/istio/examples-bookinfo-details-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-details-v1:1.18.0@sha256:daa08c3652d3c1f924988cd0e6dcb2973d7ea9090e2088418e442c87bbfd7091
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -123,7 +123,7 @@ spec:
       serviceAccountName: bookinfo-ratings
       containers:
       - name: ratings
-        image: docker.io/istio/examples-bookinfo-ratings-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-ratings-v1:1.18.0@sha256:93e8d6f8a7eeac079ef5724d4b20cbc15afcdacb71c8c1402ea1eba0ec0bd86e
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
@@ -174,7 +174,7 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-reviews-v1:1.18.0@sha256:1c71f81fa8b20d9c9650c2ad7b068cdf3729d6f9d5cbb11492fe373484799986
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
@@ -214,7 +214,7 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v2:1.18.0
+        image: docker.io/istio/examples-bookinfo-reviews-v2:1.18.0@sha256:321f554e7f4b78d13ca6983b0266c87a89058ef0a9d91d3b3f19b471ebd44b48
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
@@ -254,7 +254,7 @@ spec:
       serviceAccountName: bookinfo-reviews
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v3:1.18.0
+        image: docker.io/istio/examples-bookinfo-reviews-v3:1.18.0@sha256:a79a7512a128a47051cee3088339a33221b3ce13ea6e3ae86b8ab11c061be72c
         imagePullPolicy: IfNotPresent
         env:
         - name: LOG_DIR
@@ -322,7 +322,7 @@ spec:
       serviceAccountName: bookinfo-productpage
       containers:
       - name: productpage
-        image: docker.io/istio/examples-bookinfo-productpage-v1:1.18.0
+        image: docker.io/istio/examples-bookinfo-productpage-v1:1.18.0@sha256:e2723a59bde95d630ed96630af25058ebea255219161d6a8ac6c25d67d7e1b5a
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080

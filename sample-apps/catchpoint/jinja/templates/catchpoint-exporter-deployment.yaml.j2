@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: catchpoint-exporter
-        image: jonnywamsley/catchpoint-exporter:latest
+        image: jonnywamsley/catchpoint-exporter:latest@sha256:62c3cc4f4fd43d57845909abd1168e99bddc9a3fec10a573f0e7656ff44c7d9c
         args: ["--port=9090", "--webhook-path=/webhook", "--verbose"]
         imagePullPolicy: Always
         ports:

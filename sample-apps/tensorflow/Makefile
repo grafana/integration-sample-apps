@@ -27,7 +27,7 @@ render-config:
 # Adding a disk specification as the tensorflow install method takes a fair amount of disk space
 
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --disk 10G --cloud-init cloud-init.yaml
+	@multipass launch 24.04 -n $(VM_NAME) --disk 10G --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml

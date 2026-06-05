@@ -25,7 +25,7 @@ render-config:
 
 # specifying more memory and disk space to avoid issues with the installation of opensearch
 launch-vm: render-config
-	@multipass launch -n $(VM_NAME) --disk 10G --memory 4G --cloud-init cloud-init.yaml
+	@multipass launch 24.04 -n $(VM_NAME) --disk 10G --memory 4G --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml
