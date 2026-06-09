@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup WSL
-        uses: Vampire/setup-wsl@3b46b44374d5d0ae94654c45d114a3ed7a0e07a8 # v5.0.1
+        uses: Vampire/setup-wsl@d1da7f2c0322a5ee4f24975344f67fc0f5baf364 # v7.0.0
         with:
           distribution: Ubuntu-20.04
           wsl-shell-command: bash -e -u -o pipefail
