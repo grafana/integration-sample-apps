@@ -14,7 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-ARG ALPINE_VERSION="3.22@sha256:55ae5d250caebc548793f321534bc6a8ef1d116f334f18f4ada1b2daad3251b2"
+ARG ALPINE_VERSION="3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11"
 FROM alpine:${ALPINE_VERSION} AS builder
 SHELL ["/bin/ash", "-e", "-x", "-c", "-o", "pipefail"]
 
