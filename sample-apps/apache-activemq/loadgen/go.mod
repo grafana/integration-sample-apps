@@ -1,5 +1,5 @@
 module github.com/grafana/integration-sample-apps/sample-apps/apache-activemq/loadgen
 
-go 1.24.5
+go 1.25
 
-require github.com/Azure/go-amqp v1.6.0
+require github.com/Azure/go-amqp v1.7.0
