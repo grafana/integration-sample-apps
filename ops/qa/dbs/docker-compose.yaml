@@ -1,7 +1,7 @@
 services:
 
   mimir:
-    image: grafana/mimir:latest@sha256:804c94deebdcbfdd1b01a3d79a26bcb2a54923b3c0b293031183008a257f99c5
+    image: grafana/mimir:latest@sha256:39cc23910bbaa60d0280fd162265a22c39120ff61b02bc993f3fd3701fb8606d
     volumes:
       - ./configs/mimir:/etc/mimir-config
     entrypoint:
