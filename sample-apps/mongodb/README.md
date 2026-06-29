@@ -17,7 +17,7 @@ To get started with the sample app, follow these steps:
 1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
-   cd integration-sample-apps/mongodb
+   cd integration-sample-apps/sample-apps/mongodb
    ```
 
 2. **Set up default config**: 
@@ -29,14 +29,15 @@ To get started with the sample app, follow these steps:
 4. **Create and set up VMs**: 
    Use `make run` to start the MongoDB sample app.
 
-6. **Stop and clean Up**: 
+5. **Stop and clean Up**: 
    Use `make stop` to clean up the VM and `make clean` to remove temporary files.
 
 ## Make commands
 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
-- `make run`: Creates the MongoDB sample app, spawning a local three-member replicaset
+- `make run`: Creates the MongoDB sample app, spawning a local three-member replicaset.
+- `make run-cluster`: Creates a sharded cluster instead (config server + two 3-member shards + mongos) for testing cluster dashboards.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
 ## Default configuration variables
