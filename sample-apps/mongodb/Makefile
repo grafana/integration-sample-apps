@@ -3,23 +3,25 @@ CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE ?= your-loki-instance:3100
 PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
-# Cloud-init template and VM size; overridden by run-cluster for the sharded topology
-TEMPLATE ?= cloud-init-template.yaml
-MEMORY ?= 2G
+# Cloud-init template and VM size; default to the sharded cluster topology.
+# Overridden by run-single for the lighter single-replicaset setup.
+TEMPLATE ?= cloud-init-template_local_setup.yaml
+MEMORY ?= 4G
 
 # Import last to ensure expected parameters are set and available to import from this file
 include ../Makefile
 
-.PHONY: run run-cluster run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
+.PHONY: run run-single run-ci stop fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
+# Launch the sharded cluster (config server + two shards + mongos)
 run: launch-vm
-	@echo "VM $(VM_NAME) launched and configured."
-
-# Launch the sharded cluster (config server + two shards + mongos) instead of the single replicaset
-run-cluster: TEMPLATE = cloud-init-template_local_setup.yaml
-run-cluster: MEMORY = 4G
-run-cluster: launch-vm
 	@echo "VM $(VM_NAME) launched with sharded cluster."
+
+# Launch the lighter single replicaset instead of the sharded cluster
+run-single: TEMPLATE = cloud-init-template.yaml
+run-single: MEMORY = 2G
+run-single: launch-vm
+	@echo "VM $(VM_NAME) launched with single replicaset."
 
 run-ci: clean defaultconfig launch-vm
 	@echo "Running in CI mode"
@@ -33,7 +35,7 @@ fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:9127/metrics > prometheus_metrics
 
 render-config:
-	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/$(TEMPLATE) /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
+	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/$(CONFIG_FILE_DIR):/variables dinutac/jinja2docker:latest /templates/$(TEMPLATE) /variables/$(notdir $(CONFIG_FILE)) --format=yaml > cloud-init.yaml
 
 launch-vm: render-config
 	@multipass launch 24.04 -n $(VM_NAME) --cpus 4 --memory $(MEMORY) --disk 15G --cloud-init cloud-init.yaml

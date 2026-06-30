@@ -36,8 +36,8 @@ To get started with the sample app, follow these steps:
 
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
-- `make run`: Creates the MongoDB sample app, spawning a local three-member replicaset.
-- `make run-cluster`: Creates a sharded cluster instead (config server + two 3-member shards + mongos) for testing cluster dashboards.
+- `make run`: Creates the MongoDB sample app as a sharded cluster (config server + two 3-member shards + mongos) for testing cluster dashboards.
+- `make run-single`: Creates the lighter single three-member replicaset instead.
 - `make clean`: Deletes all created VMs and performs cleanup.
 
 ## Default configuration variables
