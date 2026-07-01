@@ -41,7 +41,12 @@ runcmd:
   
 
   # Spawn a three node replicaset with a config server and mongos
-  - sudo mlaunch --replicaset 
+  - sudo mlaunch --replicaset --dir /data/mongodb
+
+  # Let the alloy user read the mongod logs created by mlaunch (adm is the conventional log-reader group)
+  - sudo chgrp -R adm /data/mongodb
+  - sudo chmod -R g+rX /data/mongodb
+  - sudo usermod -a -G adm alloy || echo "Could not add alloy to adm group"
   # - sudo mlaunch --replicaset --auth --auth-roles dbAdminAnyDatabase readWriteAnyDatabase userAdminAnyDatabase clusterAdmin clusterMonitor
 
   # Configure Alloy
@@ -121,6 +126,41 @@ write_files:
         }
         {%- endif %}
       }
+    }
+
+    // Tail the mongod logs created by mlaunch under /data/mongodb and ship them to Loki.
+    local.file_match "integrations_mongodb_logs" {
+      path_targets = [{
+        __address__     = "localhost",
+        __path__        = "/data/mongodb/**/mongod.log",
+        instance        = constants.hostname,
+        job             = "integrations/mongodb",
+        mongodb_cluster = "mongodb_sample_app_cluster",
+      }]
+    }
+
+    loki.process "integrations_mongodb_logs" {
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+
+      // MongoDB 8.0 logs are structured JSON; promote severity and component to labels.
+      stage.json {
+        expressions = {
+          level     = "s",
+          component = "c",
+        }
+      }
+
+      stage.labels {
+        values = {
+          level     = null,
+          component = null,
+        }
+      }
+    }
+
+    loki.source.file "integrations_mongodb_logs" {
+      targets    = local.file_match.integrations_mongodb_logs.targets
+      forward_to = [loki.process.integrations_mongodb_logs.receiver]
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs_primary" {

@@ -30,37 +30,35 @@ runcmd:
   - sudo apt update
   - sudo apt install mongodb-org -y
 
-  # Stop mongod service in case it auto-started
+  # Stop the packaged mongod so it does not hold port 27017
   - sudo systemctl stop mongod
 
-  # Create required directories for each replica set
-  - sudo mkdir -p /srv/mongodb/rs0-0  /srv/mongodb/rs0-1 /srv/mongodb/rs0-2 /srv/mongodb/rs1-0  /srv/mongodb/rs1-1 /srv/mongodb/rs1-2 /srv/mongodb/confrs-0 
+  # Create data and log directories (logs in /var/log/mongodb so the alloy user can read them)
+  - sudo mkdir -p /srv/mongodb/rs0-0 /srv/mongodb/rs0-1 /srv/mongodb/rs0-2 /srv/mongodb/rs1-0 /srv/mongodb/rs1-1 /srv/mongodb/rs1-2 /srv/mongodb/confrs-0 /var/log/mongodb
 
-  # Single member config server replica set
-  - sudo mongod --configsvr --replSet confrs --port 27017 --bind_ip localhost --dbpath /srv/mongodb/confrs-0  --oplogSize 128 &> /root/confrs-0.log &
-
-  # Spawn two shards, each a three-member replicaset
-  - sudo mongod --shardsvr --replSet rs0 --port 27018 --bind_ip localhost --dbpath /srv/mongodb/rs0-0  --oplogSize 128 &> /root/rs0-0.log &
-  - sudo mongod --shardsvr --replSet rs0 --port 27019 --bind_ip localhost --dbpath /srv/mongodb/rs0-1  --oplogSize 128 &> /root/rs0-1.log &
-  - sudo mongod --shardsvr --replSet rs0 --port 27020 --bind_ip localhost --dbpath /srv/mongodb/rs0-2 --oplogSize 128 &> /root/rs0-2.log &
-  - sudo mongod --shardsvr --replSet rs1 --port 27021 --bind_ip localhost --dbpath /srv/mongodb/rs1-0  --oplogSize 128 &> /root/rs1-0.log &
-  - sudo mongod --shardsvr --replSet rs1 --port 27022 --bind_ip localhost --dbpath /srv/mongodb/rs1-1  --oplogSize 128 &> /root/rs1-1.log &
-  - sudo mongod --shardsvr --replSet rs1 --port 27023 --bind_ip localhost --dbpath /srv/mongodb/rs1-2 --oplogSize 128 &> /root/rs1-2.log &
-
-  # mongos instance tbd
-  - sudo mongos --configdb confrs/localhost:27017 --port 27024 --bind_ip localhost &> /root/mongos.log &
-  
-  # Initiate replicasets
-  ## Config server RS
+  # Config server: --fork blocks until it accepts connections (avoids the init race), --logpath captures logs
+  - sudo mongod --configsvr --replSet confrs --port 27017 --bind_ip localhost --dbpath /srv/mongodb/confrs-0 --oplogSize 128 --logpath /var/log/mongodb/confrs-0.log --fork
   - "sudo mongosh localhost:27017 --eval \"rs.initiate({_id: 'confrs', configsvr: true, members: [{_id: 0, host: 'localhost:27017'}]})\""
-  ## rs0
+
+  # Two shards, each a three-member replicaset
+  - sudo mongod --shardsvr --replSet rs0 --port 27018 --bind_ip localhost --dbpath /srv/mongodb/rs0-0 --oplogSize 128 --logpath /var/log/mongodb/rs0-0.log --fork
+  - sudo mongod --shardsvr --replSet rs0 --port 27019 --bind_ip localhost --dbpath /srv/mongodb/rs0-1 --oplogSize 128 --logpath /var/log/mongodb/rs0-1.log --fork
+  - sudo mongod --shardsvr --replSet rs0 --port 27020 --bind_ip localhost --dbpath /srv/mongodb/rs0-2 --oplogSize 128 --logpath /var/log/mongodb/rs0-2.log --fork
+  - sudo mongod --shardsvr --replSet rs1 --port 27021 --bind_ip localhost --dbpath /srv/mongodb/rs1-0 --oplogSize 128 --logpath /var/log/mongodb/rs1-0.log --fork
+  - sudo mongod --shardsvr --replSet rs1 --port 27022 --bind_ip localhost --dbpath /srv/mongodb/rs1-1 --oplogSize 128 --logpath /var/log/mongodb/rs1-1.log --fork
+  - sudo mongod --shardsvr --replSet rs1 --port 27023 --bind_ip localhost --dbpath /srv/mongodb/rs1-2 --oplogSize 128 --logpath /var/log/mongodb/rs1-2.log --fork
   - "sudo mongosh localhost:27018 --eval \"rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27018'}, {_id: 1, host: 'localhost:27019'}, {_id: 2, host: 'localhost:27020'}]})\""
-  ## rs1
   - "sudo mongosh localhost:27021 --eval \"rs.initiate({_id: 'rs1', members: [{_id: 0, host: 'localhost:27021'}, {_id: 1, host: 'localhost:27022'}, {_id: 2, host: 'localhost:27023'}]})\""
-  
-  # Add shards via mongos
+
+  # Router: start after the config server replicaset exists, then register the shards
+  - sudo mongos --configdb confrs/localhost:27017 --port 27024 --bind_ip localhost --logpath /var/log/mongodb/mongos.log --fork
   - "sudo mongosh localhost:27024 --eval \"sh.addShard('rs0/localhost:27018,localhost:27019,localhost:27020')\""
   - "sudo mongosh localhost:27024 --eval \"sh.addShard('rs1/localhost:27021,localhost:27022,localhost:27023')\""
+
+  # Let the alloy user read the mongod logs (adm is the conventional log-reader group)
+  - sudo chgrp -R adm /var/log/mongodb
+  - sudo chmod -R g+rX /var/log/mongodb
+  - sudo usermod -a -G adm alloy || echo "Could not add alloy to adm group"
 
   # Configure Alloy
   - sudo systemctl enable alloy.service
@@ -69,11 +67,11 @@ runcmd:
 write_files:
 # Alloy configuration
 
-# Note for mongodb config, there are three separate configs, namely:
-# Configs for mongos (27017) config server (27024) and shard (27018)
-# this is based on `mlaunch --replicaset --sharded 2`
-# which creates two shards for each of the three nodes in the replicaset,
-# plus a mongos and config server on 27017 and 27024 respectively
+# A scrape config is defined per cluster component:
+#   mongos          -> 27024
+#   config server   -> 27017 (replSet confrs)
+#   shard rs0        -> 27018, 27019, 27020
+#   shard rs1        -> 27021, 27022, 27023
 - owner: root:root
   path: /etc/alloy/config.alloy
   content: |
@@ -139,6 +137,41 @@ write_files:
         }
         {%- endif %}
       }
+    }
+
+    // Tail every config-server, shard and mongos log under /var/log/mongodb and ship them to Loki.
+    local.file_match "integrations_mongodb_logs" {
+      path_targets = [{
+        __address__     = "localhost",
+        __path__        = "/var/log/mongodb/*.log",
+        instance        = constants.hostname,
+        job             = "integrations/mongodb",
+        mongodb_cluster = "mongodb_sample_app_cluster",
+      }]
+    }
+
+    loki.process "integrations_mongodb_logs" {
+      forward_to = [loki.write.grafana_cloud_loki.receiver]
+
+      // MongoDB 8.0 logs are structured JSON; promote severity and component to labels.
+      stage.json {
+        expressions = {
+          level     = "s",
+          component = "c",
+        }
+      }
+
+      stage.labels {
+        values = {
+          level     = null,
+          component = null,
+        }
+      }
+    }
+
+    loki.source.file "integrations_mongodb_logs" {
+      targets    = local.file_match.integrations_mongodb_logs.targets
+      forward_to = [loki.process.integrations_mongodb_logs.receiver]
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_mongos" {
@@ -315,7 +348,7 @@ write_files:
     }
 
     prometheus.scrape "integrations_mongodb_exporter_rs1_shard0" {
-      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard0.output
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs1_shard0.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
     }
@@ -375,7 +408,7 @@ write_files:
     }
 
     prometheus.scrape "integrations_mongodb_exporter_rs1_shard2" {
-      targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard2.output
+      targets    = discovery.relabel.integrations_mongodb_exporter_rs1_shard2.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
     }
