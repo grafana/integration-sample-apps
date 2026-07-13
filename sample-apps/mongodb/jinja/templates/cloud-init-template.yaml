@@ -197,7 +197,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs_primary.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs_secondary" {
@@ -228,7 +227,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs_secondary.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
 # Load generator: continuous CRUD workload against the loadgen.events collection

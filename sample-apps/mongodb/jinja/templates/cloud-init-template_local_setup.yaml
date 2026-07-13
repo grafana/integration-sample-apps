@@ -210,7 +210,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_mongos.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_configserv" {
@@ -241,7 +240,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_configserv.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs0_shard0" {
@@ -272,7 +270,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard0.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs0_shard1" {
@@ -303,7 +300,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard1.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs0_shard2" {
@@ -334,7 +330,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs0_shard2.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs1_shard0" {
@@ -365,7 +360,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs1_shard0.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs1_shard1" {
@@ -396,7 +390,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs1_shard1.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
     prometheus.exporter.mongodb "integrations_mongodb_exporter_rs1_shard2" {
@@ -427,7 +420,6 @@ write_files:
       targets    = discovery.relabel.integrations_mongodb_exporter_rs1_shard2.output
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
-      scrape_interval = "{{ interval }}"
     }
 
 # Load generator: continuous CRUD workload against the sharded loadgen.events
