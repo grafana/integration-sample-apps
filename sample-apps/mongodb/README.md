@@ -2,6 +2,8 @@
 
 This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of MongoDB 8.0 using the Percona mongodb_exporter embedded within Alloy.
 
+A built-in load generator seeds a user collection and runs a continuous insert/update/delete/query workload so the dashboards have live data for the operation, latency, oplog, document and (in the sharded topology) data-distribution panels.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
@@ -61,3 +63,14 @@ To get started with the sample app, follow these steps:
   ```bash
   journalctl -u alloy.service
   ```
+
+### Load generator
+- **Check service status**: Confirm the workload generator is running.
+  ```bash
+  systemctl status mongodb-loadgen.service
+  ```
+- **Check logs**: Review the generator output for connection or write errors.
+  ```bash
+  journalctl -u mongodb-loadgen.service
+  ```
+- **Script**: The workload is defined in `/usr/local/bin/loadgen.js` and writes to the `loadgen.events` collection (sharded with a hashed key in the cluster topology).

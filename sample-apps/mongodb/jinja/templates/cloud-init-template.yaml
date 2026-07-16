@@ -1,3 +1,4 @@
+
 # jinja/templates/main-node-cloud-init-template.yaml
 # Cloud-init configuration for setting up Alloy and a local mongodb replicaset
 
@@ -48,6 +49,12 @@ runcmd:
   - sudo chmod -R g+rX /data/mongodb
   - sudo usermod -a -G adm alloy || echo "Could not add alloy to adm group"
   # - sudo mlaunch --replicaset --auth --auth-roles dbAdminAnyDatabase readWriteAnyDatabase userAdminAnyDatabase clusterAdmin clusterMonitor
+
+  # Seed a user collection so the collection / document dashboards have data
+  - "sudo mongosh 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset' --eval \"db.getSiblingDB('loadgen').events.createIndex({key: 1})\""
+
+  # Start the continuous CRUD load generator (unit + script defined in write_files)
+  - sudo systemctl enable --now mongodb-loadgen.service
 
   # Configure Alloy
   - sudo systemctl enable alloy.service
@@ -221,3 +228,72 @@ write_files:
       forward_to = [prometheus.remote_write.metrics_service.receiver]
       job_name   = "integrations/mongodb_exporter"
     }
+
+# Load generator: continuous CRUD workload against the loadgen.events collection
+# so insert/update/delete/query, oplog, latency and document panels have live
+# data. Connects to the replica set so writes always reach the primary.
+- owner: root:root
+  path: /usr/local/bin/loadgen.js
+  content: |
+    const target = db.getSiblingDB('loadgen');
+
+    // Idempotent safety net in case the seed step did not run.
+    try { target.events.createIndex({ key: 1 }); } catch (e) { print('index: ' + e); }
+
+    const STATUSES = ['new', 'active', 'done'];
+    let counter = 0;
+
+    while (true) {
+      counter++;
+
+      // Inserts (varied batch size) -> insert opcounters, oplog, document metrics.
+      const batch = [];
+      const n = 20 + Math.floor(Math.random() * 80);
+      for (let i = 0; i < n; i++) {
+        batch.push({
+          key: Math.floor(Math.random() * 1000000),
+          seq: counter,
+          value: Math.random() * 1000,
+          status: STATUSES[Math.floor(Math.random() * STATUSES.length)],
+          payload: 'x'.repeat(256),
+          createdAt: new Date(),
+        });
+      }
+      try { target.events.insertMany(batch); } catch (e) { print('insert: ' + e); }
+
+      // Reads (range + count) -> query/getmore opcounters and read latency.
+      try {
+        target.events.find({ key: { $lt: 500000 } }).limit(200).toArray();
+        target.events.countDocuments({ status: 'active' });
+      } catch (e) { print('read: ' + e); }
+
+      // Updates -> update opcounters + oplog.
+      try {
+        target.events.updateMany({ status: 'new' }, { $set: { status: 'active', updatedAt: new Date() } });
+      } catch (e) { print('update: ' + e); }
+
+      // Deletes every few cycles -> delete opcounters + keep the collection bounded.
+      if (counter % 5 === 0) {
+        try {
+          const oldIds = target.events.find().sort({ _id: 1 }).limit(500).toArray().map(d => d._id);
+          if (oldIds.length) target.events.deleteMany({ _id: { $in: oldIds } });
+        } catch (e) { print('delete: ' + e); }
+      }
+
+      sleep(2000);
+    }
+
+- owner: root:root
+  path: /etc/systemd/system/mongodb-loadgen.service
+  content: |
+    [Unit]
+    Description=MongoDB sample-app load generator
+    After=network.target
+
+    [Service]
+    ExecStart=/usr/bin/mongosh --quiet "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=replset" /usr/local/bin/loadgen.js
+    Restart=always
+    RestartSec=5
+
+    [Install]
+    WantedBy=multi-user.target
