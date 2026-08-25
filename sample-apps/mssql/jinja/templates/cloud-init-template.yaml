@@ -180,6 +180,7 @@ runcmd:
   - docker run --privileged --rm tonistiigi/binfmt:latest@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3 --install all
   - systemctl restart docker
 
+  # NOTE: azure-sql-edge publishes linux/amd64 only, hence the binfmt setup above.
   - docker run -e "ACCEPT_EULA=1" -e "MSSQL_SA_PASSWORD=reallyStrongPwd123" -e "MSSQL_PID=Developer" -e "MSSQL_USER=SA" -p 1433:1433 -d --name=mssql-sample-app mcr.microsoft.com/azure-sql-edge:2.0.0@sha256:52605ea3251cbc4a7e03eccd458e775ae8a626a3afb4019bec66520a81e78170
 
   # Wait for SQL Server to be ready and set up monitoring user
