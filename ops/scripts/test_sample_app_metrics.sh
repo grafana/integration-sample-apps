@@ -75,7 +75,7 @@ check_metrics() {
       exit 1
     fi
   }
-  status=${PIPESTATUS[0]}
+  status=${PIPESTATUS[1]}
   return $status
 }
 
