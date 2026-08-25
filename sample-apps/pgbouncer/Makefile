@@ -23,6 +23,7 @@ stop:
 fetch-prometheus-metrics:
 	@multipass exec $(VM_NAME) -- curl http://localhost:9127/metrics > prometheus_metrics
 
+# TODO: pgbench bypasses pgbouncer, so pgbouncer_stats_* are never produced.
 load-gen:
 	@multipass exec $(VM_NAME) -- sudo bash -c "sudo su postgres -c 'pgbench -i -s 10; pgbench -c 50 -T 60; exit;'"
 
