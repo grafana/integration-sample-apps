@@ -17,6 +17,8 @@ PROMETHEUS_INSTANCE=$2
 # - METRICS_SUCCESS_RATE_REQUIRED
 source "${OPS_DIR}/.defaultconfig"
 
+DEFAULT_SUCCESS_RATE=$METRICS_SUCCESS_RATE_REQUIRED
+
 # Track overall test status
 OVERALL_STATUS=0
 
@@ -29,6 +31,7 @@ check_metrics() {
   # $4 is .config file, to source
   # Clear the keys a config owns so they cannot carry over between configs
   unset JOB_LABEL EXTRA_GREP_REGEX
+  METRICS_SUCCESS_RATE_REQUIRED=$DEFAULT_SUCCESS_RATE
   source $4
   SUCCESS_COUNTER=0
   TOTAL_COUNTER=0
