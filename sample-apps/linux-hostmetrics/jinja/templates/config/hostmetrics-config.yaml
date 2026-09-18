@@ -1,0 +1,85 @@
+receivers:
+  hostmetrics:
+    collection_interval: {{ interval }}
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization: {enabled: true}
+          system.cpu.logical.count: {enabled: true}
+          system.cpu.physical.count: {enabled: true}
+          system.cpu.frequency: {enabled: true}
+      load:
+      memory:
+        metrics:
+          system.memory.utilization: {enabled: true}
+          system.memory.limit: {enabled: true}
+          system.linux.memory.available: {enabled: true}
+          system.linux.memory.dirty: {enabled: true}
+          system.memory.linux.shared: {enabled: true}
+          system.memory.page_size: {enabled: true}
+      disk:
+      filesystem:
+        metrics:
+          system.filesystem.utilization: {enabled: true}
+      network:
+        metrics:
+          system.network.conntrack.count: {enabled: true}
+          system.network.conntrack.max: {enabled: true}
+      paging:
+        metrics:
+          system.paging.utilization: {enabled: true}
+      processes:
+      system:
+
+processors:
+  resourcedetection:
+    detectors: [system]
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.name:
+          enabled: true
+        host.arch:
+          enabled: true
+        host.id:
+          enabled: true
+        os.type:
+          enabled: true
+        os.description:
+          enabled: true
+  resource:
+    attributes:
+      - key: service.namespace
+        value: "integrations"
+        action: upsert
+      - key: service.name
+        value: "linux-hostmetrics"
+        action: upsert
+      - key: service.instance.id
+        from_attribute: host.name
+        action: insert
+  batch:
+
+exporters:
+  otlphttp/grafanacloud:
+    endpoint: {{ otlp_url }}
+{%- if otlp_user and otlp_pass %}
+    auth:
+      authenticator: basicauth/grafanacloud
+
+extensions:
+  basicauth/grafanacloud:
+    client_auth:
+      username: "{{ otlp_user }}"
+      password: "{{ otlp_pass }}"
+{%- endif %}
+
+service:
+{%- if otlp_user and otlp_pass %}
+  extensions: [basicauth/grafanacloud]
+{%- endif %}
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      processors: [resourcedetection, resource, batch]
+      exporters: [otlphttp/grafanacloud]
