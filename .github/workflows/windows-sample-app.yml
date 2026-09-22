@@ -10,6 +10,7 @@ on:
       - main
     paths:
       - 'sample-apps/windows/**'
+      - '.github/workflows/windows-sample-app.yml'
 
   # Allow manual triggering for testing
   workflow_dispatch:
