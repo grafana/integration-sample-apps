@@ -80,7 +80,7 @@ prometheus.scrape "integrations_windows_exporter" {
 }
 
 prometheus.relabel "integrations_windows_exporter" {
-  forward_to = [otelcol.receiver.prometheus.integrations_windows_exporter.receiver]
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
 
   rule {
     source_labels = ["volume"]
@@ -88,68 +88,6 @@ prometheus.relabel "integrations_windows_exporter" {
     action        = "drop"
   }
 }
-
-"@
-
-# host_id enrichment pipeline. This uses a single-quoted here-string because the transform
-# statement is wrapped in backticks, which are the escape character in a double-quoted one.
-$configTemplate += @'
-
-otelcol.receiver.prometheus "integrations_windows_exporter" {
-  output {
-    metrics = [otelcol.processor.resourcedetection.integrations_windows_exporter.input]
-  }
-}
-
-// Detectors run in order, first match wins. This order must match how host.id is
-// resolved for this host's application telemetry.
-otelcol.processor.resourcedetection "integrations_windows_exporter" {
-  detectors = ["env", "ec2", "azure", "gcp", "system"]
-  timeout   = "10s"
-  override  = false
-
-  system {
-    resource_attributes {
-      host.id {
-        enabled = true
-      }
-    }
-  }
-
-  output {
-    metrics = [otelcol.processor.transform.integrations_windows_exporter.input]
-  }
-}
-
-otelcol.processor.transform "integrations_windows_exporter" {
-  // TEMPORARY: "propagate" so a failing OTTL statement surfaces instead of being
-  // swallowed. Revert to "ignore" before merge.
-  error_mode = "propagate"
-
-  metric_statements {
-    context    = "datapoint"
-    statements = [
-      `set(datapoint.attributes["host_id"], resource.attributes["host.id"]) where resource.attributes["host.id"] != nil`,
-    ]
-  }
-
-  output {
-    metrics = [otelcol.exporter.prometheus.integrations_windows_exporter.input]
-  }
-}
-
-otelcol.exporter.prometheus "integrations_windows_exporter" {
-  forward_to = [prometheus.remote_write.metrics_service.receiver]
-
-  add_metric_suffixes  = true
-  include_target_info  = false
-  include_scope_info   = false
-  include_scope_labels = false
-}
-
-'@
-
-$configTemplate += @"
 
 // Self monitoring for Alloy
 prometheus.exporter.self "alloy_metrics" {}

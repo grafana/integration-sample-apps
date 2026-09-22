@@ -105,10 +105,7 @@ jobs:
           # Set default config
           source ../../.defaultconfig
           
-          # Addressed as 127.0.0.1 rather than localhost throughout: Alloy runs on the
-          # Windows host, where localhost resolves to ::1 first, while the Docker ports
-          # published inside WSL are reachable over IPv4 only.
-          echo "Database setup complete - Loki: 127.0.0.1:3100, Mimir: 127.0.0.1:9009"
+          echo "Database setup complete - Loki: localhost:3100, Mimir: localhost:9009"
           
           # Wait for containers to be running first
           echo "Waiting for containers to be running..."
@@ -124,7 +121,7 @@ jobs:
           # Check Mimir health using official readiness probe
           echo "Checking Mimir health..."
           for i in {1..30}; do
-            if curl -s http://127.0.0.1:9009/ready >/dev/null 2>&1; then
+            if curl -s http://localhost:9009/ready >/dev/null 2>&1; then
               echo "✅ Mimir is ready"
               break
             fi
@@ -140,7 +137,7 @@ jobs:
           # Check Loki health using official readiness probe
           echo "Checking Loki health..."
           for i in {1..30}; do
-            if curl -s http://127.0.0.1:3100/ready >/dev/null 2>&1; then
+            if curl -s http://localhost:3100/ready >/dev/null 2>&1; then
               echo "✅ Loki is ready"
               break
             fi
@@ -171,9 +168,9 @@ jobs:
           
           # Create and configure Alloy with remote endpoints
           Write-Host "Creating Alloy configuration..."
-          Write-Host "Loki endpoint: http://127.0.0.1:3100/loki/api/v1/push"
-          Write-Host "Mimir endpoint: http://127.0.0.1:9009/api/v1/push"
-          .\scripts\create_default_config.ps1 -LokiUrl "http://127.0.0.1:3100/loki/api/v1/push" -PrometheusUrl "http://127.0.0.1:9009/api/v1/push"
+          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
           .\scripts\configure_alloy.ps1
           
           # Start Alloy service
@@ -197,51 +194,12 @@ jobs:
           echo "Waiting for sample app to generate metrics..."
           sleep $SAMPLE_APP_SETUP_TIME
 
-      # TEMPORARY debug step, remove before merge.
-      # Alloy runs on the Windows host, so it is queried from PowerShell:
-      # WSL2 forwards Windows -> WSL, not WSL -> Windows.
-      - name: Debug Alloy state
-        if: always()
-        shell: powershell
-        run: |
-          Write-Host "--- Alloy components (raw) ---"
-          try {
-            (Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:12345/api/v0/web/components").Content
-          } catch {
-            Write-Host "component API unreachable: $_"
-          }
-
-          Write-Host "--- Alloy service status ---"
-          Get-Service -Name "Alloy" -ErrorAction SilentlyContinue | Format-List *
-
-          Write-Host "--- Alloy event log (newest 50) ---"
-          try {
-            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Alloy'} -MaxEvents 50 -ErrorAction Stop |
-              Select-Object TimeCreated, LevelDisplayName, Message | Format-List
-          } catch {
-            Write-Host "no Alloy events found: $_"
-          }
-
-      # TEMPORARY debug step, remove before merge.
-      # Mimir runs in Docker inside WSL, so it is queried from WSL.
-      - name: Debug Mimir state
-        if: always()
-        run: |
-          source ~/.vars
-
-          echo "--- metric names in Mimir ---"
-          curl -sS -i -4 http://127.0.0.1:9009/prometheus/api/v1/label/__name__/values || true
-          echo ""
-          echo "--- jobs in Mimir ---"
-          curl -sS -i -4 http://127.0.0.1:9009/prometheus/api/v1/label/job/values || true
-          echo ""
-
       - name: Validate metrics
         run: |
           source ~/.vars
-
+          
           echo "Validating metrics using check_metrics.sh script..."
-          ./ops/scripts/test_sample_app_metrics.sh windows 127.0.0.1:9009
+          ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
 
       - name: Cleanup Docker containers
         if: always()
