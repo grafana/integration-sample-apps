@@ -194,10 +194,49 @@ jobs:
           echo "Waiting for sample app to generate metrics..."
           sleep $SAMPLE_APP_SETUP_TIME
 
+      # TEMPORARY debug step, remove before merge.
+      # Alloy runs on the Windows host, so it is queried from PowerShell:
+      # WSL2 forwards Windows -> WSL, not WSL -> Windows.
+      - name: Debug Alloy state
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "--- Alloy components (raw) ---"
+          try {
+            (Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:12345/api/v0/web/components").Content
+          } catch {
+            Write-Host "component API unreachable: $_"
+          }
+
+          Write-Host "--- Alloy service status ---"
+          Get-Service -Name "Alloy" -ErrorAction SilentlyContinue | Format-List *
+
+          Write-Host "--- Alloy event log (newest 50) ---"
+          try {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Alloy'} -MaxEvents 50 -ErrorAction Stop |
+              Select-Object TimeCreated, LevelDisplayName, Message | Format-List
+          } catch {
+            Write-Host "no Alloy events found: $_"
+          }
+
+      # TEMPORARY debug step, remove before merge.
+      # Mimir runs in Docker inside WSL, so it is queried from WSL.
+      - name: Debug Mimir state
+        if: always()
+        run: |
+          source ~/.vars
+
+          echo "--- metric names in Mimir ---"
+          curl -s http://localhost:9009/prometheus/api/v1/label/__name__/values || true
+          echo ""
+          echo "--- jobs in Mimir ---"
+          curl -s http://localhost:9009/prometheus/api/v1/label/job/values || true
+          echo ""
+
       - name: Validate metrics
         run: |
           source ~/.vars
-          
+
           echo "Validating metrics using check_metrics.sh script..."
           ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
 

@@ -122,7 +122,9 @@ otelcol.processor.resourcedetection "integrations_windows_exporter" {
 }
 
 otelcol.processor.transform "integrations_windows_exporter" {
-  error_mode = "ignore"
+  // TEMPORARY: "propagate" so a failing OTTL statement surfaces instead of being
+  // swallowed. Revert to "ignore" before merge.
+  error_mode = "propagate"
 
   metric_statements {
     context    = "datapoint"
