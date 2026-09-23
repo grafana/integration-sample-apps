@@ -16,13 +16,13 @@ CLOUD_INITS := $(foreach c,$(COLLECTORS),cloud-init-$(c).yaml)
 # Import last to ensure expected parameters are set and available to import from this file
 include ../Makefile
 
-.PHONY: run run-ci stop render-config launch-vm clean defaultconfig
+.PHONY: run run-ci stop render-config launch-vm clean distclean defaultconfig
 .DELETE_ON_ERROR:
 
 run: launch-vm
 	@echo "Launched $(NODES) node(s) per collector: $(COLLECTORS)"
 
-run-ci: clean defaultconfig launch-vm
+run-ci: distclean defaultconfig launch-vm
 	@echo "Running in CI mode"
 
 stop:
@@ -53,12 +53,17 @@ launch-vm: render-config
 
 clean:
 	@rm -f cloud-init-*.yaml
+
+distclean: clean
 	@rm -rf $(CONFIG_FILE_DIR)
 
-defaultconfig:
+defaultconfig: $(CONFIG_FILE)
+
+$(CONFIG_FILE):
 	@mkdir -p $(CONFIG_FILE_DIR)
-	@echo "interval: \"10s\"" >> $(CONFIG_FILE)
-	@echo "otlp_url: http://$(PROMETHEUS_INSTANCE)/otlp" >> $(CONFIG_FILE)
-	@echo "otel_col_version: \"$(OTEL_COL_VERSION)\"" >> $(CONFIG_FILE)
-	@echo "otlp_user: \"\"" >> $(CONFIG_FILE)
-	@echo "otlp_pass: \"\"" >> $(CONFIG_FILE)
+	@echo "interval: \"10s\"" > $@
+	@echo "otlp_url: http://$(PROMETHEUS_INSTANCE)/otlp" >> $@
+	@echo "otel_col_version: \"$(OTEL_COL_VERSION)\"" >> $@
+	@echo "otlp_user: \"\"" >> $@
+	@echo "otlp_pass: \"\"" >> $@
+	@echo "wrote $@"

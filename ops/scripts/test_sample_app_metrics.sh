@@ -48,14 +48,13 @@ check_metrics() {
     echo "---- [ GREP regex now: "$GREP_REGEX" ] ----"
   fi
 
-  # `:-` only defaults an unset or empty value, so a whitespace-only filter would
-  # word-split to nothing and check no instances at all
-  INSTANCES=$(echo $INSTANCE_FILTER)
-  [ -z "$INSTANCES" ] && INSTANCES=any
+  # read -ra splits without globbing; a blank filter falls back to the whole job
+  read -ra INSTANCES <<< "$INSTANCE_FILTER"
+  [ ${#INSTANCES[@]} -eq 0 ] && INSTANCES=(any)
 
   STATUS=0
-  for INSTANCE in $INSTANCES; do
-    check_instance $1 $2 $3 $INSTANCE || STATUS=1
+  for INSTANCE in "${INSTANCES[@]}"; do
+    check_instance "$1" "$2" "$3" "$INSTANCE" || STATUS=1
   done
   return $STATUS
 }

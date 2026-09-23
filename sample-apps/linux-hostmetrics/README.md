@@ -34,11 +34,12 @@ To get started with the sample app, follow these steps:
 
 ## Make commands
 
-- `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
+- `make defaultconfig`: Creates the configuration file with default values, if it does not already exist. `make run` and `make render-config` create it when missing.
 - `make render-config`: Generates a `cloud-init-<collector>.yaml` configuration file per collector using the defined variables.
 - `make run`: Creates the Linux hostmetrics sample app.
 - `make stop`: Deletes all created VMs.
 - `make clean`: Removes the rendered configuration files.
+- `make distclean`: Also removes `jinja/variables/`, including any endpoint and credentials set there.
 
 ## Make variables
 
@@ -46,7 +47,7 @@ Any of these can be overridden on the command line, e.g. `make COLLECTORS=otelco
 
 - `COLLECTORS`: Which collectors to run, one VM per collector. Defaults to `alloy otelcol`. Each has a matching `jinja/templates/<collector>.yaml`.
 - `NODES`: How many VMs to launch per collector. Defaults to `1`.
-- `PROMETHEUS_INSTANCE`: `host:port` of the OTLP endpoint written into the default config. Defaults to `your-prometheus-instance:9090`.
+- `PROMETHEUS_INSTANCE`: `host:port` of the OTLP endpoint written into the default config when it is created. Defaults to `your-prometheus-instance:9090`.
 - `OTEL_COL_VERSION`: Pinned OpenTelemetry Collector release to install.
 - `VM_NAME`: Name prefix for the launched VMs. Defaults to `linux-hostmetrics-sample-app`.
 - `VM_CPUS`, `VM_MEMORY`, `VM_DISK`: Per-VM resources. Default to `2`, `2G` and `8G`.
