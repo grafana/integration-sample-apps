@@ -147,3 +147,11 @@ jobs:
           ./ops/scripts/test_sample_app_metrics.sh ${SAMPLE_APP} $MIMIR
           # test get link to this particular stage
           echo "CHECK_METRICS_STEP_LINKL=https://github.com/${{ github.repository }}/commit/${{ github.sha }}/checks/${{ github.run_id }}"
+
+      - name: Dump snmp debug logs
+        if: failure() && matrix.sample-app == 'snmp'
+        run: |
+          echo "--- [ Alloy snmp scrape errors ] ---"
+          multipass exec snmp-sample-app -- sudo journalctl -u alloy --no-pager | grep -iE "951G|error scraping|level=(warn|error)" | tail -n 200 || true
+          echo "--- [ snmpsim errors ] ---"
+          multipass exec snmp-sample-app -- bash -c "docker logs snmpsim_snmpsim_1 2>&1" | grep -iE "951G|error|exception|traceback" | sort | uniq -c | sort -rn | head -n 50 || true
