@@ -153,6 +153,15 @@ jobs:
           
           echo "✅ All services are ready"
 
+          # WSL2 tears the VM down seconds after its last process exits, which stops
+          # the Docker daemon and these containers: Mimir shut down 16s after the
+          # PowerShell step began, and never came back. The PowerShell steps leave WSL
+          # idle for ~5 minutes, so hold the VM open for the rest of the job.
+          # 2700s matches this job's timeout-minutes: 45.
+          echo "Holding the WSL VM open for the rest of the job..."
+          nohup sleep 2700 >/dev/null 2>&1 &
+          disown
+
       - name: Run Windows sample app
         shell: powershell
         run: |
@@ -169,9 +178,12 @@ jobs:
           
           # Create and configure Alloy with remote endpoints
           Write-Host "Creating Alloy configuration..."
-          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
-          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
-          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
+          # 127.0.0.1 rather than localhost: Alloy runs on the Windows host, where
+          # localhost resolves to ::1 first, while the Docker ports published inside
+          # WSL are reachable over IPv4 only.
+          Write-Host "Loki endpoint: http://127.0.0.1:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://127.0.0.1:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://127.0.0.1:3100/loki/api/v1/push" -PrometheusUrl "http://127.0.0.1:9009/api/v1/push"
           .\scripts\configure_alloy.ps1
           
           # Start Alloy service
