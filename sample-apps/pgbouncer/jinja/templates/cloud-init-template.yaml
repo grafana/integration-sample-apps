@@ -1,5 +1,6 @@
 # jinja/templates/cloud-init-template.yaml
 # Cloud-init configuration for setting up Postgres, PGbouncer, PGbouncer Exporter, and Alloy
+{% set pgbouncer_exporter_version = pgbouncer_exporter_version | default("0.10.2") %}
 
 apt:
   sources:
@@ -42,14 +43,9 @@ runcmd:
   - sudo systemctl enable alloy.service
   - sudo systemctl start alloy.service
   
-  #Install Exporter
-  - git clone https://github.com/prometheus-community/pgbouncer_exporter.git  
-  - cd /pgbouncer_exporter/
-  - git config --global --add safe.directory /pgbouncer_exporter
-  - sudo apt install make -y
-  - sudo snap install go --classic
-  - sudo make build
-  - ./pgbouncer_exporter &
+  # Install Exporter
+  - ARCH=$(dpkg --print-architecture) && curl -sfL https://github.com/prometheus-community/pgbouncer_exporter/releases/download/v{{ pgbouncer_exporter_version }}/pgbouncer_exporter-{{ pgbouncer_exporter_version }}.linux-${ARCH}.tar.gz | sudo tar xz -C /opt
+  - /opt/pgbouncer_exporter-{{ pgbouncer_exporter_version }}.linux-*/pgbouncer_exporter &
 
 write_files:
 # Alloy configuration
