@@ -186,7 +186,43 @@ jobs:
           Write-Host "Generating test load..."
           .\scripts\generate_load.ps1
           
+          # TEMPORARY probe, remove before merge. Windows -> WSL direction, which no
+          # run has yet demonstrated working: the readiness check runs inside WSL.
+          Write-Host "--- Windows -> mimir ---"
+          try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Uri "http://127.0.0.1:9009/ready").StatusCode }
+          catch { Write-Host "windows -> mimir failed: $_" }
+
           Write-Host "Windows sample app setup complete"
+
+      # TEMPORARY probe, remove before merge. Runs immediately after the PowerShell
+      # step, which leaves WSL idle for ~5 minutes, to catch the database state at
+      # the moment the idle window closes.
+      - name: Debug database state after idle window
+        if: always()
+        run: |
+          source ~/.vars
+
+          echo "--- WSL uptime, seconds (small value means the WSL VM restarted) ---"
+          cat /proc/uptime
+
+          echo "--- containers ---"
+          docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+
+          # Narrow --format deliberately: a bare `docker inspect` would dump the
+          # container's full config including Env.
+          docker inspect dbs-mimir-1 --format 'Running={{.State.Running}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Started={{.State.StartedAt}} Finished={{.State.FinishedAt}}' || true
+
+          echo "--- listeners on 9009/3100 ---"
+          sudo ss -ltnp 2>/dev/null | grep -E '9009|3100' || echo "nothing listening on 9009/3100"
+
+          echo "--- mimir logs ---"
+          docker logs dbs-mimir-1 --tail 30 2>&1 || true
+
+          echo "--- oom killer ---"
+          sudo dmesg 2>/dev/null | grep -i -E 'oom|killed process' | tail -5 || echo "no dmesg oom entries"
+
+          echo "--- WSL -> mimir ---"
+          curl -sS -i -4 --max-time 5 http://127.0.0.1:9009/ready || true
 
       - name: Wait for sample app to generate metrics
         run: |
@@ -195,10 +231,29 @@ jobs:
           echo "Waiting for sample app to generate metrics..."
           sleep $SAMPLE_APP_SETUP_TIME
 
+      # TEMPORARY probe, remove before merge. Same checks at validation time, to show
+      # whether the state changed during the wait.
+      - name: Debug database state before validation
+        if: always()
+        run: |
+          source ~/.vars
+
+          echo "--- WSL uptime, seconds ---"
+          cat /proc/uptime
+
+          echo "--- containers ---"
+          docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+
+          echo "--- listeners on 9009/3100 ---"
+          sudo ss -ltnp 2>/dev/null | grep -E '9009|3100' || echo "nothing listening on 9009/3100"
+
+          echo "--- WSL -> mimir ---"
+          curl -sS -i -4 --max-time 5 http://127.0.0.1:9009/ready || true
+
       - name: Validate metrics
         run: |
           source ~/.vars
-          
+
           echo "Validating metrics using check_metrics.sh script..."
           ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
 
