@@ -90,10 +90,46 @@ jobs:
           sudo apt-get install -y jq
           echo "jq installed successfully"
 
+      - name: Run Windows sample app
+        shell: powershell
+        run: |
+          Write-Host "Running Windows sample app..."
+          cd sample-apps/windows
+          
+          # Install Alloy
+          Write-Host "Installing Alloy..."
+          .\scripts\install_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to install Alloy"
+            exit 1
+          }
+          
+          # Create and configure Alloy with remote endpoints
+          Write-Host "Creating Alloy configuration..."
+          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
+          .\scripts\configure_alloy.ps1
+          
+          # Start Alloy service, databases come up later so early pushes buffer in the WAL
+          Write-Host "Starting Alloy service..."
+          .\scripts\start_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to start Alloy service"
+            exit 1
+          }
+
+          # Generate load for testing
+          Write-Host "Generating test load..."
+          .\scripts\generate_load.ps1
+
+          Write-Host "Windows sample app setup complete"
+
+      # Start after the Windows setup, WSL2 stops its VM and these containers when idle
       - name: Start Mimir and Loki containers
         run: |
           source ~/.vars
-          
+
           echo "Starting Mimir and Loki containers using docker-compose..."
           
           # Navigate to the docker-compose directory
@@ -152,41 +188,6 @@ jobs:
           
           echo "✅ All services are ready"
 
-      - name: Run Windows sample app
-        shell: powershell
-        run: |
-          Write-Host "Running Windows sample app..."
-          cd sample-apps/windows
-          
-          # Install Alloy
-          Write-Host "Installing Alloy..."
-          .\scripts\install_alloy.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to install Alloy"
-            exit 1
-          }
-          
-          # Create and configure Alloy with remote endpoints
-          Write-Host "Creating Alloy configuration..."
-          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
-          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
-          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
-          .\scripts\configure_alloy.ps1
-          
-          # Start Alloy service
-          Write-Host "Starting Alloy service..."
-          .\scripts\start_alloy.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to start Alloy service"
-            exit 1
-          }
-          
-          # Generate load for testing
-          Write-Host "Generating test load..."
-          .\scripts\generate_load.ps1
-          
-          Write-Host "Windows sample app setup complete"
-
       - name: Wait for sample app to generate metrics
         run: |
           source ~/.vars
@@ -197,7 +198,7 @@ jobs:
       - name: Validate metrics
         run: |
           source ~/.vars
-          
+
           echo "Validating metrics using check_metrics.sh script..."
           ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
 
