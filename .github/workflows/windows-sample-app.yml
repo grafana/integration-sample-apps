@@ -107,23 +107,19 @@ jobs:
           
           # Create and configure Alloy with remote endpoints
           Write-Host "Creating Alloy configuration..."
-          # 127.0.0.1, not localhost: on the Windows host localhost resolves to ::1
-          # first, where nothing listens, and every push was refused.
+          # Use 127.0.0.1, the Windows host resolves localhost to ::1
           Write-Host "Loki endpoint: http://127.0.0.1:3100/loki/api/v1/push"
           Write-Host "Mimir endpoint: http://127.0.0.1:9009/api/v1/push"
           .\scripts\create_default_config.ps1 -LokiUrl "http://127.0.0.1:3100/loki/api/v1/push" -PrometheusUrl "http://127.0.0.1:9009/api/v1/push"
           .\scripts\configure_alloy.ps1
           
-          # Start Alloy service
+          # Start Alloy service, databases come up later so early pushes buffer in the WAL
           Write-Host "Starting Alloy service..."
           .\scripts\start_alloy.ps1
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Failed to start Alloy service"
             exit 1
           }
-          
-          # Alloy starts before the databases exist, so its first pushes fail and
-          # buffer in the remote_write WAL until they come up.
 
           # Generate load for testing
           Write-Host "Generating test load..."
@@ -131,10 +127,7 @@ jobs:
 
           Write-Host "Windows sample app setup complete"
 
-      # Started after the Windows setup, not before it: WSL2 takes its VM down shortly
-      # after the last WSL process exits, stopping Docker and these containers. Started
-      # first, Mimir shut down 15s into the PowerShell step and never returned. No
-      # PowerShell step runs from here on, so they stay up.
+      # Start after the Windows setup, WSL2 stops its VM and these containers when idle
       - name: Start Mimir and Loki containers
         run: |
           source ~/.vars
@@ -197,35 +190,6 @@ jobs:
           
           echo "✅ All services are ready"
 
-      # TEMPORARY probe, remove before merge. Baseline: the containers have just
-      # started, so this should show them Up with 9009/3100 listening.
-      - name: Debug database state after startup
-        if: always()
-        run: |
-          source ~/.vars
-
-          echo "--- WSL uptime, seconds (small value means the WSL VM restarted) ---"
-          cat /proc/uptime
-
-          echo "--- containers ---"
-          docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
-
-          # Narrow --format deliberately: a bare `docker inspect` would dump the
-          # container's full config including Env.
-          docker inspect dbs-mimir-1 --format 'Running={{.State.Running}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Started={{.State.StartedAt}} Finished={{.State.FinishedAt}}' || true
-
-          echo "--- listeners on 9009/3100 ---"
-          sudo ss -ltnp 2>/dev/null | grep -E '9009|3100' || echo "nothing listening on 9009/3100"
-
-          echo "--- mimir logs ---"
-          docker logs dbs-mimir-1 --tail 30 2>&1 || true
-
-          echo "--- oom killer ---"
-          sudo dmesg 2>/dev/null | grep -i -E 'oom|killed process' | tail -5 || echo "no dmesg oom entries"
-
-          echo "--- WSL -> mimir ---"
-          curl -sS -i -4 --max-time 5 http://127.0.0.1:9009/ready || true
-
       - name: Wait for sample app to generate metrics
         run: |
           source ~/.vars
@@ -233,50 +197,12 @@ jobs:
           echo "Waiting for sample app to generate metrics..."
           sleep $SAMPLE_APP_SETUP_TIME
 
-      # TEMPORARY probe, remove before merge. Same checks after the wait: if the
-      # containers are still Up here, the restructure held.
-      - name: Debug database state before validation
-        if: always()
-        run: |
-          source ~/.vars
-
-          echo "--- WSL uptime, seconds ---"
-          cat /proc/uptime
-
-          echo "--- containers ---"
-          docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
-
-          echo "--- listeners on 9009/3100 ---"
-          sudo ss -ltnp 2>/dev/null | grep -E '9009|3100' || echo "nothing listening on 9009/3100"
-
-          echo "--- WSL -> mimir ---"
-          curl -sS -i -4 --max-time 5 http://127.0.0.1:9009/ready || true
-
       - name: Validate metrics
         run: |
           source ~/.vars
 
           echo "Validating metrics using check_metrics.sh script..."
           ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
-
-      # TEMPORARY probe, remove before merge. After validation, so it cannot disturb
-      # WSL beforehand. Shows whether Alloy's pushes now succeed, and finally tests
-      # Windows -> WSL against live containers.
-      - name: Debug Alloy state
-        if: always()
-        shell: powershell
-        run: |
-          Write-Host "--- Windows -> mimir ---"
-          try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Uri "http://127.0.0.1:9009/ready").StatusCode }
-          catch { Write-Host "windows -> mimir failed: $_" }
-
-          Write-Host "--- Alloy event log (newest 40) ---"
-          try {
-            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Alloy'} -MaxEvents 40 -ErrorAction Stop |
-              Select-Object TimeCreated, LevelDisplayName, Message | Format-List
-          } catch {
-            Write-Host "no Alloy events found: $_"
-          }
 
       - name: Cleanup Docker containers
         if: always()
