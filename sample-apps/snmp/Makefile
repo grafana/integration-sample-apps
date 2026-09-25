@@ -25,11 +25,13 @@ fetch-prometheus-metrics:
 render-config:
 	@docker run --rm -v $(shell pwd)/jinja/templates:/templates -v $(shell pwd)/jinja/variables:/variables dinutac/jinja2docker:latest /templates/cloud-init-template.yaml /variables/cloud-init.yaml --format=yaml > cloud-init.yaml
 
+# Wait for snmpsim to finish indexing its data files and start listening, which can take minutes on a slow VM
 snmpsim:
 	@multipass transfer ./snmpsim $(VM_NAME):/home/ubuntu -r
 	@multipass transfer ./snmpsim/targets.yml $(VM_NAME):/tmp/targets.yml
 	@multipass transfer ./snmpsim/auths.yml $(VM_NAME):/tmp/auths.yml
 	@multipass exec $(VM_NAME) -- bash -c "cd ./snmpsim && docker-compose -f docker-compose.snmpsim.yml up -d"
+	@multipass exec $(VM_NAME) -- bash -c 'cd ./snmpsim && for i in $$(seq 1 60); do docker-compose -f docker-compose.snmpsim.yml logs snmpsim 2>&1 | grep -q "Listening at" && echo "snmpsim ready after $$((i * 5))s" && exit 0; sleep 5; done; echo "snmpsim not listening after 300s"; exit 1'
 
 launch-vm: render-config
 	@multipass launch docker -n $(VM_NAME) --cloud-init cloud-init.yaml
