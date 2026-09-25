@@ -107,10 +107,9 @@ jobs:
           
           # Create and configure Alloy with remote endpoints
           Write-Host "Creating Alloy configuration..."
-          # Use 127.0.0.1, the Windows host resolves localhost to ::1
-          Write-Host "Loki endpoint: http://127.0.0.1:3100/loki/api/v1/push"
-          Write-Host "Mimir endpoint: http://127.0.0.1:9009/api/v1/push"
-          .\scripts\create_default_config.ps1 -LokiUrl "http://127.0.0.1:3100/loki/api/v1/push" -PrometheusUrl "http://127.0.0.1:9009/api/v1/push"
+          Write-Host "Loki endpoint: http://localhost:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://localhost:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://localhost:3100/loki/api/v1/push" -PrometheusUrl "http://localhost:9009/api/v1/push"
           .\scripts\configure_alloy.ps1
           
           # Start Alloy service, databases come up later so early pushes buffer in the WAL
