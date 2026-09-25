@@ -1,0 +1,16 @@
+# jinja/templates/cloud-init-template.yaml
+# Cloud-init configuration for setting up the OpenTelemetry hostmetrics receiver
+
+# Install
+{%- block install %}{% endblock %}
+# Configure
+runcmd:
+  - sudo apt-get update
+{%- block configure %}{% endblock %}
+# Write files
+write_files:
+- owner: root:root
+  path: {% block config_path %}{% endblock %}
+  content: |
+{% filter indent(4, true) %}{% include "config/hostmetrics-config.yaml" %}{% endfilter %}
+{%- block files %}{% endblock %}

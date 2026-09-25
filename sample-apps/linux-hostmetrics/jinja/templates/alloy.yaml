@@ -1,0 +1,32 @@
+{% extends "cloud-init-template.yaml" %}
+
+{% block install %}
+apt:
+  sources:
+    grafana:
+      source: deb https://apt.grafana.com stable main
+      keyid: 963FA27710458545
+      keyserver: https://apt.grafana.com/gpg.key
+
+packages:
+- gpg
+- alloy
+{% endblock %}
+
+{% block configure %}
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable alloy.service
+  - sudo systemctl restart alloy.service
+{% endblock %}
+
+{% block config_path %}/etc/alloy/hostmetrics.yaml{% endblock %}
+
+{% block files %}
+# Alloy systemd override to use the OpenTelemetry engine
+- owner: root:root
+  path: /etc/systemd/system/alloy.service.d/otel.conf
+  content: |
+    [Service]
+    ExecStart=
+    ExecStart=/usr/bin/alloy otel --config=/etc/alloy/hostmetrics.yaml
+{% endblock %}

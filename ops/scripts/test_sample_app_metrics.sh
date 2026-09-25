@@ -25,16 +25,14 @@ OVERALL_STATUS=0
 check_metrics() {
   # Expects two parameters, expected_metrics file and .config file
   # Existence should already be confirmed by the time this function is invoked
-  # $1 is sample app name  
+  # $1 is sample app name
   # $2 is prometheus instance
   # $3 is expected metrics file
   # $4 is .config file, to source
   # Clear the keys a config owns so they cannot carry over between configs
-  unset JOB_LABEL EXTRA_GREP_REGEX
+  unset JOB_LABEL EXTRA_GREP_REGEX INSTANCE_FILTER
   METRICS_SUCCESS_RATE_REQUIRED=$DEFAULT_SUCCESS_RATE
   source $4
-  SUCCESS_COUNTER=0
-  TOTAL_COUNTER=0
 
   # An empty JOB_LABEL leaves GREP_REGEX empty, which matches every metric
   if [ -z "$JOB_LABEL" ]; then
@@ -42,20 +40,45 @@ check_metrics() {
     return 1
   fi
 
-  {
-    # Setup grep statement
-    GREP_REGEX=$JOB_LABEL
+  # Setup grep statement
+  GREP_REGEX=$JOB_LABEL
+  if [[ ! -z "$EXTRA_GREP_REGEX" ]]; then
+    GREP_REGEX="$GREP_REGEX|$EXTRA_GREP_REGEX"
+    echo "---- [ EXTRA_GREP_REGEX provided: "$EXTRA_GREP_REGEX" ] ----"
+    echo "---- [ GREP regex now: "$GREP_REGEX" ] ----"
+  fi
 
-    echo "--- [ Checking Metrics for $1 using job='$JOB_LABEL' ] ---"
-    if [[ ! -z "$EXTRA_GREP_REGEX" ]]; then
-      GREP_REGEX="$GREP_REGEX|$EXTRA_GREP_REGEX"
-      echo "---- [ EXTRA_GREP_REGEX provided: "$EXTRA_GREP_REGEX" ] ----"
-      echo "---- [ GREP regex now: "$GREP_REGEX" ] ----"
-    fi
+  # read -ra splits without globbing; a blank filter falls back to the whole job
+  read -ra INSTANCES <<< "$INSTANCE_FILTER"
+  [ ${#INSTANCES[@]} -eq 0 ] && INSTANCES=(any)
+
+  STATUS=0
+  for INSTANCE in "${INSTANCES[@]}"; do
+    check_instance "$1" "$2" "$3" "$INSTANCE" || STATUS=1
+  done
+  return $STATUS
+}
+
+check_instance() {
+  # $1 is sample app name
+  # $2 is prometheus instance
+  # $3 is expected metrics file
+  # $4 is an instance regex, or "any" for no instance filter
+  SELECTOR="job=~\"$JOB_LABEL\""
+  ON=""
+  if [ "$4" != any ]; then
+    SELECTOR="$SELECTOR,instance=~\"$4\""
+    ON=" on instance '$4'"
+  fi
+  SUCCESS_COUNTER=0
+  TOTAL_COUNTER=0
+
+  {
+    echo "--- [ Checking Metrics for $1 using job='$JOB_LABEL'$ON ] ---"
     # `|| [ -n ... ]` so a last line with no trailing newline is still read
     while read METRIC_NAME || [ -n "$METRIC_NAME" ]; do
       let TOTAL_COUNTER++
-      if curl -s http://$2/prometheus/api/v1/query?query=$METRIC_NAME%7Bjob=~\"$JOB_LABEL\"%7D | jq -r .data.result[0].metric | grep -q -E "$GREP_REGEX"; then
+      if curl -s http://$2/prometheus/api/v1/query?query=$METRIC_NAME%7B$SELECTOR%7D | jq -r .data.result[0].metric | grep -q -E "$GREP_REGEX"; then
         let SUCCESS_COUNTER++
         echo "[PASS] '$METRIC_NAME' present"
       else
@@ -65,21 +88,21 @@ check_metrics() {
     done
 
     if (($SUCCESS_COUNTER == $TOTAL_COUNTER)); then
-      echo "--- [ TEST SUCCESS ] ---"
+      echo "--- [ TEST SUCCESS$ON ] ---"
       echo "All expected metrics were present in Prometheus/Mimir ($2)"
       return 0
     elif (( $(echo "$SUCCESS_COUNTER >= ($TOTAL_COUNTER*$METRICS_SUCCESS_RATE_REQUIRED)" | bc -l) )); then
-      echo "--- [ TEST SUCCESS (with warnings) ] ---"
-      echo "$SUCCESS_COUNTER out of $TOTAL_COUNTER expected metrics were present in Prometheus/Mimir ($PROMETHEUS_INSTANCE)"
+      echo "--- [ TEST SUCCESS (with warnings)$ON ] ---"
+      echo "$SUCCESS_COUNTER out of $TOTAL_COUNTER expected metrics were present in Prometheus/Mimir ($2)"
       echo "This is considered a PASS as it exceeds a success rate of $METRICS_SUCCESS_RATE_REQUIRED"
       return 0
     elif (($SUCCESS_COUNTER == 0)); then
-      echo "--- [ TEST FAIL ] ---"
+      echo "--- [ TEST FAIL$ON ] ---"
       echo "None of the expected metrics were detected in Prometheus/Mimir ($2)"
       return 1
     else
-      echo "--- [ TEST FAIL ] ---"
-      echo "$SUCCESS_COUNTER out of $TOTAL_COUNTER expected metrics were present in Prometheus/Mimir ($PROMETHEUS_INSTANCE)"
+      echo "--- [ TEST FAIL$ON ] ---"
+      echo "$SUCCESS_COUNTER out of $TOTAL_COUNTER expected metrics were present in Prometheus/Mimir ($2)"
       echo "This is a FAIL as it falls below the required success rate of $METRICS_SUCCESS_RATE_REQUIRED"
       return 1
     fi

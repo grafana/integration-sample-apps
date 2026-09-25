@@ -1,0 +1,15 @@
+{% extends "cloud-init-template.yaml" %}
+
+{% block install %}
+packages:
+- wget
+{% endblock %}
+
+{% block configure %}
+  - ARCH=$(dpkg --print-architecture) && sudo wget -O /tmp/otelcol-contrib.deb "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otel_col_version }}/otelcol-contrib_{{ otel_col_version }}_linux_${ARCH}.deb"
+  - sudo DEBIAN_FRONTEND=noninteractive dpkg -i --force-confold /tmp/otelcol-contrib.deb
+  - sudo systemctl enable otelcol-contrib.service
+  - sudo systemctl restart otelcol-contrib.service
+{% endblock %}
+
+{% block config_path %}/etc/otelcol-contrib/config.yaml{% endblock %}
