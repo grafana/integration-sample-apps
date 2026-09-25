@@ -91,10 +91,54 @@ jobs:
           sudo apt-get install -y jq
           echo "jq installed successfully"
 
+      - name: Run Windows sample app
+        shell: powershell
+        run: |
+          Write-Host "Running Windows sample app..."
+          cd sample-apps/windows
+          
+          # Install Alloy
+          Write-Host "Installing Alloy..."
+          .\scripts\install_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to install Alloy"
+            exit 1
+          }
+          
+          # Create and configure Alloy with remote endpoints
+          Write-Host "Creating Alloy configuration..."
+          # 127.0.0.1, not localhost: on the Windows host localhost resolves to ::1
+          # first, where nothing listens, and every push was refused.
+          Write-Host "Loki endpoint: http://127.0.0.1:3100/loki/api/v1/push"
+          Write-Host "Mimir endpoint: http://127.0.0.1:9009/api/v1/push"
+          .\scripts\create_default_config.ps1 -LokiUrl "http://127.0.0.1:3100/loki/api/v1/push" -PrometheusUrl "http://127.0.0.1:9009/api/v1/push"
+          .\scripts\configure_alloy.ps1
+          
+          # Start Alloy service
+          Write-Host "Starting Alloy service..."
+          .\scripts\start_alloy.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to start Alloy service"
+            exit 1
+          }
+          
+          # Alloy starts before the databases exist, so its first pushes fail and
+          # buffer in the remote_write WAL until they come up.
+
+          # Generate load for testing
+          Write-Host "Generating test load..."
+          .\scripts\generate_load.ps1
+
+          Write-Host "Windows sample app setup complete"
+
+      # Started after the Windows setup, not before it: WSL2 takes its VM down shortly
+      # after the last WSL process exits, stopping Docker and these containers. Started
+      # first, Mimir shut down 15s into the PowerShell step and never returned. No
+      # PowerShell step runs from here on, so they stay up.
       - name: Start Mimir and Loki containers
         run: |
           source ~/.vars
-          
+
           echo "Starting Mimir and Loki containers using docker-compose..."
           
           # Navigate to the docker-compose directory
@@ -153,63 +197,9 @@ jobs:
           
           echo "✅ All services are ready"
 
-          # WSL2 tears the VM down seconds after its last process exits, which stops
-          # the Docker daemon and these containers: Mimir shut down 16s after the
-          # PowerShell step began, and never came back. The PowerShell steps leave WSL
-          # idle for ~5 minutes, so hold the VM open for the rest of the job.
-          # 2700s matches this job's timeout-minutes: 45.
-          echo "Holding the WSL VM open for the rest of the job..."
-          nohup sleep 2700 >/dev/null 2>&1 &
-          disown
-
-      - name: Run Windows sample app
-        shell: powershell
-        run: |
-          Write-Host "Running Windows sample app..."
-          cd sample-apps/windows
-          
-          # Install Alloy
-          Write-Host "Installing Alloy..."
-          .\scripts\install_alloy.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to install Alloy"
-            exit 1
-          }
-          
-          # Create and configure Alloy with remote endpoints
-          Write-Host "Creating Alloy configuration..."
-          # 127.0.0.1 rather than localhost: Alloy runs on the Windows host, where
-          # localhost resolves to ::1 first, while the Docker ports published inside
-          # WSL are reachable over IPv4 only.
-          Write-Host "Loki endpoint: http://127.0.0.1:3100/loki/api/v1/push"
-          Write-Host "Mimir endpoint: http://127.0.0.1:9009/api/v1/push"
-          .\scripts\create_default_config.ps1 -LokiUrl "http://127.0.0.1:3100/loki/api/v1/push" -PrometheusUrl "http://127.0.0.1:9009/api/v1/push"
-          .\scripts\configure_alloy.ps1
-          
-          # Start Alloy service
-          Write-Host "Starting Alloy service..."
-          .\scripts\start_alloy.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to start Alloy service"
-            exit 1
-          }
-          
-          # Generate load for testing
-          Write-Host "Generating test load..."
-          .\scripts\generate_load.ps1
-          
-          # TEMPORARY probe, remove before merge. Windows -> WSL direction, which no
-          # run has yet demonstrated working: the readiness check runs inside WSL.
-          Write-Host "--- Windows -> mimir ---"
-          try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Uri "http://127.0.0.1:9009/ready").StatusCode }
-          catch { Write-Host "windows -> mimir failed: $_" }
-
-          Write-Host "Windows sample app setup complete"
-
-      # TEMPORARY probe, remove before merge. Runs immediately after the PowerShell
-      # step, which leaves WSL idle for ~5 minutes, to catch the database state at
-      # the moment the idle window closes.
-      - name: Debug database state after idle window
+      # TEMPORARY probe, remove before merge. Baseline: the containers have just
+      # started, so this should show them Up with 9009/3100 listening.
+      - name: Debug database state after startup
         if: always()
         run: |
           source ~/.vars
@@ -243,8 +233,8 @@ jobs:
           echo "Waiting for sample app to generate metrics..."
           sleep $SAMPLE_APP_SETUP_TIME
 
-      # TEMPORARY probe, remove before merge. Same checks at validation time, to show
-      # whether the state changed during the wait.
+      # TEMPORARY probe, remove before merge. Same checks after the wait: if the
+      # containers are still Up here, the restructure held.
       - name: Debug database state before validation
         if: always()
         run: |
@@ -268,6 +258,25 @@ jobs:
 
           echo "Validating metrics using check_metrics.sh script..."
           ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
+
+      # TEMPORARY probe, remove before merge. After validation, so it cannot disturb
+      # WSL beforehand. Shows whether Alloy's pushes now succeed, and finally tests
+      # Windows -> WSL against live containers.
+      - name: Debug Alloy state
+        if: always()
+        shell: powershell
+        run: |
+          Write-Host "--- Windows -> mimir ---"
+          try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Uri "http://127.0.0.1:9009/ready").StatusCode }
+          catch { Write-Host "windows -> mimir failed: $_" }
+
+          Write-Host "--- Alloy event log (newest 40) ---"
+          try {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Alloy'} -MaxEvents 40 -ErrorAction Stop |
+              Select-Object TimeCreated, LevelDisplayName, Message | Format-List
+          } catch {
+            Write-Host "no Alloy events found: $_"
+          }
 
       - name: Cleanup Docker containers
         if: always()
