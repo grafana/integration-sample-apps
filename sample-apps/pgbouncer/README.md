@@ -54,6 +54,7 @@ To get started with the sample app, follow these steps:
 - `loki_url`: URL for Loki push endpoint (e.g., `http://your-loki-instance:3100/loki/api/v1/push`).
 - `loki_user`: Your Loki username.
 - `loki_pass`: Your Loki password.
+- `pgbouncer_exporter_version`: Version of the PgBouncer Prometheus exporter to install (default: `0.10.2`). Versions 0.11 and later rename the `pgbouncer_stats_*` metrics the integration uses.
 
 ## Validating services
 
