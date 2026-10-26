@@ -1,4 +1,4 @@
-FROM cassandra:5.0.8@sha256:b89056c366c4b807380cd9a4ac865ad558c0b4d5aac342f69087d0169ca1ddcd
+FROM cassandra:5.0.9@sha256:3ea9333712c5692f3fe91d6c4dcc262df9e36338c4fdd1bc00a5e53f1137a1a0
 
 # Redeclare ARG variables after FROM so they're available in RUN commands
 ARG JMX_EXPORTER_VERSION=1.3.0
