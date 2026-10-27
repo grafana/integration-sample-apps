@@ -4,7 +4,6 @@ pg_locks_count
 pg_long_running_transactions
 pg_postmaster_start_time_seconds
 pg_replication_is_replica
-pg_replication_lag
 pg_replication_lag_seconds
 pg_settings_block_size
 pg_settings_max_connections
@@ -17,6 +16,7 @@ pg_stat_bgwriter_buffers_alloc_total
 pg_stat_bgwriter_buffers_clean_total
 pg_stat_bgwriter_checkpoints_req_total
 pg_stat_bgwriter_checkpoints_timed_total
+pg_stat_bgwriter_maxwritten_clean_total
 pg_stat_database_blks_hit
 pg_stat_database_blks_read
 pg_stat_database_conflicts
@@ -26,6 +26,7 @@ pg_stat_database_temp_bytes
 pg_stat_database_tup_deleted
 pg_stat_database_tup_fetched
 pg_stat_database_tup_inserted
+pg_stat_database_tup_returned
 pg_stat_database_tup_updated
 pg_stat_database_xact_commit
 pg_stat_database_xact_rollback
@@ -43,7 +44,4 @@ pg_stat_user_tables_seq_scan
 pg_statio_user_indexes_idx_blks_hit_total
 pg_statio_user_indexes_idx_blks_read_total
 pg_up
-process_cpu_seconds_total
-process_resident_memory_bytes
-process_virtual_memory_bytes
 up
