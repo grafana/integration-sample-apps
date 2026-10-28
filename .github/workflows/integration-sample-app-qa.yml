@@ -111,7 +111,9 @@ jobs:
 
       - name: Configure Multipass
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
-        run: sudo chmod a+w /var/snap/multipass/common/multipass_socket
+        run: |
+          timeout 60 bash -c 'until sudo test -S /var/snap/multipass/common/multipass_socket; do sleep 1; done'
+          sudo chmod a+w /var/snap/multipass/common/multipass_socket
 
       - name: Checkout repo
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
