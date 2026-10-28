@@ -107,7 +107,7 @@ jobs:
 
       - name: Install Multipass
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
-        run: sudo snap install multipass && sudo snap set system experimental.parallel-instances=true && sudo snap install multipass_socket
+        run: sudo snap install multipass
 
       - name: Configure Multipass
         if: steps.check_ci_support.outputs.SUPPORTS_CI == 'true' && steps.check_ci_support.outputs.CI_BYPASS == 'false'
