@@ -4,7 +4,7 @@ CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
 OTEL_COL_VERSION ?= 0.161.0
 
-COLLECTORS ?= alloy otelcol
+COLLECTORS ?= alloy
 NODES ?= 1
 VM_CPUS ?= 2
 VM_MEMORY ?= 2G
@@ -36,20 +36,16 @@ $(CLOUD_INITS): cloud-init-%.yaml: jinja/templates/%.yaml $(TEMPLATES) $(CONFIG_
 		dinutac/jinja2docker:latest /templates/$*.yaml /variables/cloud-init.yaml --format=yaml > $@
 	@echo "rendered $@"
 
-# Launched in parallel; each launch blocks until its cloud-init finishes
+# Launched sequentially as Multipass doesn't handle concurrent launches well.
+# Each  launch blocks until its cloud-init finishes.
 launch-vm: render-config
-	@pids=""; \
-	for c in $(COLLECTORS); do \
+	@for c in $(COLLECTORS); do \
 		for i in $$(seq 1 $(NODES)); do \
 			if [ $(NODES) -gt 1 ]; then name=$(VM_NAME)-$$c-$$i; else name=$(VM_NAME)-$$c; fi; \
 			multipass launch 24.04 -n $$name --cpus $(VM_CPUS) --memory $(VM_MEMORY) \
-				--disk $(VM_DISK) --cloud-init cloud-init-$$c.yaml & \
-			pids="$$pids $$!"; \
+				--disk $(VM_DISK) --cloud-init cloud-init-$$c.yaml || exit 1; \
 		done; \
-	done; \
-	status=0; \
-	for p in $$pids; do wait $$p || status=1; done; \
-	exit $$status
+	done
 
 clean:
 	@rm -f cloud-init-*.yaml

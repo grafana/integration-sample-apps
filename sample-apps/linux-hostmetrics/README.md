@@ -1,6 +1,6 @@
 # Linux hostmetrics sample app
 
-This sample application creates Ubuntu VMs instrumented with the OpenTelemetry `hostmetrics` receiver, exporting over OTLP. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of Linux using semantic convention metrics. The receiver is run by both Grafana Alloy (through its OpenTelemetry engine) and the OpenTelemetry Collector.
+This sample application creates Ubuntu VMs instrumented with the OpenTelemetry `hostmetrics` receiver, exporting over OTLP. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of Linux using semantic convention metrics. By default the receiver runs in Grafana Alloy, through its OpenTelemetry engine, but it can also run in the OpenTelemetry Collector.
 
 ## Prerequisites
 
@@ -43,9 +43,9 @@ To get started with the sample app, follow these steps:
 
 ## Make variables
 
-Any of these can be overridden on the command line, e.g. `make COLLECTORS=otelcol NODES=3 run`.
+Any of these can be overridden on the command line, e.g. `make COLLECTORS="alloy otelcol" NODES=3 run`. VMs are launched one at a time, so each extra VM adds about a minute.
 
-- `COLLECTORS`: Which collectors to run, one VM per collector. Defaults to `alloy otelcol`. Each has a matching `jinja/templates/<collector>.yaml`.
+- `COLLECTORS`: Which collectors to run, one VM per collector: `alloy`, `otelcol` or both. Defaults to `alloy`. Each has a matching `jinja/templates/<collector>.yaml`.
 - `NODES`: How many VMs to launch per collector. Defaults to `1`.
 - `PROMETHEUS_INSTANCE`: `host:port` of the OTLP endpoint written into the default config when it is created. Defaults to `your-prometheus-instance:9090`.
 - `OTEL_COL_VERSION`: Pinned OpenTelemetry Collector release to install.
