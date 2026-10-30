@@ -37,7 +37,7 @@ $(CLOUD_INITS): cloud-init-%.yaml: jinja/templates/%.yaml $(TEMPLATES) $(CONFIG_
 	@echo "rendered $@"
 
 # Launched sequentially as Multipass doesn't handle concurrent launches well.
-# Each  launch blocks until its cloud-init finishes.
+# Each launch blocks until its cloud-init finishes.
 launch-vm: render-config
 	@for c in $(COLLECTORS); do \
 		for i in $$(seq 1 $(NODES)); do \
