@@ -1,4 +1,4 @@
-FROM golang:1.26@sha256:3aff6657219a4d9c14e27fb1d8976c49c29fddb70ba835014f477e1c70636647 as builder
+FROM golang:1.27@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec7f5e374944095b as builder
 
 WORKDIR /app
 RUN git clone https://github.com/grafana/openldap_exporter.git .
