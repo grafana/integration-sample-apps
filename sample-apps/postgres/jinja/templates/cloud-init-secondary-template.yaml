@@ -47,11 +47,13 @@ write_files:
     chown postgres:postgres /var/lib/postgresql/.pgpass
 
     # Basebackup: -R writes standby.signal + primary_conninfo into postgresql.auto.conf
+    # -C -S streams through a replication slot on the primary, so the exporter's pg_replication_slots metrics have a slot to report
     sudo -u postgres pg_basebackup \
         -h ${PRIMARY_IP} \
         -U replicator \
         -D ${PG_DATA} \
-        -Fp -Xs -P -R
+        -Fp -Xs -P -R \
+        -C -S postgres_secondary
 
     # Start postgres as a hot standby
     systemctl start postgresql
