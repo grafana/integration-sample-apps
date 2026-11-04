@@ -5,6 +5,7 @@ pg_long_running_transactions
 pg_postmaster_start_time_seconds
 pg_replication_is_replica
 pg_replication_lag_seconds
+pg_replication_slots_active
 pg_settings_block_size
 pg_settings_max_connections
 pg_settings_max_locks_per_transaction
