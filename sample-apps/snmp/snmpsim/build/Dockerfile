@@ -11,6 +11,8 @@ RUN f=$(python -c 'import os, snmpsim; print(os.path.dirname(snmpsim.__file__))'
     && sed -i 's/random.randrange(-deviation, deviation)/random.randrange(int(-deviation), int(deviation))/' "$f" \
     && grep -q 'random.randrange(int(-deviation), int(deviation))' "$f"
 
+COPY alert_test.py /usr/local/bin/alert-test
+
 RUN adduser --system snmpsim
 
 EXPOSE 161/udp
