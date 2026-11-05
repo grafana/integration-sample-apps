@@ -4,6 +4,13 @@ COPY requirements.txt ./requirements.txt
 # Install any needed packages specified in requirements.txt
 RUN pip install -q --trusted-host pypi.python.org -r requirements.txt
 
+# snmpsim 1.2.2 passes the numeric variation's deviation setting to random.randrange as a float.
+# This fails on Python 3.12+. The sed casts both bounds to int in the installed numeric.py.
+# The grep fails the build if a new snmpsim release changes the line.
+RUN f=$(python -c 'import os, snmpsim; print(os.path.dirname(snmpsim.__file__))')/variation/numeric.py \
+    && sed -i 's/random.randrange(-deviation, deviation)/random.randrange(int(-deviation), int(deviation))/' "$f" \
+    && grep -q 'random.randrange(int(-deviation), int(deviation))' "$f"
+
 RUN adduser --system snmpsim
 
 EXPOSE 161/udp
