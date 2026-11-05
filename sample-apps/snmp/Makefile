@@ -7,7 +7,7 @@ PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
 # Import last to ensure expected parameters are set and available to import from this file
 include ../Makefile
 
-.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig snmpsim
+.PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig snmpsim alert-test
 
 run: launch-vm snmpsim
 	@echo "VM $(VM_NAME) launched and configured."
@@ -30,11 +30,15 @@ snmpsim:
 	@multipass transfer ./snmpsim $(VM_NAME):/home/ubuntu -r
 	@multipass transfer ./snmpsim/targets.yml $(VM_NAME):/tmp/targets.yml
 	@multipass transfer ./snmpsim/auths.yml $(VM_NAME):/tmp/auths.yml
+	@multipass exec $(VM_NAME) -- sudo install -m 640 -g alloy -t /etc/alloy /tmp/targets.yml /tmp/auths.yml
 	@multipass exec $(VM_NAME) -- bash -c "cd ./snmpsim && docker-compose -f docker-compose.snmpsim.yml up -d"
 	@multipass exec $(VM_NAME) -- bash -c 'cd ./snmpsim && for i in $$(seq 1 60); do docker-compose -f docker-compose.snmpsim.yml logs snmpsim 2>&1 | grep -q "Listening at" && echo "snmpsim ready after $$((i * 5))s" && exit 0; sleep 5; done; echo "snmpsim not listening after 300s"; exit 1'
 
+alert-test:
+	@multipass exec $(VM_NAME) -- docker exec snmpsim_snmpsim_1 alert-test $(CMD)
+
 launch-vm: render-config
-	@multipass launch docker -n $(VM_NAME) --cloud-init cloud-init.yaml
+	@multipass launch 24.04 -n $(VM_NAME) --cpus 2 --memory 4G --disk 10G --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml
