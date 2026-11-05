@@ -38,7 +38,7 @@ alert-test:
 	@multipass exec $(VM_NAME) -- docker exec snmpsim_snmpsim_1 alert-test $(CMD)
 
 launch-vm: render-config
-	@multipass launch docker -n $(VM_NAME) --cloud-init cloud-init.yaml
+	@multipass launch 24.04 -n $(VM_NAME) --cpus 2 --memory 4G --disk 10G --cloud-init cloud-init.yaml
 
 clean:
 	@rm -f cloud-init.yaml
