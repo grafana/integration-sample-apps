@@ -30,6 +30,7 @@ snmpsim:
 	@multipass transfer ./snmpsim $(VM_NAME):/home/ubuntu -r
 	@multipass transfer ./snmpsim/targets.yml $(VM_NAME):/tmp/targets.yml
 	@multipass transfer ./snmpsim/auths.yml $(VM_NAME):/tmp/auths.yml
+	@multipass exec $(VM_NAME) -- sudo install -m 640 -g alloy -t /etc/alloy /tmp/targets.yml /tmp/auths.yml
 	@multipass exec $(VM_NAME) -- bash -c "cd ./snmpsim && docker-compose -f docker-compose.snmpsim.yml up -d"
 	@multipass exec $(VM_NAME) -- bash -c 'cd ./snmpsim && for i in $$(seq 1 60); do docker-compose -f docker-compose.snmpsim.yml logs snmpsim 2>&1 | grep -q "Listening at" && echo "snmpsim ready after $$((i * 5))s" && exit 0; sleep 5; done; echo "snmpsim not listening after 300s"; exit 1'
 

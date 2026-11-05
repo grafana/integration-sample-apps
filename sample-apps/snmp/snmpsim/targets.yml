@@ -1,10 +1,17 @@
 - targets:
+    - 127.0.0.1:161
+  labels:
+    module: system,if_mib,hrDevice,hrStorage
+    name: snmp_sample_app
+    auth: public_v2
+
+- targets:
     - 127.0.0.1:162
   labels:
     module: system,if_mib,cisco_device
     name: net.cisco.c2911
     auth: net.cisco.c2911
-    rack: rack1
+    __rack: rack1
     datacenter: dc1
 - targets:
     - 127.0.0.1:162
@@ -12,7 +19,7 @@
     module: system,if_mib,cisco_device
     name: net.cisco.c7600
     auth: net.cisco.c7600
-    rack: rack1
+    __rack: rack1
     datacenter: dc1
 
 # Juniper
@@ -22,7 +29,7 @@
     module: system,if_mib #,juniper
     name: net.juniper.ex4200-24f
     auth: net.juniper.ex4200-24f
-    rack: rack2
+    __rack: rack2
     datacenter: dc1
 
 - targets:
@@ -31,7 +38,7 @@
     module: system,if_mib #,juniper
     name: net.juniper.mx240
     auth: net.juniper.mx240
-    rack: rack3
+    __rack: rack3
     datacenter: dc1
 
 - targets:
@@ -40,7 +47,7 @@
     module: system,if_mib,juniper
     name: net.juniper.srx
     auth: net.juniper.srx
-    rack: rack4
+    __rack: rack4
     datacenter: dc1
 # Miktorik
 - targets:
@@ -49,7 +56,7 @@
     module: system,if_mib,mikrotik,hrStorage,hrDevice
     name: net.mikrotik.941-2nD
     auth: net.mikrotik.941-2nD
-    rack: rack5
+    __rack: rack5
     datacenter: dc2
 - targets:
     - 127.0.0.1:162
@@ -57,7 +64,7 @@
     module: system,if_mib,mikrotik,hrStorage,hrDevice
     name: net.mikrotik.951G-2HnD
     auth: net.mikrotik.951G-2HnD
-    rack: rack5
+    __rack: rack5
     datacenter: dc2
 - targets:
     - 127.0.0.1:162
@@ -65,5 +72,5 @@
     module: system,if_mib,mikrotik,hrStorage,hrDevice
     name: net.mikrotik.CCR1016-12G
     auth: net.mikrotik.CCR1016-12G
-    rack: rack5
+    __rack: rack5
     datacenter: dc2

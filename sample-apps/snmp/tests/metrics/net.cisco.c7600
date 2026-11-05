@@ -16,6 +16,5 @@ cempMemPoolType
 cpmCPUTotal1minRev
 ciscoMemoryPoolUsed
 ciscoMemoryPoolFree
-entSensorStatus
 entSensorValue
 up
