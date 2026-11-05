@@ -95,6 +95,12 @@ auths:
     auth_protocol: MD5
     priv_protocol: DES
     version: 2
+  net.cisco.mds9148s:
+    community: net.cisco.mds9148s
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2
   # net.dell.MXL-10:
   #   community: net.dell.MXL-10
   #   security_level: noAuthNoPriv

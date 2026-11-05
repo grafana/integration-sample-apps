@@ -21,6 +21,14 @@
     auth: net.cisco.c7600
     __rack: rack1
     datacenter: dc1
+- targets:
+    - 127.0.0.1:162
+  labels:
+    module: system,if_mib,cisco_device,cisco_fc_fe
+    name: net.cisco.mds9148s
+    auth: net.cisco.mds9148s
+    __rack: rack6
+    datacenter: dc1
 
 # Juniper
 - targets:
