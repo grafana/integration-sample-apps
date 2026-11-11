@@ -62,3 +62,14 @@ limits:
   ingestion_burst_size: 500000
   ingestion_rate: 250000
   native_histograms_ingestion_enabled: true
+
+  # Grafana Cloud defaults that aren't autoscaled, from
+  # https://grafana.com/docs/grafana-cloud/platform/pricing-and-usage/usage-limits/
+  # and https://grafana.com/docs/grafana-cloud/send-data/metrics/label-handling-and-limits/
+  # Autoscaled limits such as ingestion_rate are left higher than Cloud's starting values.
+  out_of_order_time_window: 2h
+  max_global_exemplars_per_user: 100000
+  label_value_length_over_limit_strategy: truncate
+  max_partial_query_length: 32d
+  max_labels_query_length: 32d
+  max_query_expression_size_bytes: 131072
