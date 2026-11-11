@@ -42,15 +42,14 @@ datasources:
     # data source per organization.
     #isDefault:
     # <map> Fields to convert to JSON and store in jsonData.
-    # jsonData:
-    #   # <string> Defines the Graphite service's version.
-    #   graphiteVersion: "1.1"
-    #   # <bool> Enables TLS authentication using a client
-    #   # certificate configured in secureJsonData.
-    #   tlsAuth: true
-    #   # <bool> Enables TLS authentication using a CA
-    #   # certificate.
-    #   tlsAuthWithCACert: true
+    # timeInterval is the datasource "Scrape interval". Grafana derives
+    # $__rate_interval from it (max(4 * timeInterval, interval + timeInterval)).
+    # 60s mirrors the Grafana Cloud metrics data source and the 60s
+    # scrape_interval most sample apps' Alloy configs use. Without it Grafana
+    # assumes 15s, so $__rate_interval is 1m and rate() over 60s scrapes sees
+    # fewer than 2 samples.
+    jsonData:
+      timeInterval: 60s
     # # <map> Fields to encrypt before storing in jsonData.
     # secureJsonData:
     #   # <string> Defines the CA cert, client cert, and
