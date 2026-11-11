@@ -37,6 +37,11 @@ make setup-dbs
 
 This will setup Grafana, Mimir, and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation.
 
+The databases mirror Grafana Cloud stack defaults where it affects what sample apps produce. The data sources are named `grafanacloud-local-prom` (the default, with a 60s scrape interval) and `grafanacloud-local-logs`. Mimir applies Grafana Cloud's non-autoscaled limits, and translates OTLP metrics with unit and type suffixes and the default promoted resource attributes. Grafana only runs for `ENV=local`. 
+
+These settings come from `ops/qa/dbs` and apply to `make setup-dbs` and CI only.
+`ENV=k3d` targets a separately configured environment with Mimir, Loki, etc.
+
 ### Run a sample-app
 Running sample apps can differ from sample-app to sample-app, but if they are CI compatible, e.g. if they do **not** have a `.CI_BYPASS` file in their directory, then they can be run locally as well.
 
