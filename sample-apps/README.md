@@ -47,7 +47,7 @@ Add a `tests/dashboards` file with one `https://` URL of a dashboard `.json` fil
 https://raw.githubusercontent.com/grafana/jsonnet-libs/master/docker-mixin/dashboards_out/docker.json
 ```
 
-Screenshots cover the 15 minutes before they are taken. Dashboards exported for sharing, which carry `__inputs` datasource placeholders, are not supported.
+Screenshots cover the 5 minutes before they are taken. Dashboards exported for sharing, which carry `__inputs` datasource placeholders, are not supported.
 
 The comment is only posted for pull requests from branches of this repository. For pull requests from forks, the images are attached to the workflow run as the `screenshots-<sample-app>` artifact instead.
 

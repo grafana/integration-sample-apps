@@ -1,0 +1,6 @@
+https://raw.githubusercontent.com/grafana/jsonnet-libs/master/hostmetrics-observ-lib/dashboards_out/hostmetrics-fleet.json
+https://raw.githubusercontent.com/grafana/jsonnet-libs/master/hostmetrics-observ-lib/dashboards_out/hostmetrics-nodes.json
+https://raw.githubusercontent.com/grafana/jsonnet-libs/master/hostmetrics-observ-lib/dashboards_out/hostmetrics-system.json
+https://raw.githubusercontent.com/grafana/jsonnet-libs/master/hostmetrics-observ-lib/dashboards_out/hostmetrics-memory.json
+https://raw.githubusercontent.com/grafana/jsonnet-libs/master/hostmetrics-observ-lib/dashboards_out/hostmetrics-disks.json
+https://raw.githubusercontent.com/grafana/jsonnet-libs/master/hostmetrics-observ-lib/dashboards_out/hostmetrics-network.json

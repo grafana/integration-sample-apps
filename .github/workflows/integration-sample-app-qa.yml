@@ -137,9 +137,7 @@ jobs:
       ${{ !cancelled() && needs.sample-app-testing.result != 'skipped'
       && github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
-      # Push the images to the branch ci-screenshots/pr-<number>
-      contents: write
-      # Comment on the pull request
+      # Comment on the pull request and attach the images to it
       pull-requests: write
     steps:
       - name: Download dashboard screenshots
@@ -167,23 +165,17 @@ jobs:
             exit 0
           fi
 
-          # A single commit, replaced on every run
-          git init --quiet
-          git add -- "${images[@]}"
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit --quiet --message "Dashboard screenshots for #${PR}"
-          git push --quiet --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" "HEAD:refs/heads/ci-screenshots/pr-${PR}"
-
+          # gh uploads each attached image and points its reference in the comment at the upload
           {
             echo "### Dashboard screenshots"
-            echo "Rendered from the data each sample-app produced in [this run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), covering its last 15 minutes."
+            echo "Rendered from the data each sample-app produced in [this run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), covering its last 5 minutes."
             for image in "${images[@]}"; do
               echo
               echo "<details open><summary>${image%.png}</summary>"
               echo
-              echo "![${image%.png}](https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/$(git rev-parse HEAD)/${image})"
+              echo "![${image%.png}](${image})"
               echo
               echo "</details>"
             done
-          } > "${RUNNER_TEMP}/comment.md"
-          gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file "${RUNNER_TEMP}/comment.md"
+          } > comment.md
+          gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file comment.md "${images[@]/#/--attach=}"
