@@ -77,10 +77,44 @@ jobs:
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
         run: sampletool ci check "${SAMPLE_APP}" >> "$GITHUB_OUTPUT"
+      
+      # Temporary snapstore cache because they're having a lot of downtime
+      - name: Restore Multipass snaps
+        id: multipass_snaps
+        if: steps.check_ci_support.outputs.run == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/multipass-snaps
+          key: multipass-snaps-v1
+
+      - name: Download Multipass snaps
+        if: steps.check_ci_support.outputs.run == 'true' && steps.multipass_snaps.outputs.cache-hit != 'true'
+        env:
+          SNAPS: core24 gtk-common-themes gnome-46-2404 mesa-2404 multipass
+        run: |
+          mkdir -p ~/multipass-snaps && cd ~/multipass-snaps
+          for snap in ${SNAPS}; do
+            snap download "${snap}"
+          done
+
+      - name: Save Multipass snaps
+        if: steps.check_ci_support.outputs.run == 'true' && steps.multipass_snaps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/multipass-snaps
+          key: multipass-snaps-v1
 
       - name: Install Multipass
         if: steps.check_ci_support.outputs.run == 'true'
-        run: sudo snap install multipass
+        env:
+          SNAPS: core24 gtk-common-themes gnome-46-2404 mesa-2404 multipass
+        run: |
+          cd ~/multipass-snaps
+          for snap in ${SNAPS}; do
+            if snap list "${snap}" > /dev/null 2>&1; then continue; fi
+            sudo snap ack "${snap}"_*.assert
+            sudo snap install "${snap}"_*.snap
+          done
 
       - name: Configure Multipass
         if: steps.check_ci_support.outputs.run == 'true'
