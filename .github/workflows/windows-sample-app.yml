@@ -4,10 +4,7 @@ permissions:
   contents: read
 
 on:
-  # To conserve resources we only run tests against main in PRs
   pull_request:
-    branches:
-      - main
     paths:
       - 'sample-apps/windows/**'
 
