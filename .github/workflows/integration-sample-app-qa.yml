@@ -134,7 +134,9 @@ jobs:
       ${{ !cancelled() && needs.sample-app-testing.result != 'skipped'
       && github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
-      # Comment on the pull request and attach the images to it
+      # Store the images under refs/screenshots/
+      contents: write
+      # Comment on the pull request
       pull-requests: write
     steps:
       - name: Download dashboard screenshots
@@ -169,24 +171,44 @@ jobs:
           # A comment holds 65536 characters, start over before the history fills it
           [ ${#earlier} -lt 50000 ] || earlier=""
 
-          # gh uploads each attached image and points its reference in the comment at the upload
+          # The images go to a ref of their own in this repository. 
+          git init --quiet
+          git add -- "${images[@]}"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet --message "Dashboard screenshots for #${PR}"
+          base=""
+          if git push --quiet "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" "HEAD:refs/screenshots/pr-${PR}/run-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"; then
+            url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/$(git rev-parse HEAD)"
+            # The links take a moment to work
+            for attempt in 1 2 3 4 5; do
+              if curl --silent --fail --head --output /dev/null "${url}/${images[0]}"; then base="${url}"; break; fi
+              sleep 3
+            done
+          fi
+
+          run="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           {
             echo "### Dashboard screenshots"
             echo
             echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
             echo
-            echo "Rendered from the data each sample-app produced in [this run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), covering its last 5 minutes."
-            for image in "${images[@]}"; do
+            echo "Rendered from the data each sample-app produced in [this run](${run}), covering its last 5 minutes."
+            if [ -z "${base}" ]; then
               echo
-              echo "<details open><summary>${image%.png}</summary>"
-              echo
-              echo "![${image%.png}](${image})"
-              echo
-              echo "</details>"
-            done
+              echo "The images could not be stored for display here. They are in the artifacts of [this run](${run})."
+            else
+              for image in "${images[@]}"; do
+                echo
+                echo "<details open><summary>${image%.png}</summary>"
+                echo
+                echo "![${image%.png}](${base}/${image})"
+                echo
+                echo "</details>"
+              done
+            fi
             echo
             echo "</details>"
             echo
             echo "${earlier}"
           } > comment.md
-          gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file comment.md "${images[@]/#/--attach=}"
+          gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file comment.md
