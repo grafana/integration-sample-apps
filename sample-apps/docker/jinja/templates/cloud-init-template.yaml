@@ -142,13 +142,17 @@ runcmd:
 
   # Configure Docker for Alloy
   - sudo usermod -a -G docker alloy
-  - sudo sed -i 's/User=alloy/User=root/' /etc/systemd/system/alloy.service
   - sudo systemctl daemon-reload
 
   # Configure Alloy
   - sudo systemctl restart alloy.service
 
 write_files:
+- owner: root:root
+  path: /etc/systemd/system/alloy.service.d/root.conf
+  content: |
+    [Service]
+    User=root
 # Alloy configuration
 - owner: root:root
   path: /etc/alloy/config.alloy
