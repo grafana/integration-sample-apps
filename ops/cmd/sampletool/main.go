@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"time"
 )
 
 const usage = `sampletool - control plane for integration sample apps
@@ -26,6 +27,9 @@ Usage: sampletool <group> <command> [flags] [name]
   apps up      Launch the --apps with 'make run-ci'
   apps wait    Sleep until sample apps have had time to produce metrics
   apps test    Check the expected metrics of the --apps arrived in Mimir
+  apps screenshot
+               Save an image of each dashboard listed in the --apps'
+               tests/dashboards to screenshots/<app>/
   apps down    Tear the --apps down with 'make stop'
 
   k3s up       Launch <name>-k3s-main, plus two workers with --cluster; VM sizes
@@ -102,6 +106,8 @@ func run(ctx context.Context, args []string) error {
 		return appsWait(ctx)
 	case "apps test":
 		return appsTest(ctx, selected, *env, *dbs, *prometheus)
+	case "apps screenshot":
+		return appsScreenshot(ctx, root, selected, *dbs)
 	case "apps down":
 		return appsDown(ctx, selected)
 	case "k3s up":
@@ -125,7 +131,8 @@ var httpClient = func() *http.Client {
 		}
 		return new(net.Dialer).DialContext(ctx, network, addr)
 	}
-	return &http.Client{Transport: transport}
+	// Rendering a large dashboard can take minutes.
+	return &http.Client{Timeout: 5 * time.Minute, Transport: transport}
 }()
 
 // request returns the body of a successful HTTP response. A body is sent as JSON.

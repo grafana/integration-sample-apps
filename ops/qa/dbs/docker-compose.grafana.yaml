@@ -4,11 +4,22 @@ services:
     environment:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      # Grafana refuses to start with the default token, this one is not a secret
+      - GF_RENDERING_RENDERER_TOKEN=sample-apps-renderer
     volumes:
       - ./configs/grafana/provisioning:/etc/grafana/provisioning
     ports:
      - '3000:3000'
     # attach to dbs network
+    networks:
+      - dbs
+
+  renderer:
+    image: grafana/grafana-image-renderer:latest@sha256:cfa6c8f63e6d626f90208f2880f15bd5facc279daec1b9bb642af07aa850d95e
+    environment:
+      - AUTH_TOKEN=sample-apps-renderer
     networks:
       - dbs
 
