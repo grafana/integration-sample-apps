@@ -90,6 +90,21 @@ jobs:
           sudo apt-get install -y jq
           echo "jq installed successfully"
 
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # sampletool runs inside WSL, so build it for Linux. Build it before the databases
+      # start, WSL2 would stop them during a Windows-side step
+      - name: Build control plane
+        shell: powershell
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -o ops/bin/sampletool ./ops/cmd/sampletool
+
       - name: Run Windows sample app
         shell: powershell
         run: |
@@ -137,9 +152,6 @@ jobs:
           
           # Start services with docker compose
           docker compose up -d
-          
-          # Set default config
-          source ../../.defaultconfig
           
           echo "Database setup complete - Loki: localhost:3100, Mimir: localhost:9009"
           
@@ -191,16 +203,15 @@ jobs:
       - name: Wait for sample app to generate metrics
         run: |
           source ~/.vars
-          source ./ops/.defaultconfig
-          echo "Waiting for sample app to generate metrics..."
-          sleep $SAMPLE_APP_SETUP_TIME
+          chmod +x ./ops/bin/sampletool
+          ./ops/bin/sampletool apps wait
 
       - name: Validate metrics
         run: |
           source ~/.vars
 
-          echo "Validating metrics using check_metrics.sh script..."
-          ./ops/scripts/test_sample_app_metrics.sh windows localhost:9009
+          echo "Validating metrics using sampletool..."
+          ./ops/bin/sampletool apps test --apps windows --prometheus localhost:9009
 
       - name: Cleanup Docker containers
         if: always()

@@ -14,9 +14,9 @@ Some variables, e.g. `<INTEGRATION_NAME>` are used throughout and will need to b
 The following files require manual review or modification, and is where logic for spinning up your sample app will go in most cases. Please carefully review the list and add logic where required.
 | File | Instructions |
 |------|--------------|
-|[.config](./.config) | Add integration specific config like the job label, or potential pass-rate override here.|
+|[tests/configs/expected_metrics.config](./tests/configs/expected_metrics.config) | Add integration specific config like the job label, or potential pass-rate override here.|
 |[.hardware_requirements](./.hardware_requirements) | If your application requires more resources, create this file to specify the necessary hardware requirements for your sample app. You can define values for CPU cores (`PRIMARY_CPU` and `WORKER_CPU`), memory allocation (`PRIMARY_MEMORY` and `WORKER_MEMORY`), and disk space (`PRIMARY_DISK` and `WORKER_DISK`) for both primary and worker nodes. Note that these specifications must remain within the hardware limitations of the GitHub Runner, which currently uses `ubuntu-latest-8-core`. See the [GitHub Actions documentation](https://docs.github.com/en/actions/reference/larger-runners-reference) for current limits. |
-|[expected_metrics](./expected_metrics) | Add a newline separated list of expected metrics for the integration. Simple metrics names only, no labels or other qualifiers should be present |
+|[tests/metrics/expected_metrics](./tests/metrics/expected_metrics) | Add a newline separated list of expected metrics for the integration. Simple metrics names only, no labels or other qualifiers should be present |
 |[README](./README.md) | End-user facing README, update with a brief summary of the what the sample app does, and any specific instructions needed to run it. If you include any new relevant make commands, make sure to add them. |
 |[makefile](./Makefile) | Makefile for setting up the sample app. There is a minimal interface contract that must be obeyed, which the Github Actions CI expects to be present, which you can find documented briefly under [section 6 here](https://github.com/grafana/integration-sample-apps/blob/main/sample-apps/README.md) |
 |[configs/suo.alloy] | This file holds the Kubernetes specific Alloy scrape config and must be fully configured as it gets deployed with the [k8s-monitoring-helm chart](https://github.com/grafana/k8s-monitoring-helm). |
@@ -28,7 +28,7 @@ A quick note here, the [configs/](configs/) folder will be copied wholesale to t
 This could include things like JMX configs or subcomponent configs needed for a reliable setup.
 
 ## 4 - VM image
-The k3s cluster VMs are launched by [`ops/scripts/k3s_setup.sh`](https://github.com/grafana/integration-sample-apps/blob/main/ops/scripts/k3s_setup.sh) (invoked via the shared `include ../Makefile`), which uses Ubuntu `24.04` as the image tag for the main node and both workers.
+The k3s cluster VMs are launched by [`sampletool k3s up`](https://github.com/grafana/integration-sample-apps/blob/main/ops/cmd/sampletool/multipass.go) (invoked via the shared `include ../Makefile`), which uses Ubuntu `24.04` as the image tag for the main node and both workers.
 
 Once the sample-app has been completed and validated, update the README to reflect to end-users how to use it. As a final step, delete the QUICKSTART_README.md file (this file)
 # --- QUICKSTART INSTRUCTIONS END ---
