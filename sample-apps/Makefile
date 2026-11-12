@@ -3,10 +3,9 @@
 # As such, there are references to variables defined in child Makefiles
 ### ----- NOTES ----- ###
 
-WORK_DIR = $(shell pwd)
-# Ops script dir, as referred to when this script is *called by a sample app*, e.g. one directory deeper
+# Ops dir, as referred to when this script is *called by a sample app*, e.g. one directory deeper
 COMMON_DIR = "../../ops/common"
-OPS_SCRIPTS_DIR = "../../ops/scripts"
+SAMPLETOOL = go run ../../ops/cmd/sampletool
 VM_MAIN = ""
 ifdef VM_CLUSTER_MAIN
 	VM_MAIN = $(VM_CLUSTER_MAIN)
@@ -16,20 +15,20 @@ else
 	VM_MAIN = $(VM_NAME)
 endif
 
-.PHONY: k3s-setup k3s-stop configure_k3d_dns
+.PHONY: k3s-setup k3s-stop k3s-setup-cluster k3s-stop-cluster configure-k3d-dns shell
 
 #k3s/multinode setup
 k3s-setup:
-	@bash $(OPS_SCRIPTS_DIR)/k3s_setup.sh $(VM_NAME) 
+	@$(SAMPLETOOL) k3s up $(VM_NAME)
 
 k3s-stop:
-	@bash $(OPS_SCRIPTS_DIR)/k3s_stop.sh $(VM_NAME)
+	@$(SAMPLETOOL) k3s down $(VM_NAME)
 
 k3s-setup-cluster:
-	@bash $(OPS_SCRIPTS_DIR)/k3s_setup.sh $(VM_NAME) cluster
+	@$(SAMPLETOOL) k3s up --cluster $(VM_NAME)
 
 k3s-stop-cluster:
-	@bash $(OPS_SCRIPTS_DIR)/k3s_stop.sh $(VM_NAME) cluster
+	@$(SAMPLETOOL) k3s down --cluster $(VM_NAME)
 
 # k3d (local dev) testing
 configure-k3d-dns:
