@@ -120,7 +120,7 @@ func screenshotApp(ctx context.Context, grafana string, urls []string, dir strin
 }
 
 // renderDashboard downloads a dashboard, imports it into Grafana and returns a
-// full-page PNG of it covering the last 15 minutes.
+// full-page PNG of it covering the last 5 minutes.
 func renderDashboard(ctx context.Context, grafana, url string) ([]byte, error) {
 	raw, err := request(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -147,7 +147,7 @@ func renderDashboard(ctx context.Context, grafana, url string) ([]byte, error) {
 	}
 
 	// height=-1 asks the renderer for the whole page rather than one screen.
-	image, err := request(ctx, http.MethodGet, grafana+"/render/d/"+imported.UID+"/_?orgId=1&from=now-15m&to=now&tz=UTC&kiosk=true&width=1600&height=-1", nil)
+	image, err := request(ctx, http.MethodGet, grafana+"/render/d/"+imported.UID+"/_?orgId=1&from=now-5m&to=now&tz=UTC&kiosk=true&width=1600&height=-1", nil)
 	if err == nil && !bytes.HasPrefix(image, []byte("\x89PNG")) {
 		err = fmt.Errorf("the renderer returned no image: %.200s", image)
 	}
