@@ -151,6 +151,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           # The download creates no directory when no sample-app produced screenshots
           mkdir -p screenshots && cd screenshots
@@ -165,9 +166,18 @@ jobs:
             exit 0
           fi
 
+          # Earlier runs are carried over from the existing comment, collapsed
+          earlier=$(gh pr view "${PR}" --repo "${GITHUB_REPOSITORY}" --json comments --jq '[.comments[] | select(.viewerDidAuthor)] | last | .body // ""' \
+            | sed -n '/^<details open><summary>Run /,$p' | sed 's/^<details open><summary>Run /<details><summary>Run /')
+          # A comment holds 65536 characters, start over before the history fills it
+          [ ${#earlier} -lt 50000 ] || earlier=""
+
           # gh uploads each attached image and points its reference in the comment at the upload
           {
             echo "### Dashboard screenshots"
+            echo
+            echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
+            echo
             echo "Rendered from the data each sample-app produced in [this run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), covering its last 5 minutes."
             for image in "${images[@]}"; do
               echo
@@ -177,5 +187,9 @@ jobs:
               echo
               echo "</details>"
             done
+            echo
+            echo "</details>"
+            echo
+            echo "${earlier}"
           } > comment.md
           gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file comment.md "${images[@]/#/--attach=}"
