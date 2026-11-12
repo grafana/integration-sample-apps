@@ -2,6 +2,8 @@
 
 This sample application creates an Ubuntu VM integrated with Alloy for metric and log collection. This sample app utilizes cloud-init and Make commands to facilitate the setup, configuration, and monitoring of SNMP using snmpd as well as snmpsim snapshots.
 
+Alloy runs the SNMP integration's filtered advanced metrics snippet and its logs snippet, adapted from version 2.0.3 of the integration. Update `jinja/templates/cloud-init-template.yaml` when the snippets change. The device list and the authentication file are installed to `/etc/alloy/targets.yml` and `/etc/alloy/auths.yml`.
+
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
@@ -17,7 +19,7 @@ To get started with the sample app, follow these steps:
 1. **Clone the repository**: 
    ```sh
    git clone https://github.com/grafana/integration-sample-apps.git
-   cd integration-sample-apps/snmp
+   cd integration-sample-apps/sample-apps/snmp
    ```
 
 2. **Set up default config**: 
@@ -29,7 +31,7 @@ To get started with the sample app, follow these steps:
 4. **Create and set up VMs**: 
    Use `make run` to start the SNMP sample app.
 
-6. **Stop and clean Up**: 
+5. **Stop and clean Up**:
    Use `make stop` to clean up the VM and `make clean` to remove temporary files.
 
 ## Make commands
@@ -37,8 +39,9 @@ To get started with the sample app, follow these steps:
 - `make defaultconfig`: Initializes the configuration file with default values for cloud-init templates.
 - `make render-config`: Generates the `cloud-init.yaml` configuration file using the defined variables.
 - `make run`: Creates the SNMP sample app.
-- `make load-gen`: Sets up a load generation for the sample app.
-- `make clean`: Deletes all created VMs and performs cleanup.
+- `make alert-test CMD="<command>"`: Changes simulated values so an SNMP alert fires. See [Testing alerts](#testing-alerts).
+- `make stop`: Stops and deletes the VM.
+- `make clean`: Removes the rendered configuration files.
 
 ## Default configuration variables
 
@@ -98,7 +101,41 @@ It is recommended to at least change:
 - 1.3.6.1.2.1.31.1.1.1.18.* - ifAlias.
 1. Put snapshot file into ./snmpsim/data dir.
 1. Update targets.yml and auths.yml files.
-1. Add corresponding `./tests/configs` files to automatically check in CI.
+1. Add a `./tests/metrics` list and a matching `./tests/configs` file to check the device in CI.
+
+`./tests/metrics/integration` is the integration's `metric_names`, checked across every SNMP job. Update it when the integration's `metric_names` change.
+
+## Simulated traffic
+
+Traffic moves on `net.cisco.c2911`, `net.cisco.c7600`, `net.cisco.mds9148s`, `net.juniper.ex4200-24f` and the three MikroTik devices. Uptime moves on the same devices except `net.cisco.c2911`, whose uptime stays fixed so that the `reboot` test can set it. Each moving counter keeps the average rate of its recording and varies between polls. On `net.cisco.c7600`, the 10 busiest interfaces move. On `net.cisco.mds9148s`, the Fibre Channel credit counters move too.
+
+A moving counter is a row like `1.3.6.1.2.1.31.1.1.1.6.1|70:numeric|cumulative=1,scale=0,rate=1,offset=675.769,deviation=8109`. `offset` is the average increase per second and `deviation` is the jitter added at each poll. See snmpsim's [numeric variation module](https://docs.lextudio.com/snmpsim/documentation/simulation-with-variation-modules#numeric-module).
+
+`net.cisco.mds9148s` is hand-written, not a recording from a real switch.
+
+`net.juniper.mx240` and `net.juniper.srx` are snmpwalk recordings. That format holds fixed values only, so their traffic stays flat.
+
+## Testing alerts
+
+`make alert-test` changes simulated values on demand. Run it from this directory:
+
+```sh
+make alert-test CMD="cpu-high"
+```
+
+| Command | Alert |
+|---|---|
+| `interface-down warning`, `interface-up warning` | `SNMPInterfaceDown`, warning |
+| `interface-down critical`, `interface-up critical` | `SNMPInterfaceDown`, critical |
+| `reboot` | `SNMPNodeHasRebooted` |
+| `fru-fail`, `fru-on` | `SNMPFRUComponentProblem` |
+| `cpu-high`, `cpu-normal` | `SNMPNodeCPUHighUsage` |
+| `memory-high`, `memory-normal` | `SNMPNodeMemoryUtilization` |
+| `errors [minutes]` | `SNMPInterfaceErrors` |
+| `drops [minutes]` | `SNMPInterfaceDrops` |
+| `fc-errors [minutes]` | `SNMPInterfaceFCerrors` |
+
+`fru-fail` and `fru-on` act on `net.cisco.c7600`. `fc-errors` acts on `fc1/1` of `net.cisco.mds9148s`. The other commands act on `net.cisco.c2911`. Its uplink and critical interfaces are `Gi0/0` and `Gi0/0.114`. `errors` and `drops` keep adding to the uplink's counters for 20 and 35 minutes by default, past each alert's pending period. `fc-errors` adds to all three counters the `SNMPInterfaceFCerrors` rules read, for 20 minutes by default. `make alert-test` with no command lists them all.
 
 ## Testing syslog
 
