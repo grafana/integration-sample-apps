@@ -1,16 +1,20 @@
 # Configuration file version
 apiVersion: 1
 # # List of data sources to delete from the database.
-# deleteDatasources:
-#   - name: Graphite
-#     orgId: 1
+# Removes the data source as named before the rename to
+# grafanacloud-local-logs; it keeps uid loki, which otherwise collides on
+# dbs VMs created before the rename.
+deleteDatasources:
+  - name: loki
+    orgId: 1
 
 # # List of data sources to insert/update depending on what's
 # # available in the database.
 datasources:
   # <string, required> Sets the name you use to refer to
   # the data source in panels and queries.
-  - name: loki
+  # Follows the Grafana Cloud grafanacloud-<STACK_NAME>-logs convention.
+  - name: grafanacloud-local-logs
     # <string, required> Sets the data source type.
     type: loki
     # <string, required> Sets the access mode, either

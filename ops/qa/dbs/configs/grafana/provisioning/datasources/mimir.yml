@@ -1,16 +1,21 @@
 # Configuration file version
 apiVersion: 1
 # # List of data sources to delete from the database.
-# deleteDatasources:
-#   - name: Graphite
-#     orgId: 1
+# Removes the data source as named before the rename to
+# grafanacloud-local-prom; it keeps uid mimir, which otherwise collides on
+# dbs VMs created before the rename.
+deleteDatasources:
+  - name: mimir
+    orgId: 1
 
 # # List of data sources to insert/update depending on what's
 # # available in the database.
 datasources:
   # <string, required> Sets the name you use to refer to
   # the data source in panels and queries.
-  - name: mimir
+  # Follows the Grafana Cloud grafanacloud-<STACK_NAME>-prom convention, so
+  # data source variable regexes written for Cloud also match locally.
+  - name: grafanacloud-local-prom
     # <string, required> Sets the data source type.
     type: prometheus
     # <string, required> Sets the access mode, either
@@ -40,17 +45,18 @@ datasources:
     # <bool> Toggles whether the data source is pre-selected
     # for new panels. You can set only one default
     # data source per organization.
-    #isDefault:
+    isDefault: true
     # <map> Fields to convert to JSON and store in jsonData.
-    # jsonData:
-    #   # <string> Defines the Graphite service's version.
-    #   graphiteVersion: "1.1"
-    #   # <bool> Enables TLS authentication using a client
-    #   # certificate configured in secureJsonData.
-    #   tlsAuth: true
-    #   # <bool> Enables TLS authentication using a CA
-    #   # certificate.
-    #   tlsAuthWithCACert: true
+    # timeInterval is the datasource "Scrape interval". Grafana derives
+    # $__rate_interval from it (max(4 * timeInterval, interval + timeInterval)).
+    # 60s mirrors the Grafana Cloud metrics data source and the 60s
+    # scrape_interval most sample apps' Alloy configs use. Without it Grafana
+    # assumes 15s, so $__rate_interval is 1m and rate() over 60s scrapes sees
+    # fewer than 2 samples.
+    jsonData:
+      timeInterval: 60s
+      # Lets Grafana use the Mimir APIs, as the Cloud metrics data source does.
+      prometheusType: Mimir
     # # <map> Fields to encrypt before storing in jsonData.
     # secureJsonData:
     #   # <string> Defines the CA cert, client cert, and

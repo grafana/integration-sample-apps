@@ -59,7 +59,7 @@ Any of these can be overridden on the command line, e.g. `make COLLECTORS="alloy
 - `otel_col_version`: OpenTelemetry Collector release to install, e.g. `0.161.0`. Set from `OTEL_COL_VERSION`.
 - `otlp_user`, `otlp_pass`: Basic auth credentials for the OTLP endpoint. Empty by default, which sends no credentials; set both to export to an endpoint that requires them.
 
-The `job` and `instance` labels are derived by OTLP ingest from the `service.namespace`, `service.name` and `service.instance.id` resource attributes, which the collector's `resource` processor sets.
+The `job` and `instance` labels are derived by OTLP ingest from the `service.namespace`, `service.name` and `service.instance.id` resource attributes, which the collector's `resource` processor sets. As on Grafana Cloud, the local Mimir adds unit and type suffixes to metric names, e.g. `system.cpu.time` is stored as `system_cpu_time_seconds_total`, and also keeps those attributes as `service_namespace`, `service_name` and `service_instance_id` labels.
 
 ## Validating services
 
