@@ -4,10 +4,7 @@ permissions:
   contents: read
 
 on:
-  # To conserve resources we only run tests against main in PRs
   pull_request:
-    branches:
-      - main
 
 jobs:
   check-for-changed-sample-apps:
@@ -80,10 +77,44 @@ jobs:
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
         run: sampletool ci check "${SAMPLE_APP}" >> "$GITHUB_OUTPUT"
+      
+      # Temporary snapstore cache because they're having a lot of downtime
+      - name: Restore Multipass snaps
+        id: multipass_snaps
+        if: steps.check_ci_support.outputs.run == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/multipass-snaps
+          key: multipass-snaps-v1
+
+      - name: Download Multipass snaps
+        if: steps.check_ci_support.outputs.run == 'true' && steps.multipass_snaps.outputs.cache-hit != 'true'
+        env:
+          SNAPS: core24 gtk-common-themes gnome-46-2404 mesa-2404 multipass
+        run: |
+          mkdir -p ~/multipass-snaps && cd ~/multipass-snaps
+          for snap in ${SNAPS}; do
+            snap download "${snap}"
+          done
+
+      - name: Save Multipass snaps
+        if: steps.check_ci_support.outputs.run == 'true' && steps.multipass_snaps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/multipass-snaps
+          key: multipass-snaps-v1
 
       - name: Install Multipass
         if: steps.check_ci_support.outputs.run == 'true'
-        run: sudo snap install multipass
+        env:
+          SNAPS: core24 gtk-common-themes gnome-46-2404 mesa-2404 multipass
+        run: |
+          cd ~/multipass-snaps
+          for snap in ${SNAPS}; do
+            if snap list "${snap}" > /dev/null 2>&1; then continue; fi
+            sudo snap ack "${snap}"_*.assert
+            sudo snap install "${snap}"_*.snap
+          done
 
       - name: Configure Multipass
         if: steps.check_ci_support.outputs.run == 'true'
@@ -96,6 +127,7 @@ jobs:
         run: sampletool dbs up --dbs dbs --env qa
 
       - name: Run ${{ matrix.sample-app }} sample-app
+        id: run_sample_app
         if: steps.check_ci_support.outputs.run == 'true'
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
@@ -110,3 +142,107 @@ jobs:
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
         run: sampletool apps test --apps "${SAMPLE_APP}"
+
+      - name: Capture dashboard screenshots
+        if: ${{ !cancelled() && steps.run_sample_app.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          SAMPLE_APP: ${{ matrix.sample-app }}
+        run: sampletool apps screenshot --apps "${SAMPLE_APP}"
+
+      - name: Upload dashboard screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots-${{ matrix.sample-app }}
+          path: screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish-screenshots:
+    name: Post dashboard screenshots
+    runs-on: ubuntu-latest
+    needs: [sample-app-testing]
+    # Fork PRs only get a read-only token, their screenshots stay in the run's artifacts
+    if: >-
+      ${{ !cancelled() && needs.sample-app-testing.result != 'skipped'
+      && github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      # Store the images under refs/screenshots/
+      contents: write
+      # Comment on the pull request
+      pull-requests: write
+    steps:
+      - name: Download dashboard screenshots
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: screenshots-*
+          merge-multiple: true
+          path: screenshots
+
+      - name: Comment on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The download creates no directory when no sample-app produced screenshots
+          mkdir -p screenshots && cd screenshots
+          shopt -s nullglob
+          images=()
+          for image in */*.png; do
+            # File names come from the pull request, skip unexpected ones
+            [[ "$image" =~ ^[A-Za-z0-9_/-]+\.png$ ]] && images+=("$image")
+          done
+          if [ ${#images[@]} -eq 0 ]; then
+            echo "No sample-app produced screenshots"
+            exit 0
+          fi
+
+          # Earlier runs are carried over from the existing comment, collapsed
+          earlier=$(gh pr view "${PR}" --repo "${GITHUB_REPOSITORY}" --json comments --jq '[.comments[] | select(.viewerDidAuthor)] | last | .body // ""' \
+            | sed -n '/^<details open><summary>Run /,$p' | sed 's/^<details open><summary>Run /<details><summary>Run /')
+          # A comment holds 65536 characters, start over before the history fills it
+          [ ${#earlier} -lt 50000 ] || earlier=""
+
+          # The images go to a ref of their own in this repository. 
+          git init --quiet
+          git add -- "${images[@]}"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet --message "Dashboard screenshots for #${PR}"
+          base=""
+          if git push --quiet "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" "HEAD:refs/screenshots/pr-${PR}/run-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"; then
+            url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/$(git rev-parse HEAD)"
+            # The links take a moment to work
+            for attempt in 1 2 3 4 5; do
+              if curl --silent --fail --head --output /dev/null "${url}/${images[0]}"; then base="${url}"; break; fi
+              sleep 3
+            done
+          fi
+
+          run="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "### Dashboard screenshots"
+            echo
+            echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
+            echo
+            echo "Rendered from the data each sample-app produced in [this run](${run}), covering its last 5 minutes."
+            if [ -z "${base}" ]; then
+              echo
+              echo "The images could not be stored for display here. They are in the artifacts of [this run](${run})."
+            else
+              for image in "${images[@]}"; do
+                echo
+                echo "<details open><summary>${image%.png}</summary>"
+                echo
+                echo "![${image%.png}](${base}/${image})"
+                echo
+                echo "</details>"
+              done
+            fi
+            echo
+            echo "</details>"
+            echo
+            echo "${earlier}"
+          } > comment.md
+          gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file comment.md

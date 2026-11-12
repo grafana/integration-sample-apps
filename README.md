@@ -38,7 +38,7 @@ Ensure Multipass is running, then from the root of the repo execute:
 make setup-dbs
 ```
 
-This will setup Grafana, Mimir, and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation.
+This will setup Grafana (with its image renderer), Mimir, and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation.
 
 The databases mirror Grafana Cloud stack defaults where it affects what sample apps produce. The data sources are named `grafanacloud-local-prom` (the default, with a 60s scrape interval) and `grafanacloud-local-logs`. Mimir applies Grafana Cloud's non-autoscaled limits, and translates OTLP metrics with unit and type suffixes and the default promoted resource attributes. Grafana only runs for `ENV=local`. 
 
@@ -66,6 +66,16 @@ To do so, simply run the following make command, again providing a comma-separat
 make test-apps APPS=<apps>
 ```
 This will give you a metric by metric pass/fail, as well as an overall pass-fail based on the configured pass-rate for the given sample-app
+
+### Capturing dashboard screenshots
+
+Sample apps that list their integration's dashboards (see [Adding dashboard screenshots](sample-apps/README.md#adding-dashboard-screenshots)) can have them rendered against the data they produced:
+
+```sh
+make screenshot-apps APPS=<apps>
+```
+
+This loads each dashboard into the Grafana of the databases VM and saves a full-page image of it to `screenshots/<app>/`. In CI the same step runs for every changed sample app, and the images are posted as a comment on the pull request.
 
 ### Tearing down the test setup
 
