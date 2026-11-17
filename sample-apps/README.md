@@ -53,6 +53,8 @@ jsonnet-libs/docker-mixin@my-mixin-branch
 
 Dashboards from elsewhere can be listed as one `https://` URL of a dashboard `.json` file per line. Lines starting with `#` are comments.
 
+The comment groups mixin dashboards by their jsonnet-libs ref and then by mixin, with the dashboards listed by URL under each sample-app.
+
 Screenshots cover the 5 minutes before they are taken. Dashboards exported for sharing, which carry `__inputs` datasource placeholders, are skipped.
 
 Listing a mixin uses the GitHub API, which allows 60 requests an hour without a token. Set `GITHUB_TOKEN` to raise the limit; CI does this.
