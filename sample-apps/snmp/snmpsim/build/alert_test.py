@@ -12,10 +12,14 @@ Commands:
   fru-fail, fru-on                  fail or restore a power supply on net.cisco.c7600
   cpu-high, cpu-normal              set net.cisco.c2911's CPU to 95% or back to 3%
   memory-high, memory-normal        set net.cisco.c2911's processor memory to 95% used or back
-  errors [minutes]                  add errors on net.cisco.c2911's uplink every 10 seconds, 20 minutes by default
-  drops [minutes]                   add discards on net.cisco.c2911's uplink every 10 seconds, 35 minutes by default
+  errors [minutes]                  add 30 errors to net.cisco.c2911's uplink every 10 seconds, about 3% of its
+                                    packets, 20 minutes by default
+  drops [minutes]                   add 100 discards to net.cisco.c2911's uplink every 10 seconds, about 9% of
+                                    its packets, 35 minutes by default
   fc-errors [minutes]               add invalid transmission words, invalid CRCs and discarded frames on
                                     net.cisco.mds9148s's fc1/1 every 10 seconds, 20 minutes by default
+  flap [minutes]                    take net.cisco.c2911's uplink down and up every 90 seconds, 20 minutes by
+                                    default, and leave it up
 """
 import asyncio
 import sys
@@ -72,13 +76,24 @@ async def put(community, *pairs):
     await request(set_cmd, community, [ObjectType(ObjectIdentity(oid), value) for oid, value in pairs])
 
 
-async def increase(device, oids, minutes):
-    print("Adding to %s on %s every 10 seconds for %d minutes" % (", ".join(oids), device, minutes))
+async def increase(device, oids, minutes, step=5):
+    print("Adding %d to %s on %s every 10 seconds for %d minutes" % (step, ", ".join(oids), device, minutes))
     end = time.time() + minutes * 60
     while time.time() < end:
         values = await get(device, *oids)
-        await put(device, *[(oid, Counter32((value + 5) % 2**32)) for oid, value in zip(oids, values)])
+        await put(device, *[(oid, Counter32((value + step) % 2**32)) for oid, value in zip(oids, values)])
         await asyncio.sleep(10)
+
+
+async def flap(minutes):
+    print("Flapping %s on %s every 90 seconds for %d minutes" % (IF_OPER_STATUS + UPLINK, LAB, minutes))
+    end = time.time() + minutes * 60
+    status = 2
+    while time.time() < end:
+        await put(LAB, (IF_OPER_STATUS + UPLINK, Integer32(status)))
+        status = 3 - status
+        await asyncio.sleep(90)
+    await put(LAB, (IF_OPER_STATUS + UPLINK, Integer32(1)))
 
 
 def memory(percent):
@@ -96,9 +111,10 @@ COMMANDS = {
     "cpu-normal": lambda: put(LAB, (CPU_1MIN, Gauge32(3))),
     "memory-high": lambda: memory(95),
     "memory-normal": lambda: put(LAB, (MEMORY_USED, Gauge32(88360644)), (MEMORY_FREE, Gauge32(2271625400))),
-    "errors": lambda minutes="20": increase(LAB, ERRORS, int(minutes)),
-    "drops": lambda minutes="35": increase(LAB, DISCARDS, int(minutes)),
+    "errors": lambda minutes="20": increase(LAB, ERRORS, int(minutes), step=30),
+    "drops": lambda minutes="35": increase(LAB, DISCARDS, int(minutes), step=100),
     "fc-errors": lambda minutes="20": increase(FC, FC_ERRORS, int(minutes)),
+    "flap": lambda minutes="20": flap(int(minutes)),
 }
 
 if __name__ == "__main__":

@@ -134,8 +134,9 @@ make alert-test CMD="cpu-high"
 | `errors [minutes]` | `SNMPInterfaceErrors` |
 | `drops [minutes]` | `SNMPInterfaceDrops` |
 | `fc-errors [minutes]` | `SNMPInterfaceFCerrors` |
+| `flap [minutes]` | `SNMPInterfaceIsFlapping` |
 
-`fru-fail` and `fru-on` act on `net.cisco.c7600`. `fc-errors` acts on `fc1/1` of `net.cisco.mds9148s`. The other commands act on `net.cisco.c2911`. Its uplink and critical interfaces are `Gi0/0` and `Gi0/0.114`. `errors` and `drops` keep adding to the uplink's counters for 20 and 35 minutes by default, past each alert's pending period. `fc-errors` adds to all three counters the `SNMPInterfaceFCerrors` rules read, for 20 minutes by default. `make alert-test` with no command lists them all.
+`fru-fail` and `fru-on` act on `net.cisco.c7600`. `fc-errors` acts on `fc1/1` of `net.cisco.mds9148s`. The other commands act on `net.cisco.c2911`. Its uplink and critical interfaces are `Gi0/0` and `Gi0/0.114`. `errors` and `drops` keep adding to the uplink's counters for 20 and 35 minutes by default, past each alert's pending period. They add about 3% errors and 9% discards to the uplink's packets, above the alerts' default thresholds of 1% and 5%. `fc-errors` adds to all three counters the `SNMPInterfaceFCerrors` rules read, for 20 minutes by default. `flap` takes the uplink down and up every 90 seconds for 20 minutes by default, then leaves it up. At one scrape a minute, that is about 10 status changes in 15 minutes. `make alert-test` with no command lists them all.
 
 ## Testing syslog
 
