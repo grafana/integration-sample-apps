@@ -5,8 +5,6 @@ cempMemPoolUsed
 ciscoImageString
 ciscoMemoryPoolFree
 ciscoMemoryPoolUsed
-cpmCPUMemoryFree
-cpmCPUMemoryUsed
 cpmCPUTotal1minRev
 entSensorPrecision
 entSensorValue
@@ -50,6 +48,7 @@ jnxOperatingTemp
 mtxrHlPower
 mtxrHlTemperature
 mtxrHlVoltage
+mtxrLicVersion
 snmp_scrape_duration_seconds
 snmp_scrape_pdus_returned
 sysDescr
