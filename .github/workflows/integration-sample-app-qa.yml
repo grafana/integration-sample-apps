@@ -248,9 +248,8 @@ jobs:
           fi
 
           run="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          # A collapsible section, open when a second argument is given
-          section() { echo; echo "<details${2:+ open}><summary>$1</summary>"; echo; }
-          end_section() { echo; echo "</details>"; }
+          section() { echo; echo "<details${2:+ open}><summary>$1</summary>"; echo; echo "<blockquote>"; echo; }
+          end_section() { echo; echo "</blockquote>"; echo "</details>"; }
           screenshot() {
             local name="${1##*/}"
             section "${name%.png}" open
@@ -263,46 +262,42 @@ jobs:
             echo
             echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
             echo
+            echo "<blockquote>"
+            echo
             echo "Rendered from the data each sample-app produced in [this run](${run}), covering its last 5 minutes."
           }
+          footer() { echo; echo "</blockquote>"; echo "</details>"; echo; }
           {
             header
             if [ -z "${base}" ]; then
               echo
               echo "The images could not be stored for display here. They are in the artifacts of [this run](${run})."
             else
-              # Mixin dashboards nest under their ref, then their mixin
-              for ref in $(printf '%s\n' "${mixin_images[@]}" | cut -d/ -f2 | sort -u); do
-                section "jsonnet-libs@${ref}" open
-                for group in $(printf '%s\n' "${mixin_images[@]}" | awk -F/ -v ref="${ref}" '$2 == ref { print $3 "/" $1 }' | sort -u); do
-                  mixin="${group%/*}"
-                  app="${group#*/}"
-                  matching=()
-                  for image in "${mixin_images[@]}"; do
-                    if [[ "$image" == "${app}/${ref}/${mixin}/"* ]]; then matching+=("$image"); fi
-                  done
-                  section "${mixin} · ${app} sample-app · ${#matching[@]} dashboard$([ ${#matching[@]} -eq 1 ] || echo s)"
-                  for image in "${matching[@]}"; do screenshot "$image"; done
-                  end_section
+              # Mixin dashboards nest under their mixin, named with its jsonnet-libs ref unless that is master
+              for group in $(printf '%s\n' "${mixin_images[@]}" | awk -F/ 'NF == 4 { print $3 "/" $2 "/" $1 }' | sort -u); do
+                IFS=/ read -r mixin ref app <<< "${group}"
+                matching=()
+                for image in "${mixin_images[@]}"; do
+                  if [[ "$image" == "${app}/${ref}/${mixin}/"* ]]; then matching+=("$image"); fi
                 done
+                label="${mixin}"
+                if [ "${ref}" != master ]; then label="${mixin}@${ref}"; fi
+                section "${label} · ${app} sample-app · ${#matching[@]} dashboard$([ ${#matching[@]} -eq 1 ] || echo s)"
+                for image in "${matching[@]}"; do screenshot "$image"; done
                 end_section
               done
               # Dashboards listed by URL nest under their sample-app
-              if [ ${#other_images[@]} -gt 0 ]; then
-                section "Other dashboards" open
-                for app in $(printf '%s\n' "${other_images[@]}" | cut -d/ -f1 | sort -u); do
-                  section "${app} sample-app"
-                  for image in "${other_images[@]}"; do
-                    if [[ "$image" == "${app}/"* ]]; then screenshot "$image"; fi
-                  done
-                  end_section
+              for app in $(printf '%s\n' "${other_images[@]}" | cut -d/ -f1 | sort -u); do
+                matching=()
+                for image in "${other_images[@]}"; do
+                  if [[ "$image" == "${app}/"* ]]; then matching+=("$image"); fi
                 done
+                section "${app} sample-app · ${#matching[@]} dashboard$([ ${#matching[@]} -eq 1 ] || echo s)"
+                for image in "${matching[@]}"; do screenshot "$image"; done
                 end_section
-              fi
+              done
             fi
-            echo
-            echo "</details>"
-            echo
+            footer
           } > current.md
 
           limit=65000
@@ -311,9 +306,7 @@ jobs:
               header
               echo
               echo "This run captured too many screenshots to show here. They are in the artifacts of [this run](${run})."
-              echo
-              echo "</details>"
-              echo
+              footer
             } > current.md
           fi
           # Earlier runs are kept newest first while they fit, dropping the oldest
