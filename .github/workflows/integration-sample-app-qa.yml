@@ -167,6 +167,9 @@ jobs:
     if: >-
       ${{ !cancelled() && needs.sample-app-testing.result != 'skipped'
       && github.event.pull_request.head.repo.full_name == github.repository }}
+    concurrency:
+      group: screenshots-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       # Store the images under refs/screenshots/
       contents: write
@@ -199,9 +202,17 @@ jobs:
             exit 0
           fi
 
+          # Other workflows comment as github-actions[bot] too, so the screenshot comment is found by its marker
+          marker="<!-- sample-app-screenshots -->"
+          comment=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments?per_page=100" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | tail -n 1)
+
           # Earlier runs are carried over from the existing comment, collapsed
-          earlier=$(gh pr view "${PR}" --repo "${GITHUB_REPOSITORY}" --json comments --jq '[.comments[] | select(.viewerDidAuthor)] | last | .body // ""' \
-            | sed -n '/^<details open><summary>Run /,$p' | sed 's/^<details open><summary>Run /<details><summary>Run /')
+          earlier=""
+          if [ -n "${comment}" ]; then
+            earlier=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" --jq .body \
+              | sed -n '/^<details open><summary>Run /,$p' | sed 's/^<details open><summary>Run /<details><summary>Run /')
+          fi
           # A comment holds 65536 characters, start over before the history fills it
           [ ${#earlier} -lt 50000 ] || earlier=""
 
@@ -222,6 +233,7 @@ jobs:
 
           run="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           {
+            echo "${marker}"
             echo "### Dashboard screenshots"
             echo
             echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
@@ -245,4 +257,8 @@ jobs:
             echo
             echo "${earlier}"
           } > comment.md
-          gh pr comment "${PR}" --repo "${GITHUB_REPOSITORY}" --edit-last --create-if-none --body-file comment.md
+          if [ -n "${comment}" ]; then
+            gh api --silent --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" -F body=@comment.md
+          else
+            gh api --silent --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@comment.md
+          fi
