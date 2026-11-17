@@ -72,7 +72,7 @@ func dbsUp(ctx context.Context, root, name string, grafana bool) error {
 	}
 	if grafana {
 		fmt.Println("Configuring extras for local development")
-		steps = append(steps, []string{"exec", name, "--", "bash", "-c", "docker-compose -f docker-compose.grafana.yaml up -d"})
+		steps = append(steps, []string{"exec", name, "--", "bash", "-c", grafanaComposeUp})
 	}
 	for _, step := range steps {
 		if err := multipass(ctx, step...); err != nil {

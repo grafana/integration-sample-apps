@@ -7,7 +7,7 @@ DBS_NAME ?= "dbs"
 APPS ?= ""
 ENV ?= "local"
 
-.PHONY: help setup-dbs stop-dbs setup-apps test-apps stop-apps stop-all
+.PHONY: help setup-dbs stop-dbs setup-apps test-apps screenshot-apps stop-apps stop-all
 
 help:
 	@$(SAMPLETOOL) help
@@ -27,6 +27,10 @@ setup-apps:
 test-apps:
 	@echo "Testing apps=$(APPS) for env=$(ENV)"
 	@$(SAMPLETOOL) apps test --apps $(APPS) --env $(ENV) --dbs $(DBS_NAME)
+
+screenshot-apps:
+	@echo "Capturing dashboards of apps=$(APPS)"
+	@$(SAMPLETOOL) apps screenshot --apps $(APPS) --dbs $(DBS_NAME)
 
 stop-apps:
 	@echo "Tearing down apps=$(APPS)"

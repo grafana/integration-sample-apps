@@ -1,0 +1,2 @@
+# The MySQL integration builds on mysqld-mixin, which lives in grafana/mysqld_exporter
+https://raw.githubusercontent.com/grafana/mysqld_exporter/main/mysqld-mixin/dashboards/mysql-overview.json
