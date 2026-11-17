@@ -6,6 +6,10 @@ permissions:
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   check-for-changed-sample-apps:
     name: Check for changed sample apps
@@ -55,6 +59,7 @@ jobs:
       matrix:
         sample-app: ${{ fromJSON(needs.check-for-changed-sample-apps.outputs.changed-sample-apps) }}
       fail-fast: false
+      max-parallel: 10
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
