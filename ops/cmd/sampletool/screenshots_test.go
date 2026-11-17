@@ -3,17 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
 // The fake GitHub here only knows demo-mixin, at any ref.
-func TestDashboardURLs(t *testing.T) {
+func TestDashboards(t *testing.T) {
 	var refs, tokens []string
 	github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/contents/demo-mixin/dashboards_out" {
@@ -35,35 +37,39 @@ func TestDashboardURLs(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "test-token")
 
 	root := newRepo(t, map[string]string{
-		"listed/tests/dashboards":   "# from the mixin\nhttps://example.com/a.json\n\njsonnet-libs/demo-mixin\njsonnet-libs/demo-mixin@feature/branch\n",
-		"none/Makefile":             "",
-		"insecure/tests/dashboards": "http://example.com/a.json\n",
-		"missing/tests/dashboards":  "jsonnet-libs/missing-mixin\n",
+		"listed/tests/dashboards":    "# from the mixin\nhttps://example.com/a.json\n\njsonnet-libs/demo-mixin\njsonnet-libs/demo-mixin@feature/branch\n",
+		"none/Makefile":              "",
+		"insecure/tests/dashboards":  "http://example.com/a.json\n",
+		"missing/tests/dashboards":   "jsonnet-libs/missing-mixin\n",
+		"traversal/tests/dashboards": "jsonnet-libs/../demo-mixin\n",
 	})
-	apps, err := sampleApps(root, "listed,none,insecure,missing")
+	apps, err := sampleApps(root, "listed,none,insecure,missing,traversal")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	want := []string{
-		"https://example.com/a.json",
-		"https://raw.example.com/master/demo-mixin/dashboards_out/overview.json",
-		"https://raw.example.com/feature/branch/demo-mixin/dashboards_out/overview.json",
+	want := []dashboard{
+		{url: "https://example.com/a.json"},
+		{url: "https://raw.example.com/master/demo-mixin/dashboards_out/overview.json", mixin: "demo-mixin", ref: "master"},
+		{url: "https://raw.example.com/feature/branch/demo-mixin/dashboards_out/overview.json", mixin: "demo-mixin", ref: "feature/branch"},
 	}
-	if urls, err := apps[0].dashboardURLs(ctx); err != nil || strings.Join(urls, " ") != strings.Join(want, " ") {
-		t.Errorf("listed: got %q, %v; want %q", urls, err, want)
+	if listed, err := apps[0].dashboards(ctx); err != nil || !slices.Equal(listed, want) {
+		t.Errorf("listed: got %+v, %v; want %+v", listed, err, want)
 	}
 	if strings.Join(refs, " ") != "master feature/branch" || tokens[0] != "Bearer test-token" {
 		t.Errorf("want the master and feature/branch listings with the token, got refs %q and tokens %q", refs, tokens)
 	}
-	if urls, err := apps[1].dashboardURLs(ctx); err != nil || len(urls) != 0 {
-		t.Errorf("none: got %q, %v; want no dashboards and no error", urls, err)
+	if listed, err := apps[1].dashboards(ctx); err != nil || len(listed) != 0 {
+		t.Errorf("none: got %+v, %v; want no dashboards and no error", listed, err)
 	}
-	if _, err := apps[2].dashboardURLs(ctx); err == nil {
+	if _, err := apps[2].dashboards(ctx); err == nil {
 		t.Error("insecure: want an error for a URL that is not https://")
 	}
-	if _, err := apps[3].dashboardURLs(ctx); err == nil || !strings.Contains(err.Error(), "missing-mixin@master") {
+	if _, err := apps[3].dashboards(ctx); err == nil || !strings.Contains(err.Error(), "missing-mixin@master") {
 		t.Errorf("missing: want an error naming the mixin, got: %v", err)
+	}
+	if _, err := apps[4].dashboards(ctx); err == nil {
+		t.Error("traversal: want an error for a mixin name that is not a plain directory")
 	}
 }
 
@@ -99,16 +105,31 @@ func TestScreenshotApp(t *testing.T) {
 
 	dir := t.TempDir()
 	// The failure comes first, and the query string must not reach the file name.
-	urls := []string{server.URL + "/mixin/broken.json", server.URL + "/mixin/shared.json", server.URL + "/mixin/good.json?v=1.2"}
-	err := screenshotApp(context.Background(), server.URL, urls, dir)
+	dashboards := []dashboard{
+		{url: server.URL + "/mixin/broken.json"},
+		{url: server.URL + "/mixin/shared.json", mixin: "demo-mixin", ref: "master"},
+		{url: server.URL + "/mixin/good.json?v=1.2"},
+		{url: server.URL + "/mixin/good.json", mixin: "demo-mixin", ref: "feature/branch"},
+	}
+	err := screenshotApp(context.Background(), server.URL, dashboards, dir)
 	if err == nil || !strings.Contains(err.Error(), "dashboard broken") || strings.Contains(err.Error(), "dashboard good") ||
 		strings.Contains(err.Error(), "dashboard shared") {
 		t.Errorf("want an error for the broken dashboard only, skipping the shared one, got: %v", err)
 	}
-	if image, _ := os.ReadFile(filepath.Join(dir, "good-json-v-1-2.png")); !strings.HasPrefix(string(image), "\x89PNG") {
-		t.Errorf("good-json-v-1-2.png = %q, want the rendered image", image)
-	}
-	if files, _ := filepath.Glob(filepath.Join(dir, "*")); len(files) != 1 || len(imported) != 2 {
-		t.Errorf("want 1 image and 2 imports, got files %v and imports %v", files, imported)
+	var images []string
+	filepath.WalkDir(dir, func(file string, entry fs.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() {
+			image, _ := os.ReadFile(file)
+			if !strings.HasPrefix(string(image), "\x89PNG") {
+				t.Errorf("%s = %q, want the rendered image", file, image)
+			}
+			rel, _ := filepath.Rel(dir, file)
+			images = append(images, filepath.ToSlash(rel))
+		}
+		return err
+	})
+	// A mixin's image sits under its ref, with any slash in it replaced.
+	if want := []string{"feature-branch/demo-mixin/good.png", "good-json-v-1-2.png"}; !slices.Equal(images, want) || len(imported) != 3 {
+		t.Errorf("want images %q and 3 imports, got images %q and imports %v", want, images, imported)
 	}
 }

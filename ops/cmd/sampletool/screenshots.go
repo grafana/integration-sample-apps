@@ -22,45 +22,49 @@ import (
 const grafanaComposeUp = "docker-compose -f docker-compose.grafana.yaml up -d"
 
 // mixinLine matches jsonnet-libs/<mixin>, optionally followed by @<ref>.
-var mixinLine = regexp.MustCompile(`^jsonnet-libs/([A-Za-z0-9._-]+)(?:@([A-Za-z0-9._/-]+))?$`)
+var mixinLine = regexp.MustCompile(`^jsonnet-libs/([A-Za-z0-9][A-Za-z0-9._-]*)(?:@([A-Za-z0-9][A-Za-z0-9._/-]*))?$`)
 
-// dashboardURLs reads the app's optional tests/dashboards file. Each line is
+// dashboard is a dashboard to capture. One listed from a mixin keeps the
+// mixin's name and ref, so its image can be grouped under them.
+type dashboard struct{ url, mixin, ref string }
+
+// dashboards reads the app's optional tests/dashboards file. Each line is
 // either the https URL of a dashboard JSON file, or jsonnet-libs/<mixin>[@ref]
 // for every dashboard in that mixin's dashboards_out, at master by default.
-func (a app) dashboardURLs(ctx context.Context) ([]string, error) {
+func (a app) dashboards(ctx context.Context) ([]dashboard, error) {
 	file := filepath.Join(a.dir, "tests", "dashboards")
 	data, err := os.ReadFile(file)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	var urls []string
+	var listed []dashboard
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 		if m := mixinLine.FindStringSubmatch(line); m != nil {
-			listed, err := mixinDashboards(ctx, m[1], cmp.Or(m[2], "master"))
+			fromMixin, err := mixinDashboards(ctx, m[1], cmp.Or(m[2], "master"))
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", file, err)
 			}
-			urls = append(urls, listed...)
+			listed = append(listed, fromMixin...)
 			continue
 		}
 		if !strings.HasPrefix(line, "https://") {
 			return nil, fmt.Errorf("%s: %q is neither an https:// URL nor jsonnet-libs/<mixin>", file, line)
 		}
-		urls = append(urls, line)
+		listed = append(listed, dashboard{url: line})
 	}
-	return urls, nil
+	return listed, nil
 }
 
 // jsonnetLibsAPI is the GitHub API of grafana/jsonnet-libs, replaced in tests.
 var jsonnetLibsAPI = "https://api.github.com/repos/grafana/jsonnet-libs"
 
-// mixinDashboards returns the download URLs of the dashboards a jsonnet-libs
-// mixin has built into its dashboards_out directory at ref.
-func mixinDashboards(ctx context.Context, mixin, ref string) ([]string, error) {
+// mixinDashboards returns the dashboards a jsonnet-libs mixin has built into
+// its dashboards_out directory at ref.
+func mixinDashboards(ctx context.Context, mixin, ref string) ([]dashboard, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		jsonnetLibsAPI+"/contents/"+mixin+"/dashboards_out?ref="+url.QueryEscape(ref), nil)
 	if err != nil {
@@ -83,16 +87,16 @@ func mixinDashboards(ctx context.Context, mixin, ref string) ([]string, error) {
 	if err := json.Unmarshal(data, &files); err != nil {
 		return nil, fmt.Errorf("listing the dashboards of %s@%s: %w", mixin, ref, err)
 	}
-	var urls []string
+	var listed []dashboard
 	for _, f := range files {
 		if f.Type == "file" && strings.HasSuffix(f.Name, ".json") {
-			urls = append(urls, f.DownloadURL)
+			listed = append(listed, dashboard{url: f.DownloadURL, mixin: mixin, ref: ref})
 		}
 	}
-	if len(urls) == 0 {
+	if len(listed) == 0 {
 		return nil, fmt.Errorf("%s@%s has no dashboards in dashboards_out", mixin, ref)
 	}
-	return urls, nil
+	return listed, nil
 }
 
 // appsScreenshot saves an image of every dashboard the apps list to
@@ -101,11 +105,11 @@ func appsScreenshot(ctx context.Context, root string, apps []app, dbsName string
 	var errs []error
 	grafana := ""
 	for _, a := range apps {
-		urls, err := a.dashboardURLs(ctx)
+		listed, err := a.dashboards(ctx)
 		if err != nil {
 			return err
 		}
-		if len(urls) == 0 {
+		if len(listed) == 0 {
 			fmt.Printf("%s lists no dashboards in tests/dashboards, nothing to capture\n", a.name)
 			continue
 		}
@@ -114,7 +118,7 @@ func appsScreenshot(ctx context.Context, root string, apps []app, dbsName string
 				return err
 			}
 		}
-		errs = append(errs, screenshotApp(ctx, grafana, urls, filepath.Join(root, "screenshots", a.name)))
+		errs = append(errs, screenshotApp(ctx, grafana, listed, filepath.Join(root, "screenshots", a.name)))
 	}
 	return errors.Join(errs...)
 }
@@ -147,19 +151,25 @@ func startGrafana(ctx context.Context, dbsName string) (string, error) {
 
 var unsafeName = regexp.MustCompile(`[^A-Za-z0-9_-]`)
 
-// screenshotApp captures each dashboard to dir/<name>.png, carrying on when
-// one of them fails.
-func screenshotApp(ctx context.Context, grafana string, urls []string, dir string) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
+// screenshotApp captures each dashboard to dir/<name>.png, or to
+// dir/<ref>/<mixin>/<name>.png for one listed from a mixin, carrying on when
+// one of them fails. The pull-request comment groups the images by that path.
+func screenshotApp(ctx context.Context, grafana string, dashboards []dashboard, dir string) error {
 	var errs []error
-	for _, url := range urls {
-		// The name ends up in a file name and in the pull-request comment.
-		name := unsafeName.ReplaceAllString(strings.TrimSuffix(path.Base(url), ".json"), "-")
-		file := filepath.Join(dir, name+".png")
+	for _, d := range dashboards {
+		// The names end up in file names and in the pull-request comment.
+		name := unsafeName.ReplaceAllString(strings.TrimSuffix(path.Base(d.url), ".json"), "-")
+		imageDir := dir
+		if d.mixin != "" {
+			// A ref such as feature/branch is one directory, feature-branch.
+			imageDir = filepath.Join(dir, strings.ReplaceAll(d.ref, "/", "-"), d.mixin)
+		}
+		if err := os.MkdirAll(imageDir, 0o755); err != nil {
+			return err
+		}
+		file := filepath.Join(imageDir, name+".png")
 
-		image, err := renderDashboard(ctx, grafana, url)
+		image, err := renderDashboard(ctx, grafana, d.url)
 		if errors.Is(err, errSharedExport) {
 			fmt.Printf("[SKIP] %s: %v\n", name, err)
 			continue
