@@ -144,6 +144,11 @@ func request(ctx context.Context, method, url string, body []byte) ([]byte, erro
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	return do(req)
+}
+
+// do returns the body of a successful HTTP response to req.
+func do(req *http.Request) ([]byte, error) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
