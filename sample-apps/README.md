@@ -41,13 +41,21 @@ The CI workflow expects a few things from a CI enabled sample app. For a working
 # Adding dashboard screenshots
 A sample-app can list the dashboards of its integration. CI then renders them against the data the sample-app produced and posts the images as a comment on the pull request, so reviewers can see that the dashboards are populated.
 
-Add a `tests/dashboards` file with one `https://` URL of a dashboard `.json` file per line, typically the raw files in the `dashboards_out` directory of the integration's mixin:
+Add a `tests/dashboards` file that names the integration's mixin in [grafana/jsonnet-libs](https://github.com/grafana/jsonnet-libs). Every dashboard in the mixin's `dashboards_out` directory on `master` is captured, so dashboards added to the mixin later are picked up without changes here:
 ```
-# Dashboards of the Docker integration, built from its mixin
-https://raw.githubusercontent.com/grafana/jsonnet-libs/master/docker-mixin/dashboards_out/docker.json
+jsonnet-libs/docker-mixin
 ```
 
-Screenshots cover the 5 minutes before they are taken. Dashboards exported for sharing, which carry `__inputs` datasource placeholders, are not supported.
+To capture the dashboards of a jsonnet-libs branch, tag or commit instead, for example while a mixin change is still in review, add `@<ref>`:
+```
+jsonnet-libs/docker-mixin@my-mixin-branch
+```
+
+Dashboards from elsewhere can be listed as one `https://` URL of a dashboard `.json` file per line. Lines starting with `#` are comments.
+
+Screenshots cover the 5 minutes before they are taken. Dashboards exported for sharing, which carry `__inputs` datasource placeholders, are skipped.
+
+Listing a mixin uses the GitHub API, which allows 60 requests an hour without a token. Set `GITHUB_TOKEN` to raise the limit; CI does this.
 
 The comment is only posted for pull requests from branches of this repository. For pull requests from forks, the images are attached to the workflow run as the `screenshots-<sample-app>` artifact instead.
 

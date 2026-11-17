@@ -148,6 +148,8 @@ jobs:
         continue-on-error: true
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
+          # Read-only, for listing mixin dashboards in grafana/jsonnet-libs
+          GITHUB_TOKEN: ${{ github.token }}
         run: sampletool apps screenshot --apps "${SAMPLE_APP}"
 
       - name: Upload dashboard screenshots

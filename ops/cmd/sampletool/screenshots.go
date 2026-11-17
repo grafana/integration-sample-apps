@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -19,9 +21,13 @@ import (
 // grafanaComposeUp starts Grafana and its image renderer in the databases VM.
 const grafanaComposeUp = "docker-compose -f docker-compose.grafana.yaml up -d"
 
-// dashboardURLs reads the app's optional tests/dashboards file, which lists
-// one https URL of a dashboard JSON file per line.
-func (a app) dashboardURLs() ([]string, error) {
+// mixinLine matches jsonnet-libs/<mixin>, optionally followed by @<ref>.
+var mixinLine = regexp.MustCompile(`^jsonnet-libs/([A-Za-z0-9._-]+)(?:@([A-Za-z0-9._/-]+))?$`)
+
+// dashboardURLs reads the app's optional tests/dashboards file. Each line is
+// either the https URL of a dashboard JSON file, or jsonnet-libs/<mixin>[@ref]
+// for every dashboard in that mixin's dashboards_out, at master by default.
+func (a app) dashboardURLs(ctx context.Context) ([]string, error) {
 	file := filepath.Join(a.dir, "tests", "dashboards")
 	data, err := os.ReadFile(file)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -33,10 +39,58 @@ func (a app) dashboardURLs() ([]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+		if m := mixinLine.FindStringSubmatch(line); m != nil {
+			listed, err := mixinDashboards(ctx, m[1], cmp.Or(m[2], "master"))
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", file, err)
+			}
+			urls = append(urls, listed...)
+			continue
+		}
 		if !strings.HasPrefix(line, "https://") {
-			return nil, fmt.Errorf("%s: %q is not an https:// URL", file, line)
+			return nil, fmt.Errorf("%s: %q is neither an https:// URL nor jsonnet-libs/<mixin>", file, line)
 		}
 		urls = append(urls, line)
+	}
+	return urls, nil
+}
+
+// jsonnetLibsAPI is the GitHub API of grafana/jsonnet-libs, replaced in tests.
+var jsonnetLibsAPI = "https://api.github.com/repos/grafana/jsonnet-libs"
+
+// mixinDashboards returns the download URLs of the dashboards a jsonnet-libs
+// mixin has built into its dashboards_out directory at ref.
+func mixinDashboards(ctx context.Context, mixin, ref string) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		jsonnetLibsAPI+"/contents/"+mixin+"/dashboards_out?ref="+url.QueryEscape(ref), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	// Without a token GitHub allows 60 requests an hour, shared by CI runners.
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	data, err := do(req)
+	if err != nil {
+		return nil, fmt.Errorf("listing the dashboards of %s@%s: %w", mixin, ref, err)
+	}
+	var files []struct {
+		Name        string
+		Type        string
+		DownloadURL string `json:"download_url"`
+	}
+	if err := json.Unmarshal(data, &files); err != nil {
+		return nil, fmt.Errorf("listing the dashboards of %s@%s: %w", mixin, ref, err)
+	}
+	var urls []string
+	for _, f := range files {
+		if f.Type == "file" && strings.HasSuffix(f.Name, ".json") {
+			urls = append(urls, f.DownloadURL)
+		}
+	}
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("%s@%s has no dashboards in dashboards_out", mixin, ref)
 	}
 	return urls, nil
 }
@@ -47,7 +101,7 @@ func appsScreenshot(ctx context.Context, root string, apps []app, dbsName string
 	var errs []error
 	grafana := ""
 	for _, a := range apps {
-		urls, err := a.dashboardURLs()
+		urls, err := a.dashboardURLs(ctx)
 		if err != nil {
 			return err
 		}
@@ -106,6 +160,10 @@ func screenshotApp(ctx context.Context, grafana string, urls []string, dir strin
 		file := filepath.Join(dir, name+".png")
 
 		image, err := renderDashboard(ctx, grafana, url)
+		if errors.Is(err, errSharedExport) {
+			fmt.Printf("[SKIP] %s: %v\n", name, err)
+			continue
+		}
 		if err == nil {
 			err = os.WriteFile(file, image, 0o644)
 		}
@@ -119,6 +177,10 @@ func screenshotApp(ctx context.Context, grafana string, urls []string, dir strin
 	return errors.Join(errs...)
 }
 
+// errSharedExport is returned for a dashboard exported for sharing, whose
+// datasources are __inputs placeholders that only an import with inputs resolves.
+var errSharedExport = errors.New("exported for sharing with __inputs, which is not supported")
+
 // renderDashboard downloads a dashboard, imports it into Grafana and returns a
 // full-page PNG of it covering the last 5 minutes.
 func renderDashboard(ctx context.Context, grafana, url string) ([]byte, error) {
@@ -130,9 +192,8 @@ func renderDashboard(ctx context.Context, grafana, url string) ([]byte, error) {
 	if err := json.Unmarshal(raw, &dashboard); err != nil {
 		return nil, fmt.Errorf("%s is not dashboard JSON: %w", url, err)
 	}
-	// Dashboards exported for sharing have unresolved datasource placeholders.
 	if _, ok := dashboard["__inputs"]; ok {
-		return nil, errors.New("dashboards with __inputs are not supported")
+		return nil, errSharedExport
 	}
 	// The id belongs to the Grafana the dashboard was saved in.
 	delete(dashboard, "id")
