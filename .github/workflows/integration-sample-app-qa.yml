@@ -226,8 +226,6 @@ jobs:
             earlier=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" --jq .body \
               | sed -n '/^<details open><summary>Run /,$p' | sed 's/^<details open><summary>Run /<details><summary>Run /')
           fi
-          # A comment holds 65536 characters, start over before the history fills it
-          [ ${#earlier} -lt 50000 ] || earlier=""
 
           # The images go to a ref of their own in this repository. 
           git init --quiet
@@ -254,13 +252,16 @@ jobs:
             echo "![${name%.png}](${base}/$1)"
             end_section
           }
-          {
+          header() {
             echo "${marker}"
             echo "### Dashboard screenshots"
             echo
             echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
             echo
             echo "Rendered from the data each sample-app produced in [this run](${run}), covering its last 5 minutes."
+          }
+          {
+            header
             if [ -z "${base}" ]; then
               echo
               echo "The images could not be stored for display here. They are in the artifacts of [this run](${run})."
@@ -297,8 +298,29 @@ jobs:
             echo
             echo "</details>"
             echo
-            echo "${earlier}"
-          } > comment.md
+          } > current.md
+
+          limit=65000
+          if [ "$(wc -c < current.md)" -gt "${limit}" ]; then
+            {
+              header
+              echo
+              echo "This run captured too many screenshots to show here. They are in the artifacts of [this run](${run})."
+              echo
+              echo "</details>"
+              echo
+            } > current.md
+          fi
+          # Earlier runs are kept newest first while they fit, dropping the oldest
+          printf '%s\n' "${earlier}" | awk -v budget="$(( limit - $(wc -c < current.md) ))" '
+            /^<details><summary>Run / { if (block != "") runs[++n] = block; block = "" }
+            { block = block $0 "\n" }
+            END {
+              if (block != "") runs[++n] = block
+              for (i = 1; i <= n && used + length(runs[i]) <= budget; i++) { used += length(runs[i]); printf "%s", runs[i] }
+            }' > earlier.md
+          cat current.md earlier.md > comment.md
+
           if [ -n "${comment}" ]; then
             gh api --silent --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" -F body=@comment.md
           else
