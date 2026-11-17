@@ -446,8 +446,9 @@ write_files:
             "datacenter",
             "rack",
         ]
-        target_match_label = "name"
-        logs_match_label = "hostname"
+        target_to_log_match = {
+            "name" = "hostname",
+        }
 
         forward_to = [loki.relabel.integrations_snmp_output.receiver]
     }
