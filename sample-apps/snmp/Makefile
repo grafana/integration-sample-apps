@@ -35,7 +35,7 @@ snmpsim:
 	@multipass exec $(VM_NAME) -- bash -c 'cd ./snmpsim && for i in $$(seq 1 60); do docker-compose -f docker-compose.snmpsim.yml logs snmpsim 2>&1 | grep -q "Listening at" && echo "snmpsim ready after $$((i * 5))s" && exit 0; sleep 5; done; echo "snmpsim not listening after 300s"; exit 1'
 
 alert-test:
-	@multipass exec $(VM_NAME) -- docker exec snmpsim_snmpsim_1 alert-test $(CMD)
+	@multipass exec $(VM_NAME) -- bash -c "cd ./snmpsim && docker-compose -f docker-compose.snmpsim.yml exec -T snmpsim alert-test $(CMD)"
 
 launch-vm: render-config
 	@multipass launch 24.04 -n $(VM_NAME) --cpus 2 --memory 4G --disk 10G --cloud-init cloud-init.yaml
