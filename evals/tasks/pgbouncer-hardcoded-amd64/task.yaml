@@ -1,0 +1,33 @@
+id: pgbouncer-hardcoded-amd64
+kind: seeded
+source: "Seeded: pgbouncer's exporter download hardcodes linux-amd64"
+tier: static
+max_turns: 25
+prompt: |
+  On my Apple Silicon Mac the pgbouncer sample app comes up, but no pgbouncer metrics arrive,
+  and on the VM the pgbouncer_exporter process fails with "exec format error". It works in CI.
+  Fix the app.
+seed:
+  reverse_patch: reference.patch
+graders:
+  lint_fixed:
+    - app: pgbouncer
+      contains: hardcodes amd64
+  scope:
+    allowed:
+      - sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+      - sample-apps/pgbouncer/README.md
+    required:
+      - sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+  checks:
+    - name: still downloads the pinned release
+      type: regex
+      files: [sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml]
+      pattern: 'releases/download/v\{\{ pgbouncer_exporter_version \}\}'
+    - name: picks the architecture at run time
+      type: regex
+      files: [sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml]
+      pattern: 'dpkg --print-architecture|uname -m'
+rubric: |
+  The exporter download must pick linux-amd64 or linux-arm64 on the VM at run time (dpkg
+  --print-architecture), keep the pinned version, and still work in CI on amd64.

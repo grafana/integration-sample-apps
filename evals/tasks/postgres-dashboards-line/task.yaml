@@ -1,0 +1,28 @@
+id: postgres-dashboards-line
+kind: seeded
+source: "Seeded: postgres tests/dashboards points at a GitHub tree page; lint accepts it because it is https://"
+tier: static
+max_turns: 25
+prompt: |
+  CI's screenshot step fails for the postgres sample app with
+  "https://github.com/grafana/jsonnet-libs/tree/master/postgres-observ-lib is not dashboard
+  JSON". Fix the app so its dashboards get screenshotted again.
+seed:
+  reverse_patch: reference.patch
+graders:
+  scope:
+    allowed: [sample-apps/postgres/tests/dashboards]
+    required: [sample-apps/postgres/tests/dashboards]
+  checks:
+    - name: mixin line
+      type: regex
+      files: [sample-apps/postgres/tests/dashboards]
+      pattern: '^jsonnet-libs/postgres-observ-lib(@\S+)?\s*$'
+    - name: no tree URL
+      type: regex
+      files: [sample-apps/postgres/tests/dashboards]
+      pattern: 'github\.com/.*/tree/'
+      expect: absent
+rubric: |
+  tests/dashboards takes jsonnet-libs/<mixin>[@ref] lines or dashboard JSON URLs. The fix is the
+  line jsonnet-libs/postgres-observ-lib.

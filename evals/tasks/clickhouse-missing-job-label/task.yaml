@@ -1,0 +1,25 @@
+id: clickhouse-missing-job-label
+kind: seeded
+source: "Seeded: JOB_LABEL removed from clickhouse's test config"
+tier: static
+max_turns: 25
+prompt: |
+  CI fails for the clickhouse sample app at the metrics test step, straight away, before it
+  queries Mimir for anything. Fix it.
+seed:
+  reverse_patch: reference.patch
+graders:
+  lint_fixed:
+    - app: clickhouse
+      contains: JOB_LABEL
+  scope:
+    allowed: [sample-apps/clickhouse/tests/configs/*]
+    required: [sample-apps/clickhouse/tests/configs/clickhouse_metrics.config]
+  checks:
+    - name: job label is the one Alloy sets
+      type: regex
+      files: [sample-apps/clickhouse/tests/configs/clickhouse_metrics.config]
+      pattern: '^JOB_LABEL=["'']?integrations/clickhouse["'']?\s*$'
+rubric: |
+  The config needs JOB_LABEL=integrations/clickhouse, the job Alloy's scrape sets in the
+  template. A regex that matches more jobs than that (such as .*) is wrong.

@@ -1,0 +1,14 @@
+diff --git a/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml b/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+@@ -44,8 +44,8 @@ runcmd:
+   - sudo systemctl start alloy.service
+   
+   # Install Exporter
+-  - curl -sfL https://github.com/prometheus-community/pgbouncer_exporter/releases/download/v{{ pgbouncer_exporter_version }}/pgbouncer_exporter-{{ pgbouncer_exporter_version }}.linux-amd64.tar.gz | sudo tar xz -C /opt
+-  - /opt/pgbouncer_exporter-{{ pgbouncer_exporter_version }}.linux-amd64/pgbouncer_exporter &
++  - ARCH=$(dpkg --print-architecture) && curl -sfL https://github.com/prometheus-community/pgbouncer_exporter/releases/download/v{{ pgbouncer_exporter_version }}/pgbouncer_exporter-{{ pgbouncer_exporter_version }}.linux-${ARCH}.tar.gz | sudo tar xz -C /opt
++  - /opt/pgbouncer_exporter-{{ pgbouncer_exporter_version }}.linux-*/pgbouncer_exporter &
+ 
+ write_files:
+ # Alloy configuration

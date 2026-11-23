@@ -1,0 +1,6 @@
+diff --git a/sample-apps/postgres/tests/dashboards b/sample-apps/postgres/tests/dashboards
+--- a/sample-apps/postgres/tests/dashboards
++++ b/sample-apps/postgres/tests/dashboards
+@@ -1 +1 @@
+-https://github.com/grafana/jsonnet-libs/tree/master/postgres-observ-lib
++jsonnet-libs/postgres-observ-lib
