@@ -9,3 +9,6 @@
 
 /ops/bin/
 /screenshots/
+
+# Claude Code personal settings
+.claude/settings.local.json

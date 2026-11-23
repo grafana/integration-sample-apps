@@ -53,7 +53,7 @@ clean: stop-catchpoint-multipass
 .PHONY: defaultconfig
 defaultconfig:
 	@mkdir -p $(CONFIG_FILE_DIR)
-	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
+	@echo "loki_user: your_loki_username" > jinja/variables/cloud-init.yaml
 	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
 	@echo "prom_host: https://prometheus-us-central1.grafana.net" >> jinja/variables/cloud-init.yaml
 	@echo "prom_user: your_prometheus_username" >> jinja/variables/cloud-init.yaml

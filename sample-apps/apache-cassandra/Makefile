@@ -29,7 +29,7 @@ render-config:
 
 default-monitoring-config:
 	@mkdir -p $(CONFIG_FILE_DIR)
-	@echo "loki_host: http://$(LOKI_INSTANCE)" >> $(CONFIG_FILE_VARS)
+	@echo "loki_host: http://$(LOKI_INSTANCE)" > $(CONFIG_FILE_VARS)
 	@echo "loki_path: /loki/api/v1/push" >> $(CONFIG_FILE_VARS)
 	@echo "loki_user: your_loki_username" >> $(CONFIG_FILE_VARS)
 	@echo "loki_pass: your_loki_password" >> $(CONFIG_FILE_VARS)

@@ -7,10 +7,14 @@ DBS_NAME ?= "dbs"
 APPS ?= ""
 ENV ?= "local"
 
-.PHONY: help setup-dbs stop-dbs setup-apps test-apps screenshot-apps stop-apps stop-all
+.PHONY: help lint setup-dbs stop-dbs setup-apps test-apps screenshot-apps stop-apps stop-all
 
 help:
 	@$(SAMPLETOOL) help
+
+# Checks the APPS, or every app when APPS is empty, without starting a VM
+lint:
+	@$(SAMPLETOOL) apps lint --apps $(APPS)
 
 # DBs
 setup-dbs:
