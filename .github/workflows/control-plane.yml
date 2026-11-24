@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - 'ops/**'
+      - 'evals/**'
       - 'go.mod'
       - 'go.sum'
       - '.github/workflows/control-plane.yml'
@@ -28,12 +29,12 @@ jobs:
           go-version-file: go.mod
 
       - name: Check formatting
-        run: test -z "$(gofmt -l ops)" || { gofmt -l ops; exit 1; }
+        run: test -z "$(gofmt -l ops evals)" || { gofmt -l ops evals; exit 1; }
 
       - name: Vet
-        run: go vet ./...
+        run: go vet ./... && go -C evals vet ./...
 
       - name: Test
         env:
           CGO_ENABLED: "0"
-        run: go test ./...
+        run: go test ./... && go -C evals test ./...

@@ -1,4 +1,3 @@
-id: postgres-expected-metrics
 kind: mined
 source: "Fix postgres sample app expected metrics list (grafana/integration-sample-apps#208, 08808d1), rebased onto the current list"
 tier: static
@@ -10,8 +9,6 @@ prompt: |
   Mimir does have pg_stat_database_tup_returned and pg_stat_bgwriter_maxwritten_clean_total
   with job="integrations/postgres_exporter", which the postgres dashboards use, and the
   expected list doesn't have them. Fix the sample app's expected metrics.
-seed:
-  reverse_patch: reference.patch
 graders:
   scope:
     allowed:
@@ -30,7 +27,7 @@ rubric: |
   exporter process, which Alloy embeds. Full marks need the list changed that way, the success
   rate left alone, and a reason given for each removal.
 vm:
-  # Only with run.sh --vm: proves the list against a real run.
+  # Only with --vm: proves the list against a real run.
   commands:
     - make setup-dbs DBS_NAME=evaldbs
     - make setup-apps APPS=postgres DBS_NAME=evaldbs

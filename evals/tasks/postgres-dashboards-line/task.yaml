@@ -1,4 +1,3 @@
-id: postgres-dashboards-line
 kind: seeded
 source: "Seeded: postgres tests/dashboards points at a GitHub tree page; lint accepts it because it is https://"
 tier: static
@@ -7,8 +6,6 @@ prompt: |
   CI's screenshot step fails for the postgres sample app with
   "https://github.com/grafana/jsonnet-libs/tree/master/postgres-observ-lib is not dashboard
   JSON". Fix the app so its dashboards get screenshotted again.
-seed:
-  reverse_patch: reference.patch
 graders:
   scope:
     allowed: [sample-apps/postgres/tests/dashboards]

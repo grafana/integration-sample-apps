@@ -1,4 +1,3 @@
-id: pgbouncer-hardcoded-amd64
 kind: seeded
 source: "Seeded: pgbouncer's exporter download hardcodes linux-amd64"
 tier: static
@@ -7,8 +6,6 @@ prompt: |
   On my Apple Silicon Mac the pgbouncer sample app comes up, but no pgbouncer metrics arrive,
   and on the VM the pgbouncer_exporter process fails with "exec format error". It works in CI.
   Fix the app.
-seed:
-  reverse_patch: reference.patch
 graders:
   lint_fixed:
     - app: pgbouncer

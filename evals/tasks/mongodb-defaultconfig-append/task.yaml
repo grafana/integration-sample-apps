@@ -1,4 +1,3 @@
-id: mongodb-defaultconfig-append
 kind: seeded
 source: "Seeded: the first line of mongodb's defaultconfig recipe appends instead of overwriting"
 tier: static
@@ -6,8 +5,6 @@ max_turns: 25
 prompt: |
   In sample-apps/mongodb, running `make defaultconfig` a second time leaves every key twice in
   jinja/variables/cloud-init.yaml, so the next render uses the wrong values. Fix it.
-seed:
-  reverse_patch: reference.patch
 graders:
   lint_fixed:
     - app: mongodb

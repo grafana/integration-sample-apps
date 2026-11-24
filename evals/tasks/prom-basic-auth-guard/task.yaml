@@ -1,4 +1,3 @@
-id: prom-basic-auth-guard
 kind: mined
 source: "Fix prom basic auth check in sample app templates (grafana/integration-sample-apps#205, 569aac6), template part only"
 tier: static
@@ -7,8 +6,6 @@ prompt: |
   If I set prom_user and prom_pass for a sample app but leave loki_user and loki_pass empty,
   Alloy sends metrics to Mimir without basic auth and every remote write gets a 401. Setting
   the Loki credentials too makes it work. Fix this in the sample apps.
-seed:
-  reverse_patch: reference.patch
 graders:
   scope:
     allowed:

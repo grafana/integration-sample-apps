@@ -6,27 +6,30 @@ bug or a symptom in a copy of the repository and asks an agent to fix it. The tr
 with deterministic checks.
 
 ```bash
-evals/run.sh --variant current --variant no-agents-md --tasks mysql-ci-trap,mongodb-defaultconfig-append
-evals/compare.sh no-agents-md current
+go -C evals run . --variant current --variant no-agents-md --tasks mysql-ci-trap,mongodb-defaultconfig-append
+go -C evals run . compare no-agents-md current
 ```
 
-Needs Go, Python 3, git, the `claude` CLI logged in (`claude auth login`), and Ruby or PyYAML to
-read the YAML.
+Needs Go, git and the `claude` CLI logged in (`claude auth login`). `evals/` is a Go module of its
+own, so its dependencies stay out of `sampletool`'s. `go -C evals test ./...` checks the graders;
+`-short` skips the slow test that runs every task with the stand-in agents.
 
 ## How a trial runs
 
-1. `run.sh` snapshots the checkout: tracked and untracked files that aren't ignored, uncommitted
+1. The run snapshots the checkout: tracked and untracked files that aren't ignored, uncommitted
    changes included. It leaves out `evals/`, so the agent can't read the tasks or their answers.
-   `--ref <commit>` snapshots a commit instead. `--source <dir>` snapshots another checkout.
+   `--ref <commit>` snapshots a commit instead. `--source <dir>` (relative to `evals/`) snapshots
+   another checkout.
 2. Each trial gets its own copy in a temporary directory. The copy's `AGENTS.md`, `CLAUDE.md` and
-   `.claude/` are replaced by the variant's. The task's seed is applied, and the result is
+   `.claude/` are replaced by the variant's. The task's `reference.patch` is applied in reverse to
+   plant the bug, and the result is
    committed as the only commit of a new repository. The agent sees no history, so `git log` can't
    show it the planted bug. Nothing touches your checkout's git state.
 3. The agent runs as
    `claude -p <prompt> --output-format stream-json --max-turns <n> --model <variant model>`. Only
    project settings are loaded (`--setting-sources project`), with no MCP servers. Edits are
    accepted, and anything that would need a permission prompt is denied. `claude` ignores
-   `permissions.allow` in a folder nobody has trusted, so `run.sh` passes the variant's
+   `permissions.allow` in a folder nobody has trusted, so the run passes the variant's
    `.claude/settings.json` rules as `--allowedTools` and `--disallowedTools`. On top of those, every
    agent may run read-only shell commands (`ls`, `cat`, `grep`,
    `git diff` and so on). `make stop-all`, `multipass delete` and `git push` are always denied. In
@@ -47,7 +50,7 @@ A trial passes when every deterministic grader passes and the agent didn't error
 
 | Grader | Passes when |
 |---|---|
-| `lint` | `sampletool apps lint --json` reports no errors, and no finding that the seeded copy didn't have. |
+| `lint` | The copy's own `sampletool apps lint --json` reports no errors, and no finding that the seeded copy didn't have. |
 | `lint_fixed` | The findings the task names are gone, warnings included. |
 | `scope` | The diff only touches the task's `allowed` paths, touches every `required` path, and doesn't touch any `forbidden` one. |
 | `reference` | The task's checks hold: the result matches the reference fix, matches patterns that any correct fix must, or passes a `command` that tests the behaviour. |
@@ -55,8 +58,8 @@ A trial passes when every deterministic grader passes and the agent didn't error
 | `strays` | No new rendered `cloud-init.yaml`, `screenshots/` or `prometheus_metrics` left behind, ignored or not. |
 | `vm` | `--vm` only: every command in the task's `vm.commands` exits 0. |
 
-`--judge` also asks a model to score the diff from 1 to 5 against the task's `rubric`. The score is
-stored as `judge`, but it never counts towards `pass`.
+A task's `rubric` says what a full-marks fix looks like, for whoever reads the transcripts. No
+grader uses it.
 
 Each record also holds the turns, cost, duration, permission denials, tool calls, files changed,
 model, and a hash of the variant's files. The hash shows when `current` changed between two runs.
@@ -86,8 +89,8 @@ commit. Those parents predate `sampletool`, so the lint graders couldn't run the
    git show <commit> --format= -- <paths> > evals/tasks/<id>/reference.patch
    ```
 
-   The seed applies it in reverse, so it must reverse-apply to the current checkout. If later
-   changes conflict with it, rebuild it against the current files.
+   The trial applies it in reverse to plant the bug, so it must reverse-apply to the current
+   checkout. If later changes conflict with it, rebuild it against the current files.
 2. Write `tasks/<id>/task.yaml`. Copy the closest existing task. The prompt describes the symptom
    the way a person would report it, and never names the fix. Prefer a `command` check, which
    runs a script in a scratch copy of the result, or a loose `regex`, over `same_as_reference`:
@@ -95,12 +98,12 @@ commit. Those parents predate `sampletool`, so the lint graders couldn't run the
 3. Check that the graders pass the reference fix and fail a no-op:
 
    ```bash
-   evals/run.sh --agent reference --trials 1 --tasks <id>
-   evals/run.sh --agent noop --trials 1 --tasks <id>
+   go -C evals run . --agent reference --trials 1 --tasks <id>
+   go -C evals run . --agent noop --trials 1 --tasks <id>
    ```
 
    Neither agent calls a model. Their records go to `results/runs/` only, so they never mix with
-   real results.
+   real results. `go -C evals test ./...` does the same for every task.
 
 ## Running a baseline and comparing variants
 
@@ -116,11 +119,11 @@ To test a change, freeze the old harness before editing it, then compare:
 ```bash
 cp -RL evals/variants/current evals/variants/before-my-change
 # edit AGENTS.md
-evals/run.sh --variant before-my-change --variant current
-evals/compare.sh before-my-change current
+go -C evals run . --variant before-my-change --variant current
+go -C evals run . compare before-my-change current
 ```
 
-`compare.sh <a> <b>` reads each variant's latest results file. Pass `--all` to merge every dated
+`compare <a> <b>` reads each variant's latest results file. Pass `--all` to merge every dated
 file, or give `.jsonl` paths to compare two runs of the same variant over time. It prints the pass
 rate, mean cost, mean turns, permission denials and the most frequent failed graders, per task and
 overall.
