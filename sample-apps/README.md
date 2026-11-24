@@ -83,8 +83,7 @@ jobs:
 
   sample-apps:
     needs: [metric-lists]
-    permissions:
-      contents: read
+    permissions: {}
     uses: grafana/integration-sample-apps/.github/workflows/sample-app.yml@<sha>
     with:
       apps: '["mysql"]'
@@ -92,7 +91,7 @@ jobs:
 ```
 
 - `apps` is a JSON array of sample-app names. Apps that CI can't run, with a `.CI_BYPASS` file, pass without running.
-- `ref` picks the branch, tag or commit of this repository to run the sample-apps from, by default `main`. Point it at a pull request's head to test a change that needs one here as well.
+- `ref` picks the branch, tag or commit of this repository to run the sample-apps from, by default `main`. Point it at a pull request's head commit to test a change.
 - `metrics-artifact` names an artifact of the calling run, holding `<app>` or `<app>/<scenario>` files. They replace the apps' own `tests/metrics` files, as `sampletool apps test --metrics` does, while the scenario's config still applies.
 - `runner` must support nested virtualization, by default `ubuntu-latest-8-cores`.
 

@@ -73,8 +73,7 @@ jobs:
     needs: [check-for-changed-sample-apps]
     # An empty matrix fails the workflow, so skip the job when no sample app changed
     if: needs.check-for-changed-sample-apps.outputs.changed-sample-apps != '[]' && needs.check-for-changed-sample-apps.outputs.changed-sample-apps != ''
-    permissions:
-      contents: read
+    permissions: {}
     uses: ./.github/workflows/sample-app.yml
     with:
       apps: ${{ needs.check-for-changed-sample-apps.outputs.changed-sample-apps }}

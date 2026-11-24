@@ -4,8 +4,7 @@ name: "Sample app"
 # call it for the apps they change, and other repositories can call it to test
 # an integration's change against its sample-app, passing their own metric lists.
 
-permissions:
-  contents: read
+permissions: {}
 
 on:
   workflow_call:
@@ -62,12 +61,14 @@ jobs:
       fail-fast: false
       max-parallel: 10
     steps:
-      # A called workflow checks out its caller by default, so the repository is always named
+      # A called workflow checks out its caller by default, so the repository is
+      # always named. github.sha is the caller's commit, so it's only the default
+      # here: called from elsewhere with no ref, the sample-apps run from main.
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: ${{ inputs.repository || github.repository }}
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || ((inputs.repository || github.repository) == github.repository && github.sha) || 'main' }}
           persist-credentials: false
 
       - name: Setup Go
