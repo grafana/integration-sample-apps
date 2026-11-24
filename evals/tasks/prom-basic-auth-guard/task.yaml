@@ -1,0 +1,53 @@
+kind: mined
+source: "Fix prom basic auth check in sample app templates (grafana/integration-sample-apps#205, 569aac6), template part only"
+tier: static
+max_turns: 40
+prompt: |
+  If I set prom_user and prom_pass for a sample app but leave loki_user and loki_pass empty,
+  Alloy sends metrics to Mimir without basic auth and every remote write gets a 401. Setting
+  the Loki credentials too makes it work. Fix this in the sample apps.
+graders:
+  scope:
+    allowed:
+      - sample-apps/*/jinja/templates/*
+    required:
+      - sample-apps/envoy/jinja/templates/cloud-init-template.yaml
+      - sample-apps/jenkins/jinja/templates/cloud-init-template.yaml
+      - sample-apps/mongodb/jinja/templates/cloud-init-template.yaml
+      - sample-apps/mongodb/jinja/templates/cloud-init-template_local_setup.yaml
+      - sample-apps/mysql/jinja/templates/cloud-init-template.yaml
+      - sample-apps/nginx/jinja/templates/cloud-init-template.yaml
+      - sample-apps/opensearch/jinja/templates/cloud-init-template.yaml
+      - sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+      - sample-apps/rabbitmq/jinja/templates/cloud-init-template.yaml
+      - sample-apps/snmp/jinja/templates/cloud-init-template.yaml
+      - sample-apps/split-metric-test/jinja/templates/cloud-init-template.yaml
+      - sample-apps/squid/jinja/templates/cloud-init-template.yaml
+      - sample-apps/wildfly/jinja/templates/cloud-init-template.yaml
+  checks:
+    - name: no prom basic_auth behind a loki guard
+      type: regex
+      files: ["sample-apps/*/jinja/templates/*.yaml"]
+      pattern: 'loki_user[^%]*%\}\s*basic_auth\s*\{\s*username\s*=\s*"\{\{\s*prom_user'
+      expect: absent
+    - name: every prom basic_auth kept and guarded by prom vars
+      type: regex
+      files:
+        - sample-apps/envoy/jinja/templates/cloud-init-template.yaml
+        - sample-apps/jenkins/jinja/templates/cloud-init-template.yaml
+        - sample-apps/mongodb/jinja/templates/cloud-init-template.yaml
+        - sample-apps/mongodb/jinja/templates/cloud-init-template_local_setup.yaml
+        - sample-apps/mysql/jinja/templates/cloud-init-template.yaml
+        - sample-apps/nginx/jinja/templates/cloud-init-template.yaml
+        - sample-apps/opensearch/jinja/templates/cloud-init-template.yaml
+        - sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+        - sample-apps/rabbitmq/jinja/templates/cloud-init-template.yaml
+        - sample-apps/snmp/jinja/templates/cloud-init-template.yaml
+        - sample-apps/split-metric-test/jinja/templates/cloud-init-template.yaml
+        - sample-apps/squid/jinja/templates/cloud-init-template.yaml
+        - sample-apps/wildfly/jinja/templates/cloud-init-template.yaml
+      pattern: 'prom_user[^%]*prom_pass[^%]*%\}\s*basic_auth\s*\{\s*username\s*=\s*"\{\{\s*prom_user'
+rubric: |
+  The cause is that the remote_write blocks guard prometheus basic_auth with loki_user and
+  loki_pass. The reference fix changes that guard to prom_user and prom_pass in all 13
+  templates and nothing else.

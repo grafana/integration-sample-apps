@@ -1,0 +1,37 @@
+kind: mined
+source: "Fix postgres sample app expected metrics list (grafana/integration-sample-apps#208, 08808d1), rebased onto the current list"
+tier: static
+max_turns: 30
+prompt: |
+  I ran the postgres sample app locally and `make test-apps APPS=postgres` found 45 of the
+  49 expected metrics. These four never arrive: pg_replication_lag,
+  process_cpu_seconds_total, process_resident_memory_bytes and process_virtual_memory_bytes.
+  Mimir does have pg_stat_database_tup_returned and pg_stat_bgwriter_maxwritten_clean_total
+  with job="integrations/postgres_exporter", which the postgres dashboards use, and the
+  expected list doesn't have them. Fix the sample app's expected metrics.
+graders:
+  scope:
+    allowed:
+      - sample-apps/postgres/tests/**
+      - sample-apps/postgres/README.md
+    required:
+      - sample-apps/postgres/tests/metrics/linux_metrics
+  checks:
+    - name: metrics list
+      type: same_as_reference
+      file: sample-apps/postgres/tests/metrics/linux_metrics
+      mode: tokens
+rubric: |
+  The reference fix adds the two collected metrics and removes the four that never arrive,
+  because pg_replication_lag_seconds is already listed and the process_* metrics belong to the
+  exporter process, which Alloy embeds. Full marks need the list changed that way, the success
+  rate left alone, and a reason given for each removal.
+vm:
+  # Only with --vm: proves the list against a real run.
+  commands:
+    - make setup-dbs DBS_NAME=evaldbs
+    - make setup-apps APPS=postgres DBS_NAME=evaldbs
+    - go run ./ops/cmd/sampletool apps wait
+    - make test-apps APPS=postgres DBS_NAME=evaldbs
+    - make stop-apps APPS=postgres
+    - make stop-dbs DBS_NAME=evaldbs

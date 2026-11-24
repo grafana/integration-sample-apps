@@ -1,0 +1,156 @@
+diff --git a/sample-apps/envoy/jinja/templates/cloud-init-template.yaml b/sample-apps/envoy/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/envoy/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/envoy/jinja/templates/cloud-init-template.yaml
+@@ -143,7 +143,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/jenkins/jinja/templates/cloud-init-template.yaml b/sample-apps/jenkins/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/jenkins/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/jenkins/jinja/templates/cloud-init-template.yaml
+@@ -97,7 +97,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/mongodb/jinja/templates/cloud-init-template.yaml b/sample-apps/mongodb/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/mongodb/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/mongodb/jinja/templates/cloud-init-template.yaml
+@@ -113,7 +113,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/mongodb/jinja/templates/cloud-init-template_local_setup.yaml b/sample-apps/mongodb/jinja/templates/cloud-init-template_local_setup.yaml
+--- a/sample-apps/mongodb/jinja/templates/cloud-init-template_local_setup.yaml
++++ b/sample-apps/mongodb/jinja/templates/cloud-init-template_local_setup.yaml
+@@ -126,7 +126,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/mysql/jinja/templates/cloud-init-template.yaml b/sample-apps/mysql/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/mysql/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/mysql/jinja/templates/cloud-init-template.yaml
+@@ -84,7 +84,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/nginx/jinja/templates/cloud-init-template.yaml b/sample-apps/nginx/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/nginx/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/nginx/jinja/templates/cloud-init-template.yaml
+@@ -206,7 +206,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/opensearch/jinja/templates/cloud-init-template.yaml b/sample-apps/opensearch/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/opensearch/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/opensearch/jinja/templates/cloud-init-template.yaml
+@@ -61,7 +61,7 @@ write_files:
+         endpoint {
+           url = "{{ prom_url }}"
+ 
+-          {% if loki_user and loki_pass -%}
++          {% if prom_user and prom_pass -%}
+           basic_auth {
+             username = "{{ prom_user }}"
+             password = "{{ prom_pass }}"
+diff --git a/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml b/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/pgbouncer/jinja/templates/cloud-init-template.yaml
+@@ -94,7 +94,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/rabbitmq/jinja/templates/cloud-init-template.yaml b/sample-apps/rabbitmq/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/rabbitmq/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/rabbitmq/jinja/templates/cloud-init-template.yaml
+@@ -120,7 +120,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/snmp/jinja/templates/cloud-init-template.yaml b/sample-apps/snmp/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/snmp/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/snmp/jinja/templates/cloud-init-template.yaml
+@@ -246,7 +246,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/split-metric-test/jinja/templates/cloud-init-template.yaml b/sample-apps/split-metric-test/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/split-metric-test/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/split-metric-test/jinja/templates/cloud-init-template.yaml
+@@ -69,7 +69,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"
+diff --git a/sample-apps/squid/jinja/templates/cloud-init-template.yaml b/sample-apps/squid/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/squid/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/squid/jinja/templates/cloud-init-template.yaml
+@@ -60,7 +60,7 @@ write_files:
+         endpoint {
+           url = "{{ prom_url }}"
+ 
+-          {% if loki_user and loki_pass -%}
++          {% if prom_user and prom_pass -%}
+           basic_auth {
+             username = "{{ prom_user }}"
+             password = "{{ prom_pass }}"
+diff --git a/sample-apps/wildfly/jinja/templates/cloud-init-template.yaml b/sample-apps/wildfly/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/wildfly/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/wildfly/jinja/templates/cloud-init-template.yaml
+@@ -61,7 +61,7 @@ write_files:
+       endpoint {
+         url = "{{ prom_url }}"
+ 
+-        {% if loki_user and loki_pass -%}
++        {% if prom_user and prom_pass -%}
+         basic_auth {
+           username = "{{ prom_user }}"
+           password = "{{ prom_pass }}"

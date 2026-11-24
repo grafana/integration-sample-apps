@@ -1,0 +1,24 @@
+diff --git a/sample-apps/mysql/jinja/templates/cloud-init-template.yaml b/sample-apps/mysql/jinja/templates/cloud-init-template.yaml
+--- a/sample-apps/mysql/jinja/templates/cloud-init-template.yaml
++++ b/sample-apps/mysql/jinja/templates/cloud-init-template.yaml
+@@ -131,19 +131,8 @@ write_files:
+ 
+     prometheus.scrape "integrations_mysqld_exporter" {
+       targets    = discovery.relabel.integrations_mysqld_exporter.output
+-      forward_to = [prometheus.relabel.integrations_mysqld_exporter.receiver]
+-      job_name   = "integrations/mysqld_exporter"
+-    }
+-
+-    // Keep the series the MySQL integration uses, to cut cardinality
+-    prometheus.relabel "integrations_mysqld_exporter" {
+       forward_to = [prometheus.remote_write.metrics_service.receiver]
+-
+-      rule {
+-        source_labels = ["__name__"]
+-        regex         = "up|mysql_up|mysql_global_status_(aborted_.*|bytes_.*|commands_total|connections|innodb_.*|max_used_connections|queries|questions|slow_queries|threads_.*|uptime)|mysql_global_variables_.*|mysql_info_schema_.*|mysql_slave_status_.*|mysql_heartbeat_.*|instance:.*"
+-        action        = "keep"
+-      }
++      job_name   = "integrations/mysqld_exporter"
+     }
+     local.file_match "logs_integrations_mysql" {
+       path_targets = [{

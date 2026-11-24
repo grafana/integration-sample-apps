@@ -1,0 +1,6 @@
+# The harness as it is in this checkout: AGENTS.md, CLAUDE.md and .claude/ are
+# symlinks to the repository root, so this variant follows every edit to them.
+# To freeze a version for later comparison, copy it to a new variant with real
+# files: cp -RL variants/current variants/<name>
+description: Current AGENTS.md, CLAUDE.md and .claude/settings.json
+model: claude-sonnet-5-5

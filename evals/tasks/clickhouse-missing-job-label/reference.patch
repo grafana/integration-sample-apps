@@ -1,0 +1,5 @@
+diff --git a/sample-apps/clickhouse/tests/configs/clickhouse_metrics.config b/sample-apps/clickhouse/tests/configs/clickhouse_metrics.config
+--- a/sample-apps/clickhouse/tests/configs/clickhouse_metrics.config
++++ b/sample-apps/clickhouse/tests/configs/clickhouse_metrics.config
+@@ -0,0 +1 @@
++JOB_LABEL=integrations/clickhouse

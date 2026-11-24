@@ -1,0 +1,4 @@
+# Baseline: no AGENTS.md or CLAUDE.md. Keeps .claude/settings.json (a symlink to
+# the repository root) so the only difference from 'current' is the agent docs.
+description: No AGENTS.md or CLAUDE.md; same settings and model as current
+model: claude-sonnet-5-5
