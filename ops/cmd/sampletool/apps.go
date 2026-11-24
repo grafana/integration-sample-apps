@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -62,17 +65,77 @@ func appsUp(ctx context.Context, apps []app, env, dbsName string) error {
 		return err
 	}
 	for _, a := range apps {
+		var before map[string]bool
+		if env == "k3d" {
+			if before, err = multipassVMs(ctx); err != nil {
+				return err
+			}
+		}
 		fmt.Printf("-- Spawning sample-app %s --\n", a.name)
 		if err := command(ctx, a.dir, "make", "PROMETHEUS_INSTANCE="+prometheus, "LOKI_INSTANCE="+loki, "run-ci"); err != nil {
 			return err
 		}
 		if env == "k3d" {
-			if err := command(ctx, a.dir, "make", "configure-k3d-dns"); err != nil {
+			after, err := multipassVMs(ctx)
+			if err != nil {
 				return err
+			}
+			launched := newVMs(before, after)
+			if len(launched) == 0 {
+				return fmt.Errorf("%s launched no Multipass VMs to add the k3d hostnames to", a.name)
+			}
+			for _, vm := range launched {
+				if err := configureK3dDNS(ctx, vm); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	return nil
+}
+
+// newVMs returns the VMs in after that aren't in before, sorted by name.
+func newVMs(before, after map[string]bool) []string {
+	var vms []string
+	for vm := range after {
+		if !before[vm] {
+			vms = append(vms, vm)
+		}
+	}
+	slices.Sort(vms)
+	return vms
+}
+
+// k3dHostsScript replaces the VM's /etc/hosts entry for the k3d hostnames with
+// one for the address in $1.
+const k3dHostsScript = `sed -i '/[[:space:]]loki\.k3d\.localhost[[:space:]]/d' /etc/hosts && echo "$1 loki.k3d.localhost mimir.k3d.localhost" >> /etc/hosts`
+
+// configureK3dDNS points loki.k3d.localhost and mimir.k3d.localhost at the VM's
+// DNS server, which is the host that runs k3d.
+func configureK3dDNS(ctx context.Context, vm string) error {
+	status, err := multipassOutput(ctx, "exec", vm, "--", "resolvectl", "status")
+	if err != nil {
+		return err
+	}
+	ip, ok := currentDNSServer(status)
+	if !ok {
+		return fmt.Errorf("%s: resolvectl status shows no IPv4 DNS server", vm)
+	}
+	fmt.Printf("Pointing the k3d hostnames at %s on %s\n", ip, vm)
+	return multipass(ctx, "exec", vm, "--", "sudo", "sh", "-c", k3dHostsScript, "sh", ip)
+}
+
+var dnsServerLine = regexp.MustCompile(`Current DNS Server:\s*(\S+)`)
+
+// currentDNSServer returns the first IPv4 "Current DNS Server" in the output of
+// resolvectl status.
+func currentDNSServer(status string) (string, bool) {
+	for _, m := range dnsServerLine.FindAllStringSubmatch(status, -1) {
+		if addr, err := netip.ParseAddr(m[1]); err == nil && addr.Is4() {
+			return addr.String(), true
+		}
+	}
+	return "", false
 }
 
 func appsWait(ctx context.Context) error {

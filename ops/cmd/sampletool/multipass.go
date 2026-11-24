@@ -39,6 +39,23 @@ func multipassOutput(ctx context.Context, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// multipassVMs returns the names of every Multipass VM on the machine.
+func multipassVMs(ctx context.Context) (map[string]bool, error) {
+	out, err := multipassOutput(ctx, "list", "--format", "json")
+	if err != nil {
+		return nil, err
+	}
+	var list struct{ List []struct{ Name string } }
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		return nil, fmt.Errorf("parsing multipass list: %w", err)
+	}
+	vms := map[string]bool{}
+	for _, vm := range list.List {
+		vms[vm.Name] = true
+	}
+	return vms, nil
+}
+
 // multipassIP returns the first (internal) IPv4 address of a VM.
 func multipassIP(ctx context.Context, vm string) (string, error) {
 	out, err := multipassOutput(ctx, "info", vm, "--format", "json")

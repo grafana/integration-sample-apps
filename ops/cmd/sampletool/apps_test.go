@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/joho/godotenv"
@@ -78,6 +79,34 @@ func TestCICheck(t *testing.T) {
 		run, err := ciCheck(apps[0])
 		if run != want.run || (err != nil) != want.fails {
 			t.Errorf("%s: ciCheck = %t, %v; want run %t, failure %t", name, run, err, want.run, want.fails)
+		}
+	}
+}
+
+func TestNewVMs(t *testing.T) {
+	before := map[string]bool{"dbs": true, "other": true}
+	after := map[string]bool{"dbs": true, "other": true, "kafka-sample-app-k3s-worker-1": true, "kafka-sample-app-k3s-main": true}
+	got := newVMs(before, after)
+	want := []string{"kafka-sample-app-k3s-main", "kafka-sample-app-k3s-worker-1"}
+	if !slices.Equal(got, want) {
+		t.Errorf("newVMs = %v, want %v", got, want)
+	}
+}
+
+func TestCurrentDNSServer(t *testing.T) {
+	tests := map[string]struct {
+		status, want string
+		ok           bool
+	}{
+		"link":       {status: "Global\n       Protocols: -LLMNR\n\nLink 2 (enp0s1)\n    Current Scopes: DNS\nCurrent DNS Server: 192.168.64.1\n       DNS Servers: 192.168.64.1\n", want: "192.168.64.1", ok: true},
+		"IPv6 first": {status: "Current DNS Server: fe80::1\nCurrent DNS Server: 10.0.0.1\n", want: "10.0.0.1", ok: true},
+		"none":       {status: "Global\n       Protocols: -LLMNR\n"},
+		"not an IP":  {status: "Current DNS Server: 192.168.64\n"},
+	}
+	for name, tt := range tests {
+		got, ok := currentDNSServer(tt.status)
+		if got != tt.want || ok != tt.ok {
+			t.Errorf("%s: currentDNSServer = %q, %v, want %q, %v", name, got, ok, tt.want, tt.ok)
 		}
 	}
 }
