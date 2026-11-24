@@ -2,7 +2,7 @@
 // their results. See README.md.
 //
 //	go -C evals run . [--variant NAME]... [--tasks a,b] [--trials N] [--jobs N] [--vm]
-//	                  [--model ID] [--max-turns N] [--agent claude|reference|noop]
+//	                  [--model ID] [--max-turns N] [--agent reference|noop]
 //	                  [--source DIR] [--ref REF] [--keep]
 //	go -C evals run . compare <a> [<b>] [--all] [--run RUN_ID]
 package main

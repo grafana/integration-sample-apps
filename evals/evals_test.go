@@ -50,11 +50,14 @@ func TestTasksGradeTheReferenceAndNoop(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for agent, wantPass := range map[string]bool{"reference": true, "noop": false} {
-			r.agent = agent
-			rec := runTrial(ctx, trialSpec{run: r, variant: v, task: tk, n: 1})
+		for standIn, wantPass := range map[string]bool{"reference": true, "noop": false} {
+			agent, err := agentFor(standIn, v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec := runTrial(ctx, trialSpec{run: r, variant: v, agent: agent, task: tk, n: 1})
 			if rec.Pass != wantPass || rec.Error != "" {
-				t.Errorf("%s with the %s agent: pass = %v, error %q, graders %+v", name, agent, rec.Pass, rec.Error, rec.Graders)
+				t.Errorf("%s with the %s agent: pass = %v, error %q, graders %+v", name, standIn, rec.Pass, rec.Error, rec.Graders)
 			}
 		}
 	}
@@ -161,7 +164,7 @@ func TestCheckRegexAndReference(t *testing.T) {
 	}
 }
 
-func TestParseTranscript(t *testing.T) {
+func TestParseClaudeTranscript(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "t.jsonl")
 	stream := `{"type":"system","subtype":"init"}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"make lint"}},{"type":"tool_use","name":"Edit","input":{"file_path":"x"}}]}}
@@ -171,7 +174,7 @@ not json
 	if err := os.WriteFile(path, []byte(stream), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r, err := parseTranscript(path)
+	r, err := parseClaudeTranscript(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,5 +209,73 @@ func TestCompare(t *testing.T) {
 	out.Reset()
 	if err := compareCmd([]string{a, "--run", "r2"}, &out); err != nil || !strings.Contains(out.String(), "1/1") {
 		t.Errorf("--run: %v\n%s", err, out.String())
+	}
+}
+
+func TestCommandAgent(t *testing.T) {
+	v := &variant{name: "demo", Agent: "command", Model: "m1", Effort: "high", Args: []string{"extra"},
+		Command: []string{"sh", "-c", `printf '%s|%s|%s|%s|%s' "$1" "$2" "$3" "$4" "$5" > got; echo said hello; exit 3`,
+			"sh", "{prompt}", "{model}", "{effort}", "{max_turns}"}}
+	a, err := agentFor("", v)
+	if err != nil || a.name() != "sh" {
+		t.Fatalf("agentFor = %v, %v", a, err)
+	}
+	work := t.TempDir()
+	transcript := filepath.Join(t.TempDir(), "t.log")
+	r, err := a.run(context.Background(), agentTrial{work: work, transcript: transcript,
+		task: &task{Prompt: "fix it", MaxTurns: 12}, variant: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := readFile(filepath.Join(work, "got")); got != "fix it|m1|high|12|extra" {
+		t.Errorf("arguments = %q", got)
+	}
+	if out, _ := readFile(transcript); !strings.Contains(out, "said hello") {
+		t.Errorf("transcript = %q", out)
+	}
+	if !r.IsError || r.Stop != "exit 3" || r.commandsKnown {
+		t.Errorf("result = %+v", r)
+	}
+	for _, bad := range []*variant{{name: "x", Agent: "command"}, {name: "y", Agent: "codex"}} {
+		if _, err := agentFor("", bad); err == nil {
+			t.Errorf("agentFor(%+v): want an error", bad)
+		}
+	}
+}
+
+func TestClaudeTrialArgs(t *testing.T) {
+	work := writeFiles(t, map[string]string{".claude/settings.json": `{"permissions": {"allow": ["Bash(make lint)"], "deny": ["Bash(rm *)"]}}`})
+	trial := agentTrial{work: work, variant: &variant{Effort: "low"}}
+	args := strings.Join(claudeTrialArgs(trial), " ")
+	for _, want := range []string{"Bash(make lint)", "--disallowedTools Bash(make stop-all*)", "Bash(rm *)", "Bash(multipass launch*)", "--effort low"} {
+		if !strings.Contains(args, want) {
+			t.Errorf("args lack %q: %s", want, args)
+		}
+	}
+	trial.vm = true
+	if args := strings.Join(claudeTrialArgs(trial), " "); strings.Contains(args, "multipass launch") {
+		t.Errorf("the VM tier denies VM commands: %s", args)
+	}
+	if !claude().restricted() || (commandAgent{argv: []string{"x"}}).restricted() {
+		t.Error("only agents with trialArgs are restricted")
+	}
+}
+
+// A variant's harness files may be real files or symlinks to the repository's.
+func TestCopyEntry(t *testing.T) {
+	src := writeFiles(t, map[string]string{"real/.claude/settings.json": "{}", "AGENTS.md": "docs"})
+	if err := os.Symlink(filepath.Join(src, "real", ".claude"), filepath.Join(src, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	dst := t.TempDir()
+	for from, to := range map[string]string{"real/.claude": "a", "linked": "b", "AGENTS.md": "c"} {
+		if err := copyEntry(filepath.Join(src, from), filepath.Join(dst, to), true); err != nil {
+			t.Fatalf("%s: %v", from, err)
+		}
+	}
+	for _, want := range []string{"a/settings.json", "b/settings.json", "c"} {
+		if info, err := os.Lstat(filepath.Join(dst, want)); err != nil || !info.Mode().IsRegular() {
+			t.Errorf("%s: %v, %v", want, info, err)
+		}
 	}
 }

@@ -2,17 +2,11 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // baseAllowed is granted to every variant on top of its own
@@ -44,121 +38,45 @@ var staticDenied = []string{
 	"Bash(go run ./ops/cmd/sampletool apps screenshot*)",
 }
 
-const trialTimeout = 20 * time.Minute
-
-// agentResult is what an agent did in a trial.
-type agentResult struct {
-	Turns       int            `json:"turns"`
-	CostUSD     float64        `json:"cost_usd"`
-	DurationMS  int64          `json:"duration_ms"`
-	DeniedCount int            `json:"denied_count"`
-	Denied      []denial       `json:"denied"`
-	IsError     bool           `json:"is_error"`
-	Stop        string         `json:"stop"`
-	ToolCalls   map[string]int `json:"tool_calls"`
-	Stderr      string         `json:"stderr,omitempty"`
-	Commands    []string       `json:"-"`
+// claude runs Claude Code with the variant's permission rules, and reads its
+// stream-json transcript.
+func claude() commandAgent {
+	return commandAgent{
+		label: "claude",
+		argv: []string{"claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
+			"--max-turns", "{max_turns}", "--model", "{model}",
+			"--setting-sources", "project", "--strict-mcp-config", "--no-session-persistence",
+			"--permission-mode", "acceptEdits", "--permission-prompts", "none"},
+		trialArgs: claudeTrialArgs,
+		parse:     parseClaudeTranscript,
+	}
 }
 
-type denial struct {
-	Tool  string `json:"tool"`
-	Input string `json:"input"`
-}
-
-// childEnv is the environment for agents and VM commands. The settings of
-// the session that started the run (CLAUDECODE, CLAUDE_EFFORT and so on) must
-// not leak into the agent under test.
-func childEnv(extra map[string]string) []string {
-	var env []string
-	for _, kv := range os.Environ() {
-		if !strings.HasPrefix(kv, "CLAUDE") {
-			env = append(env, kv)
-		}
-	}
-	for k, v := range extra {
-		env = append(env, k+"="+v)
-	}
-	return env
-}
-
-// projectPermissions returns the variant's permission rules. claude ignores
-// permissions.allow in a folder nobody has trusted, which a trial's temporary
-// copy never is, so they go in as flags.
-func projectPermissions(work string) (allow, deny []string) {
-	data, err := os.ReadFile(filepath.Join(work, ".claude", "settings.json"))
-	if err != nil {
-		return nil, nil
-	}
+// claudeTrialArgs passes the variant's .claude/settings.json rules as flags:
+// claude ignores permissions.allow in a folder nobody has trusted, which a
+// trial's temporary copy never is.
+func claudeTrialArgs(t agentTrial) []string {
 	var settings struct {
 		Permissions struct{ Allow, Deny []string }
 	}
-	_ = json.Unmarshal(data, &settings)
-	return settings.Permissions.Allow, settings.Permissions.Deny
-}
-
-func runClaude(ctx context.Context, work string, t *task, v *variant, maxTurns int, vm bool, transcript string) (agentResult, error) {
-	for _, n := range []int{maxTurns, v.MaxTurns, t.MaxTurns, 30} {
-		if n > 0 {
-			maxTurns = n
-			break
-		}
+	if data, err := os.ReadFile(filepath.Join(t.work, ".claude", "settings.json")); err == nil {
+		_ = json.Unmarshal(data, &settings)
 	}
-	allow, deny := projectPermissions(work)
-	deny = append(slices.Clone(alwaysDenied), deny...)
-	if !vm {
+	deny := append(slices.Clone(alwaysDenied), settings.Permissions.Deny...)
+	if !t.vm {
 		deny = append(deny, staticDenied...)
 	}
-	args := []string{"-p", t.Prompt, "--output-format", "stream-json", "--verbose",
-		"--max-turns", strconv.Itoa(maxTurns), "--model", v.Model,
-		"--setting-sources", "project", "--strict-mcp-config", "--no-session-persistence",
-		"--permission-mode", "acceptEdits", "--permission-prompts", "none",
-		"--allowedTools"}
-	args = append(append(args, baseAllowed...), allow...)
+	args := append(append([]string{"--allowedTools"}, baseAllowed...), settings.Permissions.Allow...)
 	args = append(append(args, "--disallowedTools"), deny...)
-	if v.Effort != "" {
-		args = append(args, "--effort", v.Effort)
+	if t.variant.Effort != "" {
+		args = append(args, "--effort", t.variant.Effort)
 	}
-	args = append(args, v.Args...)
-
-	out, err := os.Create(transcript)
-	if err != nil {
-		return agentResult{}, err
-	}
-	defer out.Close()
-	ctx, cancel := context.WithTimeout(ctx, trialTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "claude", args...)
-	cmd.Dir, cmd.Env, cmd.Stdout = work, childEnv(v.Env), out
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	start := time.Now()
-	runErr := cmd.Run()
-	timedOut := errors.Is(ctx.Err(), context.DeadlineExceeded)
-	if err := out.Sync(); err != nil {
-		return agentResult{}, err
-	}
-	r, err := parseTranscript(transcript)
-	if err != nil {
-		return r, err
-	}
-	if r.DurationMS == 0 {
-		r.DurationMS = time.Since(start).Milliseconds()
-	}
-	if timedOut {
-		r.IsError, r.Stop = true, "timeout"
-	}
-	if r.Stop == "no result" {
-		r.Stderr = truncate(stderr.String(), 1000)
-		if runErr != nil && r.Stderr == "" {
-			r.Stderr = runErr.Error()
-		}
-	}
-	return r, nil
+	return args
 }
 
-// parseTranscript reads claude's stream-json output.
-func parseTranscript(path string) (agentResult, error) {
-	r := agentResult{ToolCalls: map[string]int{}, Denied: []denial{}, IsError: true, Stop: "no result"}
+// parseClaudeTranscript reads claude's stream-json output.
+func parseClaudeTranscript(path string) (agentResult, error) {
+	r := agentResult{ToolCalls: map[string]int{}, Denied: []denial{}, IsError: true, Stop: "no result", commandsKnown: true}
 	f, err := os.Open(path)
 	if err != nil {
 		return r, err

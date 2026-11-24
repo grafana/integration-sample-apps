@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +21,6 @@ type runState struct {
 	dir    string // temporary: the snapshot and the trials' copies
 	src    string // the snapshot
 	logs   string // results/runs/<id>: transcripts and diffs
-	agent  string
 	vm     bool
 	keep   bool
 	source sourceInfo
@@ -43,7 +41,7 @@ func runCmd(ctx context.Context, args []string) error {
 	vm := flags.Bool("vm", false, "run the VM tier, one trial at a time")
 	model := flags.String("model", "", "override each variant's model")
 	maxTurns := flags.Int("max-turns", 0, "override each task's turn limit")
-	agent := flags.String("agent", "claude", "claude, or reference or noop to check the graders without a model")
+	standIn := flags.String("agent", "", "reference or noop: check the graders with a stand-in instead of each variant's agent")
 	source := flags.String("source", "..", "the checkout to snapshot")
 	ref := flags.String("ref", "", "snapshot this commit instead of the working tree")
 	keep := flags.Bool("keep", false, "keep the trial directories to inspect")
@@ -52,9 +50,6 @@ func runCmd(ctx context.Context, args []string) error {
 	}
 	if flags.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q", flags.Arg(0))
-	}
-	if !slices.Contains([]string{"claude", "reference", "noop"}, *agent) {
-		return fmt.Errorf("unknown agent %q", *agent)
 	}
 
 	evals, err := evalsDir()
@@ -65,6 +60,7 @@ func runCmd(ctx context.Context, args []string) error {
 		variantNames = stringList{"current"}
 	}
 	var variants []*variant
+	agents := map[string]agent{}
 	for _, name := range variantNames {
 		v, err := loadVariant(evals, name)
 		if err != nil {
@@ -72,6 +68,9 @@ func runCmd(ctx context.Context, args []string) error {
 		}
 		if *model != "" {
 			v.Model = *model
+		}
+		if agents[name], err = agentFor(*standIn, v); err != nil {
+			return err
 		}
 		variants = append(variants, v)
 	}
@@ -93,8 +92,15 @@ func runCmd(ctx context.Context, args []string) error {
 		fmt.Fprintln(os.Stderr, "--vm runs one trial at a time: parallel Multipass launches break VMs")
 		*jobs = 1
 	}
-	if *agent == "claude" && !claudeLoggedIn(ctx) {
-		return errors.New("claude isn't logged in: run 'claude auth login' first")
+	for _, v := range variants {
+		a, ok := agents[v.name].(commandAgent)
+		switch {
+		case !ok: // a stand-in
+		case a.name() == "claude" && !claudeLoggedIn(ctx):
+			return errors.New("claude isn't logged in: run 'claude auth login' first")
+		case !a.restricted():
+			fmt.Fprintf(os.Stderr, "%s: evals can't restrict what %s runs, so its command must sandbox it\n", v.name, a.name())
+		}
 	}
 
 	sourceDir, err := filepath.Abs(*source)
@@ -108,8 +114,7 @@ func runCmd(ctx context.Context, args []string) error {
 		return err
 	}
 	now := time.Now()
-	r := &runState{id: fmt.Sprintf("%s-%d", now.Format("20060102-150405"), os.Getpid()),
-		agent: *agent, vm: *vm, keep: *keep}
+	r := &runState{id: fmt.Sprintf("%s-%d", now.Format("20060102-150405"), os.Getpid()), vm: *vm, keep: *keep}
 	r.dir = filepath.Join(tmp, "sampleapps-evals", r.id)
 	r.src = filepath.Join(r.dir, "src")
 	r.logs = filepath.Join(evals, "results", "runs", r.id)
@@ -134,12 +139,12 @@ func runCmd(ctx context.Context, args []string) error {
 	for _, v := range variants {
 		// Only real agents' results are kept; the stand-ins only check the graders.
 		results[v.name] = filepath.Join(evals, "results", now.Format("2006-01-02")+"-"+v.name+".jsonl")
-		if *agent != "claude" {
-			results[v.name] = filepath.Join(r.logs, *agent+"-"+v.name+".jsonl")
+		if *standIn != "" {
+			results[v.name] = filepath.Join(r.logs, *standIn+"-"+v.name+".jsonl")
 		}
 		for _, t := range tasks {
 			for n := 1; n <= *trials; n++ {
-				specs = append(specs, trialSpec{run: r, variant: v, task: t, n: n, maxTurns: *maxTurns})
+				specs = append(specs, trialSpec{run: r, variant: v, agent: agents[v.name], task: t, n: n, maxTurns: *maxTurns})
 			}
 		}
 	}
@@ -147,7 +152,7 @@ func runCmd(ctx context.Context, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Running %d trials (%s agent, %s tier, %d at a time)\n", len(specs), *agent,
+	fmt.Printf("Running %d trials (%s tier, %d at a time)\n", len(specs),
 		map[bool]string{false: "static", true: "vm"}[*vm], *jobs)
 	var mu sync.Mutex // guards the results files and the output
 	var g errgroup.Group

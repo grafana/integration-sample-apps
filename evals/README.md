@@ -25,7 +25,7 @@ own, so its dependencies stay out of `sampletool`'s. `go -C evals test ./...` ch
    plant the bug, and the result is
    committed as the only commit of a new repository. The agent sees no history, so `git log` can't
    show it the planted bug. Nothing touches your checkout's git state.
-3. The agent runs as
+3. The variant's agent runs in the copy. Claude Code, the default, runs as
    `claude -p <prompt> --output-format stream-json --max-turns <n> --model <variant model>`. Only
    project settings are loaded (`--setting-sources project`), with no MCP servers. Edits are
    accepted, and anything that would need a permission prompt is denied. `claude` ignores
@@ -102,14 +102,30 @@ commit. Those parents predate `sampletool`, so the lint graders couldn't run the
    go -C evals run . --agent noop --trials 1 --tasks <id>
    ```
 
-   Neither agent calls a model. Their records go to `results/runs/` only, so they never mix with
+   `--agent` swaps each variant's agent for one of these stand-ins. Neither calls a model, and
+   their records go to `results/runs/` only, so they never mix with
    real results. `go -C evals test ./...` does the same for every task.
 
 ## Running a baseline and comparing variants
 
-A variant is a directory in `variants/` with a `variant.yaml` (`model`, and optionally `effort`,
-`max_turns`, `env` and extra `args` for `claude`), plus whichever of `AGENTS.md`, `CLAUDE.md` and
-`.claude/` it uses. Leaving one out removes it from the copy.
+A variant is a directory in `variants/` with a `variant.yaml`, plus whichever of `AGENTS.md`,
+`CLAUDE.md` and `.claude/` it uses. Leaving one out removes it from the copy. `variant.yaml` sets
+`model`, and optionally `max_turns` and `env`, and picks the agent:
+
+- `agent: claude`, the default, runs Claude Code as described above. `effort` and extra `args`
+  apply to it.
+- `agent: command` runs any agent CLI, such as one that reads `AGENTS.md` too, to check the docs
+  aren't tuned to one agent. `command` is its program and arguments, where `{prompt}`, `{model}`
+  and `{max_turns}` are replaced:
+
+  ```yaml
+  agent: command
+  command: [my-agent, --model, "{model}", --prompt, "{prompt}"]
+  ```
+
+  Its output is saved but not parsed, so its records have no turns, cost or permission denials,
+  and the `rules` grader can't check the commands it ran. Nor can the run deny anything: the
+  command must sandbox the agent itself, VM commands included.
 
 - `current` symlinks the repository's own files, so it always tests the harness as it is now.
 - `no-agents-md` has no `AGENTS.md` or `CLAUDE.md`, and the same settings and model as `current`.

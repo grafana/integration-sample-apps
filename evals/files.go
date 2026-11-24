@@ -111,12 +111,15 @@ func copyTree(src, dst string, follow bool, skip ...string) error {
 	})
 }
 
-// copyEntry copies one file or symlink, creating dst's parent directories.
+// copyEntry copies a file, directory or symlink, creating dst's parent directories.
 // With follow, a symlink is copied as what it points to, directories included.
 func copyEntry(src, dst string, follow bool) error {
 	info, err := os.Lstat(src)
 	if err != nil {
 		return err
+	}
+	if info.IsDir() {
+		return copyTree(src, dst, follow)
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err

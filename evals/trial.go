@@ -26,7 +26,8 @@ type record struct {
 	Graders     map[string]grade `json:"graders,omitempty"`
 	Files       []string         `json:"files_changed,omitempty"`
 	agentResult
-	CommandsRun int    `json:"commands_run"`
+	// CommandsRun is unset when the agent's transcript doesn't show its commands.
+	CommandsRun *int   `json:"commands_run,omitempty"`
 	Error       string `json:"error,omitempty"`
 }
 
@@ -35,6 +36,7 @@ type trialSpec struct {
 	run      *runState
 	variant  *variant
 	task     *task
+	agent    agent
 	n        int
 	maxTurns int
 }
@@ -47,7 +49,7 @@ func runTrial(ctx context.Context, s trialSpec) record {
 	name := fmt.Sprintf("%s-%d", s.task.name, s.n)
 	rec := record{
 		TS: time.Now().Format(time.RFC3339), Run: r.id, Task: s.task.name, Kind: s.task.Kind,
-		Variant: s.variant.name, Model: s.variant.Model, Agent: r.agent, Trial: s.n,
+		Variant: s.variant.name, Model: s.variant.Model, Agent: s.agent.name(), Trial: s.n,
 		Tier: map[bool]string{false: "static", true: "vm"}[r.vm], Source: r.source,
 	}
 	work := filepath.Join(r.dir, "work", s.variant.name, name)
@@ -74,19 +76,16 @@ func gradeTrial(ctx context.Context, s trialSpec, work, logs string, rec *record
 	}
 	before := lint(ctx, work)
 
-	var agent agentResult
-	switch s.run.agent {
-	case "claude":
-		agent, err = runClaude(ctx, work, s.task, s.variant, s.maxTurns, s.run.vm, logs+".jsonl")
-	case "reference":
-		agent, err = agentResult{Stop: "reference"}, applyPatch(ctx, work, s.task, false)
-	default:
-		agent = agentResult{Stop: "noop"}
-	}
+	agent, err := s.agent.run(ctx, agentTrial{work: work, transcript: logs + ".jsonl", task: s.task,
+		variant: s.variant, maxTurns: s.maxTurns, vm: s.run.vm})
 	if err != nil {
 		return err
 	}
-	rec.agentResult, rec.CommandsRun = agent, len(agent.Commands)
+	rec.agentResult = agent
+	if agent.commandsKnown {
+		n := len(agent.Commands)
+		rec.CommandsRun = &n
+	}
 
 	changed, ignored, diff, err := changes(ctx, work, base)
 	if err != nil {

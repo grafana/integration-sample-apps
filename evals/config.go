@@ -70,11 +70,13 @@ type variant struct {
 	name        string
 	dir         string
 	Description string            `yaml:"description"`
+	Agent       string            `yaml:"agent"`   // claude (the default) or command
+	Command     []string          `yaml:"command"` // agent: command: the program and its arguments
 	Model       string            `yaml:"model"`
 	Effort      string            `yaml:"effort"`
 	MaxTurns    int               `yaml:"max_turns"`
 	Env         map[string]string `yaml:"env"`
-	Args        []string          `yaml:"args"`
+	Args        []string          `yaml:"args"` // extra arguments for the agent
 }
 
 // readYAML decodes a file strictly, so a misspelt key is an error.
