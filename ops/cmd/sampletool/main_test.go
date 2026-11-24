@@ -10,6 +10,7 @@ func TestRejectsWrongArguments(t *testing.T) {
 	for args, want := range map[string]string{
 		"dbs down otherdbs":          "unexpected argument",
 		"apps test docker":           "unexpected argument",
+		"apps lint docker":           "unexpected argument",
 		"k3s down demo --cluster":    "unexpected argument",
 		"ci check docker linux-node": "unexpected argument",
 		"k3s up":                     "needs a name",

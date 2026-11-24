@@ -31,6 +31,8 @@ Usage: sampletool <group> <command> [flags] [name]
                Save an image of each dashboard listed in the --apps'
                tests/dashboards to screenshots/<app>/
   apps down    Tear the --apps down with 'make stop'
+  apps lint    Check the --apps, or every app, for problems CI would hit,
+               without starting anything; --json for machine-readable output
 
   k3s up       Launch <name>-k3s-main, plus two workers with --cluster; VM sizes
                come from .hardware_requirements in the working directory
@@ -58,6 +60,7 @@ func run(ctx context.Context, args []string) error {
 	dbs := flags.String("dbs", "dbs", "name of the databases VM")
 	prometheus := flags.String("prometheus", "", "Mimir host:port for 'apps test', instead of the one --env implies")
 	cluster := flags.Bool("cluster", false, "for k3s: also manage two worker nodes")
+	asJSON := flags.Bool("json", false, "for 'apps lint': print the findings as JSON")
 	flags.Usage = func() {
 		fmt.Fprint(flags.Output(), usage)
 		flags.PrintDefaults()
@@ -88,6 +91,8 @@ func run(ctx context.Context, args []string) error {
 	var selected []app
 	if args[0] == "ci" {
 		selected, err = sampleApps(root, flags.Arg(0))
+	} else if args[0] == "apps" && args[1] == "lint" && *apps == "" {
+		selected, err = allApps(root)
 	} else if args[0] == "apps" && args[1] != "wait" {
 		selected, err = sampleApps(root, *apps)
 	}
@@ -110,6 +115,8 @@ func run(ctx context.Context, args []string) error {
 		return appsScreenshot(ctx, root, selected, *dbs)
 	case "apps down":
 		return appsDown(ctx, selected)
+	case "apps lint":
+		return appsLint(os.Stdout, selected, *asJSON)
 	case "k3s up":
 		return k3sUp(ctx, root, flags.Arg(0), *cluster)
 	case "k3s down":

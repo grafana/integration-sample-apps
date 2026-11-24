@@ -46,7 +46,7 @@ clean:
 
 defaultconfig:
 	@mkdir -p $(CONFIG_FILE_DIR)
-	@echo "loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push" >> jinja/variables/cloud-init.yaml
+	@echo "loki_url: http://$(LOKI_INSTANCE)/loki/api/v1/push" > jinja/variables/cloud-init.yaml
 	@echo "loki_user: your_loki_username" >> jinja/variables/cloud-init.yaml
 	@echo "loki_pass: your_loki_password" >> jinja/variables/cloud-init.yaml
 	@echo "prom_url: http://$(PROMETHEUS_INSTANCE)/api/v1/push" >> jinja/variables/cloud-init.yaml
