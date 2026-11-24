@@ -59,6 +59,7 @@ func run(ctx context.Context, args []string) error {
 	env := flags.String("env", "local", "where the databases run: local (the dbs VM) or k3d")
 	dbs := flags.String("dbs", "dbs", "name of the databases VM")
 	prometheus := flags.String("prometheus", "", "Mimir host:port for 'apps test', instead of the one --env implies")
+	metrics := flags.String("metrics", "", "for 'apps test': a directory of expected-metric lists, <app> or <app>/<scenario>, replacing the apps' own")
 	cluster := flags.Bool("cluster", false, "for k3s: also manage two worker nodes")
 	asJSON := flags.Bool("json", false, "for 'apps lint': print the findings as JSON")
 	flags.Usage = func() {
@@ -110,7 +111,7 @@ func run(ctx context.Context, args []string) error {
 	case "apps wait":
 		return appsWait(ctx)
 	case "apps test":
-		return appsTest(ctx, selected, *env, *dbs, *prometheus)
+		return appsTest(ctx, selected, *env, *dbs, *prometheus, *metrics)
 	case "apps screenshot":
 		return appsScreenshot(ctx, root, selected, *dbs)
 	case "apps down":

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +40,8 @@ func seriesExist(ctx context.Context, prometheus, query string) (bool, error) {
 }
 
 // appsTest checks the apps' metrics in Mimir, found through env unless prometheus is set.
-func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus string) error {
+// With overrides set, lists in that directory replace the apps' own: see listOverrides.
+func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus, overrides string) error {
 	if prometheus == "" {
 		var err error
 		if prometheus, _, err = endpoints(ctx, env, dbsName); err != nil {
@@ -50,9 +53,15 @@ func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus string) 
 		files := a.metricsFiles()
 		if len(files) == 0 {
 			errs = append(errs, fmt.Errorf("%s: no expected metrics files in tests/metrics", a.name))
+			continue
+		}
+		lists, err := listOverrides(overrides, a, files)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", a.name, err))
+			continue
 		}
 		for _, file := range files {
-			if err := testCase(ctx, a, prometheus, file); err != nil {
+			if err := testCase(ctx, a, prometheus, file, lists[file]); err != nil {
 				errs = append(errs, fmt.Errorf("%s: %s: %w", a.name, filepath.Base(file), err))
 			}
 		}
@@ -60,9 +69,77 @@ func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus string) 
 	return errors.Join(errs...)
 }
 
-// testCase checks the metrics listed in a tests/metrics file, using the config
-// of the same name, and fails when too few of them are present in Mimir.
-func testCase(ctx context.Context, a app, prometheus, metricsFile string) error {
+// listOverrides maps the app's scenario files to the lists in dir that replace
+// them: <dir>/<app>/<scenario>, or <dir>/<app> for the app's only scenario, or
+// for its "integration" scenario when it has several. A scenario without one
+// keeps its own list.
+func listOverrides(dir string, a app, scenarios []string) (map[string]string, error) {
+	lists := map[string]string{}
+	if dir == "" {
+		return lists, nil
+	}
+	path := filepath.Join(dir, a.name)
+	info, err := os.Stat(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return lists, nil
+	case err != nil:
+		return nil, err
+	case info.IsDir():
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			scenario := filepath.Join(a.dir, "tests", "metrics", e.Name())
+			if !slices.Contains(scenarios, scenario) {
+				return nil, fmt.Errorf("%s replaces tests/metrics/%s, which doesn't exist", filepath.Join(path, e.Name()), e.Name())
+			}
+			lists[scenario] = filepath.Join(path, e.Name())
+		}
+		return lists, nil
+	}
+	if len(scenarios) == 1 {
+		lists[scenarios[0]] = path
+		return lists, nil
+	}
+	integration := filepath.Join(a.dir, "tests", "metrics", "integration")
+	if !slices.Contains(scenarios, integration) {
+		return nil, fmt.Errorf("%s doesn't say which of its %d scenarios it replaces: use %s/<scenario>, or name one scenario integration",
+			path, len(scenarios), path)
+	}
+	lists[integration] = path
+	return lists, nil
+}
+
+// readMetricList reads a list of metric names separated by whitespace. A #
+// starts a comment that runs to the end of the line, as in an integration's
+// metric_names.
+func readMetricList(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line, _, _ = strings.Cut(line, "#")
+		names = append(names, strings.Fields(line)...)
+	}
+	return names, nil
+}
+
+// isRuleOutput reports whether a metric name is a recording rule's output,
+// named level:metric:operations by convention. The databases run no rules, so
+// these never arrive. Exporters shouldn't use colons, but TensorFlow Serving
+// starts names with one, such as :tensorflow:serving:request_count.
+func isRuleOutput(name string) bool {
+	return strings.Contains(name, ":") && !strings.HasPrefix(name, ":")
+}
+
+// testCase checks the metrics listed in a tests/metrics file, or in list when
+// it's set, using the config named after the tests/metrics file, and fails when
+// too few of them are present in Mimir.
+func testCase(ctx context.Context, a app, prometheus, metricsFile, list string) error {
 	config, err := godotenv.Read(filepath.Join(a.dir, "tests", "configs", filepath.Base(metricsFile)+".config"))
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
@@ -84,14 +161,29 @@ func testCase(ctx context.Context, a app, prometheus, metricsFile string) error 
 		instances = []string{""}
 	}
 
-	data, err := os.ReadFile(metricsFile)
+	if list == "" {
+		list = metricsFile
+	} else {
+		fmt.Printf("Expected metrics for %s's %s scenario come from %s\n", a.name, filepath.Base(metricsFile), list)
+	}
+	listed, err := readMetricList(list)
 	if err != nil {
 		return err
 	}
-	expected := strings.Fields(string(data))
+	var expected, rules []string
+	for _, name := range listed {
+		if isRuleOutput(name) {
+			rules = append(rules, name)
+		} else {
+			expected = append(expected, name)
+		}
+	}
+	if len(rules) > 0 {
+		fmt.Printf("Skipping %d recording rule outputs, which the databases don't produce: %s\n", len(rules), strings.Join(rules, " "))
+	}
 	// Zero of zero metrics would otherwise count as a pass.
 	if len(expected) == 0 {
-		return errors.New("no metrics listed")
+		return errors.New("no metrics listed, other than recording rule outputs")
 	}
 
 	var errs []error

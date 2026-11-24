@@ -50,7 +50,9 @@ When adding an app, copy the closest existing one rather than starting from scra
 ### Tests
 
 - `tests/metrics/<scenario>`: expected metric names, separated by whitespace, usually one per line.
-  A name listed twice counts twice towards the success rate.
+  `#` starts a comment. A name listed twice counts twice towards the success rate. Recording rule
+  outputs (`level:metric:operations`, such as `instance:mysql_heartbeat_lag_seconds`) are skipped,
+  because the databases run no rules.
 - `tests/configs/<scenario>.config`, in `.env` syntax: `JOB_LABEL` is required, and used as a regex
   (`job=~"..."`). Optional: `INSTANCE_FILTER` (space-separated instance regexes, each checked
   separately) and `METRICS_SUCCESS_RATE_REQUIRED` (default `0.8`). `sampletool` reads no other key.
@@ -60,6 +62,12 @@ When adding an app, copy the closest existing one rather than starting from scra
 The metrics list should hold what the integration's dashboards and alerts use, not every metric the
 exporter emits. A rate below `1.0` allows for listed metrics the load doesn't produce. When the list
 changes, check the rate still fits it.
+
+`sampletool apps test --metrics <dir>` replaces the lists with ones from `<dir>`: `<dir>/<app>/<scenario>`,
+or `<dir>/<app>` for an app's only scenario, or for its `integration` scenario when it has several. The
+scenario's config still applies. Other repositories use this to test their own version of an
+integration's list: `.github/workflows/sample-app.yml` takes the apps, a ref and an artifact of lists,
+and pull requests here call it for the apps they change.
 
 ## The development loop
 

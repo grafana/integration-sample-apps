@@ -103,6 +103,14 @@ func TestLintFindsProblems(t *testing.T) {
 			change: map[string]string{"demo/tests/metrics/main": "up\nup\n"},
 			level:  "warning", want: "more than once",
 		},
+		"recording rule output": {
+			change: map[string]string{"demo/tests/metrics/main": "# from metric_names\nup\ninstance:up:sum\n"},
+			level:  "warning", want: "recording rule outputs, which 'apps test' skips: instance:up:sum",
+		},
+		"only recording rule outputs": {
+			change: map[string]string{"demo/tests/metrics/main": "instance:up:sum\n"},
+			level:  "error", want: "lists no metrics, other than recording rule outputs",
+		},
 		"bad dashboards line": {
 			change: map[string]string{"demo/tests/dashboards": "# fine\njsonnet-libs/demo-mixin\nhttp://insecure.example.com/d.json\n"},
 			level:  "error", want: "line 3",
