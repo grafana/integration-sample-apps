@@ -3,14 +3,14 @@ CONFIG_FILE_DIR := jinja/variables
 CONFIG_FILE := $(CONFIG_FILE_DIR)/cloud-init.yaml
 LOKI_INSTANCE ?= your-loki-instance:3100
 PROMETHEUS_INSTANCE ?= your-prometheus-instance:9090
+# Couchbase Server does not fit on Multipass's default disk
+DISK_SIZE ?= 10
 
 # Import last to ensure expected parameters are set and available to import from this file
 include ../Makefile
 
 .PHONY: run run-ci stop exporter fetch-prometheus-metrics render-config launch-vm clean defaultconfig
 
-# For CI, we don't care about long running tests, so we can get by with default disk size
-run: DISK_SIZE = 10
 run: launch-vm
 	@echo "VM $(VM_NAME) launched and configured."
 
