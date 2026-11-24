@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -65,7 +67,7 @@ func TestSuccessRate(t *testing.T) {
 			mimir, queries := fakeMimir(t, present...)
 			apps, _ := sampleApps(root, "demo")
 
-			err := appsTest(context.Background(), apps, "", "", mimir, "")
+			err := appsTest(context.Background(), apps, "", "", mimir, "", io.Discard)
 			if tt.wantErr == "" && err != nil || tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)) {
 				t.Errorf("err = %v, want %q", err, tt.wantErr)
 			}
@@ -84,7 +86,7 @@ func TestInstanceFilterChecksEachInstance(t *testing.T) {
 	mimir, _ := fakeMimir(t, `up{job=~"integrations/demo",instance=~".*-alloy.*"}`)
 	apps, _ := sampleApps(root, "demo")
 
-	err := appsTest(context.Background(), apps, "", "", mimir, "")
+	err := appsTest(context.Background(), apps, "", "", mimir, "", io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "on instance '.*-otelcol.*'") || strings.Contains(err.Error(), "alloy") {
 		t.Errorf("want a failure for the otelcol instance only, got: %v", err)
 	}
@@ -129,7 +131,7 @@ func TestBrokenTestCasesFail(t *testing.T) {
 			if tt.mimir == "" {
 				tt.mimir, _ = fakeMimir(t)
 			}
-			err := appsTest(context.Background(), apps, "", "", tt.mimir, "")
+			err := appsTest(context.Background(), apps, "", "", tt.mimir, "", io.Discard)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("err = %v, want one mentioning %q", err, tt.wantErr)
 			}
@@ -147,7 +149,7 @@ func TestCommentsAndRuleOutputsAreNotQueried(t *testing.T) {
 	mimir, queries := fakeMimir(t, `up{job=~"integrations/demo"}`, `:tensorflow:serving:request_count{job=~"integrations/demo"}`)
 	apps, _ := sampleApps(root, "demo")
 
-	if err := appsTest(context.Background(), apps, "", "", mimir, ""); err != nil {
+	if err := appsTest(context.Background(), apps, "", "", mimir, "", io.Discard); err != nil {
 		t.Errorf("err = %v, want a pass", err)
 	}
 	if want := []string{`up{job=~"integrations/demo"}`, `:tensorflow:serving:request_count{job=~"integrations/demo"}`}; !slices.Equal(*queries, want) {
@@ -223,7 +225,7 @@ func TestListOverrides(t *testing.T) {
 			mimir, queries := fakeMimir(t, present...)
 			apps, _ := sampleApps(root, "demo")
 
-			err := appsTest(context.Background(), apps, "", "", mimir, overrides)
+			err := appsTest(context.Background(), apps, "", "", mimir, overrides, io.Discard)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Errorf("err = %v, want one mentioning %q", err, tt.wantErr)
@@ -241,6 +243,48 @@ func TestListOverrides(t *testing.T) {
 				t.Errorf("queried %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestJobSummary(t *testing.T) {
+	root := newRepo(t, map[string]string{
+		"demo/tests/metrics/broken":             "up\n",
+		"demo/tests/configs/broken.config":      "# no JOB_LABEL\n",
+		"demo/tests/metrics/integration":        "up\n",
+		"demo/tests/configs/integration.config": "JOB_LABEL=integrations/demo\nMETRICS_SUCCESS_RATE_REQUIRED=1\nINSTANCE_FILTER='a|b'\n",
+		"none/Makefile":                         "",
+	})
+	overrides := t.TempDir()
+	if err := os.WriteFile(filepath.Join(overrides, "demo"), []byte("up\nmissing_one\ninstance:up:sum\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mimir, _ := fakeMimir(t, `up{job=~"integrations/demo",instance=~"a|b"}`)
+	apps, _ := sampleApps(root, "demo,none")
+
+	var summary strings.Builder
+	if err := appsTest(context.Background(), apps, "", "", mimir, overrides, &summary); err == nil {
+		t.Error("want a failure")
+	}
+	want := "### demo\n\n" +
+		"| Scenario | Result | Present | Missing |\n|---|---|---|---|\n" +
+		"| `broken` | ❌ JOB_LABEL not set | | |\n" +
+		"| `integration` (list replaced) on instance `a\\|b` | ❌ fail | 1 of 2, 1 required; recording rule outputs skipped: 1 | `missing_one` |\n" +
+		"\n### none\n\n" +
+		"| Scenario | Result | Present | Missing |\n|---|---|---|---|\n" +
+		"| | ❌ no expected metrics files in tests/metrics | | |\n\n"
+	if summary.String() != want {
+		t.Errorf("summary =\n%s\nwant\n%s", summary.String(), want)
+	}
+}
+
+func TestMissingCellNamesTheFirstFew(t *testing.T) {
+	var missing []string
+	for i := range summaryMissing + 3 {
+		missing = append(missing, fmt.Sprintf("m%d", i))
+	}
+	got := missingCell(missing)
+	if !strings.HasPrefix(got, "`m0`, `m1`, ") || !strings.HasSuffix(got, "`m19`, and 3 more in the log") {
+		t.Errorf("missingCell = %q", got)
 	}
 }
 

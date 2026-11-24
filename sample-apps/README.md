@@ -96,4 +96,4 @@ jobs:
 - `metrics-artifact` names an artifact of the calling run, holding `<app>` or `<app>/<scenario>` files. They replace the apps' own `tests/metrics` files, as `sampletool apps test --metrics` does, while the scenario's config still applies.
 - `runner` must support nested virtualization, by default `ubuntu-latest-8-cores`.
 
-Screenshots are uploaded as `screenshots-<app>` artifacts of the calling run.
+Each app's job summary has a table of its scenarios: pass or fail, how many expected metrics were present, and which were missing. They show on the calling run's summary page. Screenshots are uploaded as `screenshots-<app>` artifacts of the calling run.

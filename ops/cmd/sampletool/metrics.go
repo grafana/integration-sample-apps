@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -39,9 +40,14 @@ func seriesExist(ctx context.Context, prometheus, query string) (bool, error) {
 	return len(body.Data.Result) > 0, nil
 }
 
+// summaryMissing is how many missing metrics a summary row names before
+// leaving the rest to the log.
+const summaryMissing = 20
+
 // appsTest checks the apps' metrics in Mimir, found through env unless prometheus is set.
 // With overrides set, lists in that directory replace the apps' own: see listOverrides.
-func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus, overrides string) error {
+// It writes a Markdown table of the results per app to summary.
+func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus, overrides string, summary io.Writer) error {
 	if prometheus == "" {
 		var err error
 		if prometheus, _, err = endpoints(ctx, env, dbsName); err != nil {
@@ -50,23 +56,30 @@ func appsTest(ctx context.Context, apps []app, env, dbsName, prometheus, overrid
 	}
 	var errs []error
 	for _, a := range apps {
+		fmt.Fprintf(summary, "### %s\n\n| Scenario | Result | Present | Missing |\n|---|---|---|---|\n", a.name)
 		files := a.metricsFiles()
-		if len(files) == 0 {
-			errs = append(errs, fmt.Errorf("%s: no expected metrics files in tests/metrics", a.name))
-			continue
-		}
 		lists, err := listOverrides(overrides, a, files)
+		if len(files) == 0 {
+			err = errors.New("no expected metrics files in tests/metrics")
+		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", a.name, err))
+			fmt.Fprintf(summary, "| | ❌ %s | | |\n\n", cell(err.Error()))
 			continue
 		}
 		for _, file := range files {
-			if err := testCase(ctx, a, prometheus, file, lists[file]); err != nil {
+			if err := testCase(ctx, a, prometheus, file, lists[file], summary); err != nil {
 				errs = append(errs, fmt.Errorf("%s: %s: %w", a.name, filepath.Base(file), err))
 			}
 		}
+		fmt.Fprintln(summary)
 	}
 	return errors.Join(errs...)
+}
+
+// cell makes text safe to put in a Markdown table cell.
+func cell(text string) string {
+	return strings.NewReplacer("|", `\|`, "\n", " ").Replace(text)
 }
 
 // listOverrides maps the app's scenario files to the lists in dir that replace
@@ -138,8 +151,20 @@ func isRuleOutput(name string) bool {
 
 // testCase checks the metrics listed in a tests/metrics file, or in list when
 // it's set, using the config named after the tests/metrics file, and fails when
-// too few of them are present in Mimir.
-func testCase(ctx context.Context, a app, prometheus, metricsFile, list string) error {
+// too few of them are present in Mimir. It writes a summary row per instance
+// filter, or one for an error that stopped the check.
+func testCase(ctx context.Context, a app, prometheus, metricsFile, list string, summary io.Writer) (err error) {
+	scenario := "`" + cell(filepath.Base(metricsFile)) + "`"
+	if list != "" {
+		scenario += " (list replaced)"
+	}
+	checked := false
+	defer func() {
+		if err != nil && !checked {
+			fmt.Fprintf(summary, "| %s | ❌ %s | | |\n", scenario, cell(err.Error()))
+		}
+	}()
+
 	config, err := godotenv.Read(filepath.Join(a.dir, "tests", "configs", filepath.Base(metricsFile)+".config"))
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
@@ -195,7 +220,7 @@ func testCase(ctx context.Context, a app, prometheus, metricsFile, list string) 
 		}
 
 		fmt.Printf("--- [ Checking Metrics for %s using job='%s'%s ] ---\n", a.name, job, on)
-		found := 0
+		var missing []string
 		for _, metric := range expected {
 			present, err := seriesExist(ctx, prometheus, metric+"{"+selector+"}")
 			if err != nil {
@@ -203,21 +228,47 @@ func testCase(ctx context.Context, a app, prometheus, metricsFile, list string) 
 			}
 			if present {
 				fmt.Printf("[PASS] '%s' present\n", metric)
-				found++
 			} else {
 				fmt.Printf("[FAIL] '%s' **not present**\n", metric)
+				missing = append(missing, metric)
 			}
 		}
+		found := len(expected) - len(missing)
 
 		// The tolerance absorbs floating-point error: 0.1*30 is slightly more than 3.
-		result := "SUCCESS"
+		result, mark := "SUCCESS", "✅ pass"
 		if float64(found)+1e-9 < float64(len(expected))*rate {
-			result = "FAIL"
+			result, mark = "FAIL", "❌ fail"
 			errs = append(errs, fmt.Errorf("%d of %d expected metrics present%s, %v required", found, len(expected), on, rate))
 		}
 		fmt.Printf("--- [ TEST %s%s ] ---\n", result, on)
 		fmt.Printf("%d out of %d expected metrics were present in Prometheus/Mimir (%s); the required success rate is %v\n",
 			found, len(expected), prometheus, rate)
+
+		row := scenario
+		if instance != "" {
+			row += " on instance `" + cell(instance) + "`"
+		}
+		present := fmt.Sprintf("%d of %d, %v required", found, len(expected), rate)
+		if len(rules) > 0 {
+			present += fmt.Sprintf("; recording rule outputs skipped: %d", len(rules))
+		}
+		fmt.Fprintf(summary, "| %s | %s | %s | %s |\n", row, mark, present, missingCell(missing))
 	}
+	checked = true
 	return errors.Join(errs...)
+}
+
+// missingCell names the missing metrics, up to summaryMissing of them.
+func missingCell(missing []string) string {
+	shown := missing[:min(len(missing), summaryMissing)]
+	var names []string
+	for _, m := range shown {
+		names = append(names, "`"+cell(m)+"`")
+	}
+	text := strings.Join(names, ", ")
+	if rest := len(missing) - len(shown); rest > 0 {
+		text += fmt.Sprintf(", and %d more in the log", rest)
+	}
+	return text
 }

@@ -93,7 +93,9 @@ Without someone to approve permission prompts, these commands are denied, so phr
    `ENV=k3d` points it at the local k3d stack (`mimir.k3d.localhost:9999`) instead, and adds the k3d
    hostnames to `/etc/hosts` on every VM the app launched.
 3. **Wait:** 3 minutes, as CI does (`go run ./ops/cmd/sampletool apps wait`).
-4. **Test:** `make test-apps APPS=mysql` prints a pass or fail per metric and per scenario.
+4. **Test:** `make test-apps APPS=mysql` prints a pass or fail per metric and per scenario. With
+   `GITHUB_STEP_SUMMARY` set, as on GitHub Actions, it also appends a Markdown table of each
+   scenario's result and missing metrics to that file.
 5. **Screenshots:** `make screenshot-apps APPS=mysql` saves each dashboard in `tests/dashboards` to
    `screenshots/mysql/`. Set `GITHUB_TOKEN` if you list mixins often: without one, GitHub allows 60
    API requests an hour.

@@ -111,7 +111,17 @@ func run(ctx context.Context, args []string) error {
 	case "apps wait":
 		return appsWait(ctx)
 	case "apps test":
-		return appsTest(ctx, selected, *env, *dbs, *prometheus, *metrics)
+		// On GitHub Actions, a table of the results also goes to the job's summary.
+		summary := io.Discard
+		if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			summary = f
+		}
+		return appsTest(ctx, selected, *env, *dbs, *prometheus, *metrics, summary)
 	case "apps screenshot":
 		return appsScreenshot(ctx, root, selected, *dbs)
 	case "apps down":
