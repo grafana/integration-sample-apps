@@ -7,6 +7,4 @@
 /.eventcache
 /network-cache
 
-# Integration QA specifics
-missing_metrics
-
+/ops/bin/
