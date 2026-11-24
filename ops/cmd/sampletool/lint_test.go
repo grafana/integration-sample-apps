@@ -55,9 +55,9 @@ func TestLintFindsProblems(t *testing.T) {
 			change: map[string]string{"demo/Makefile": "include ../Makefile\n"},
 			level:  "error", want: "no run-ci target",
 		},
-		"no shared Makefile": {
-			change: map[string]string{"demo/Makefile": "run-ci:\n\t@true\n"},
-			level:  "warning", want: "configure-k3d-dns",
+		"shared target without the shared Makefile": {
+			change: map[string]string{"demo/Makefile": "run-ci: k3s-setup\n\t@true\n"},
+			level:  "error", want: "uses k3s-setup from ../Makefile without including it",
 		},
 		"defaultconfig only appends": {
 			change: map[string]string{"demo/Makefile": strings.Replace(goodMakefile, `" > jinja`, `" >> jinja`, 1)},

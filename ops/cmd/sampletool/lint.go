@@ -30,6 +30,7 @@ var (
 	metricName      = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
 	runCITarget     = regexp.MustCompile(`(?m)^run-ci:`)
 	sharedMakefile  = regexp.MustCompile(`(?m)^include \.\./Makefile`)
+	sharedTarget    = regexp.MustCompile(`\bk3s-(setup|stop)(-cluster)?\b`)
 	hardcodedAMD64  = regexp.MustCompile(`amd64|x86_64`)
 	archDetection   = regexp.MustCompile(`dpkg --print-architecture|uname -m|arm64|aarch64`)
 	overwrite       = regexp.MustCompile(`[^>&0-9]>[^>]`)
@@ -120,8 +121,8 @@ func lintApp(a app) []finding {
 		if ci && !runCITarget.Match(makefile) {
 			add("error", "Makefile has no run-ci target, which 'apps up' runs")
 		}
-		if ci && !sharedMakefile.Match(makefile) {
-			add("warning", "Makefile doesn't include ../Makefile, so 'apps up --env k3d' fails at configure-k3d-dns")
+		if t := sharedTarget.Find(makefile); t != nil && !sharedMakefile.Match(makefile) {
+			add("error", "Makefile uses %s from ../Makefile without including it", t)
 		}
 		for _, target := range defaultTargets {
 			recipe := makeRecipe(string(makefile), target)

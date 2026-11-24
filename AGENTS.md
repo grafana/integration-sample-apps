@@ -22,7 +22,7 @@ repository is public.
 |---|---|
 | `sample-apps/<slug>/` | One sample app per integration. The directory name is the integration's slug. |
 | `sample-apps/README.md` | What CI needs from a sample app, and how to list dashboards to screenshot. Read it before adding an app or changing its tests. |
-| `sample-apps/Makefile` | Shared targets that each app's `Makefile` includes: k3s setup and teardown, `configure-k3d-dns`, `shell`. |
+| `sample-apps/Makefile` | Shared targets that each app's `Makefile` includes: k3s setup and teardown, and `shell`. |
 | `ops/cmd/sampletool/` | `sampletool`, the Go control plane behind every root `make` target and CI. `make help` lists its commands. |
 | `ops/qa/dbs/` | The Mimir, Loki and Grafana that apps send to, locally and in CI. |
 | `ops/qa/k3s-main-cloud-init.yaml` | Cloud-init for k3s main nodes. |
@@ -74,8 +74,8 @@ Needs bash, Multipass, Docker and Go. Run these from the repository root.
    Pass the same `DBS_NAME=<name>` to `setup-dbs`, `setup-apps`, `test-apps`, `screenshot-apps` and
    `stop-dbs` to run a stack of your own beside someone else's.
 2. **App:** `make setup-apps APPS=mysql` runs the app's `make run-ci` pointed at `dbs`, as CI does.
-   `ENV=k3d` points it at the local k3d stack (`mimir.k3d.localhost:9999`) instead, and adds the DNS
-   entries the VM needs.
+   `ENV=k3d` points it at the local k3d stack (`mimir.k3d.localhost:9999`) instead, and adds the k3d
+   hostnames to `/etc/hosts` on every VM the app launched.
 3. **Wait:** 3 minutes, as CI does (`go run ./ops/cmd/sampletool apps wait`).
 4. **Test:** `make test-apps APPS=mysql` prints a pass or fail per metric and per scenario.
 5. **Screenshots:** `make screenshot-apps APPS=mysql` saves each dashboard in `tests/dashboards` to
@@ -109,8 +109,8 @@ repository, so an app that lints with errors fails them.
 - **`setup-apps` discards your config edits.** `run-ci` runs `clean` and `defaultconfig` first.
 - **`defaultconfig` resets the variables file.** Its first line overwrites it, so edit the file after
   running it, never before. Lint warns about a recipe that only appends.
-- **`ENV=k3d` needs the shared Makefile.** It runs `make configure-k3d-dns`, which apps get by
-  including `../Makefile`.
+- **`ENV=k3d` finds an app's VMs by comparing `multipass list` before and after `run-ci`.** A VM
+  someone else launches in the meantime gets the k3d hostnames too.
 - **Launch VMs one at a time.** Parallel Multipass launches have produced duplicate MAC addresses and
   stuck VMs. `sample-apps/linux-hostmetrics` launches its VMs one at a time for this reason.
 - **Architecture.** CI runs on amd64. On Apple Silicon, Multipass VMs are arm64. Pick downloaded
