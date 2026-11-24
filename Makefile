@@ -12,7 +12,6 @@ ENV ?= "local"
 help:
 	@$(SAMPLETOOL) help
 
-# Checks the APPS, or every app when APPS is empty, without starting a VM
 lint:
 	@$(SAMPLETOOL) apps lint --apps $(APPS)
 

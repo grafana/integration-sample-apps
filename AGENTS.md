@@ -65,6 +65,14 @@ changes, check the rate still fits it.
 
 Needs bash, Multipass, Docker and Go. Run these from the repository root.
 
+Without someone to approve permission prompts, these commands are denied, so phrase them this way:
+
+- **No `git` after a `cd` in the same command.** Pass the path instead:
+  `git log -- sample-apps/mysql`, `git ls-files sample-apps/mysql`.
+- **Edit files directly**, not with `sed -i`, `echo >` or an inline script.
+- **Run the root `make` targets and `go` from the root**, e.g. `make lint APPS=mysql` and
+  `go test ./ops/...`, not `make -C ../.. lint` or `cd ops && go test ./cmd/sampletool/`.
+
 0. **Lint first:** `make lint APPS=mysql`, or `make lint` for every app, checks in under a second what
    CI needs, without a VM. Add `--json` for machine-readable findings:
    `go run ./ops/cmd/sampletool apps lint --json --apps mysql`. Errors fail it; warnings don't. CI
