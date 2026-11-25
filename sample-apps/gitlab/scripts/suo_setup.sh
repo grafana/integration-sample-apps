@@ -30,4 +30,7 @@ helm upgrade --install gitlab gitlab/gitlab \
     --version 9.1.2 \
     --timeout 20m
 
+echo "Waiting for the GitLab webservice"
+kubectl rollout status deployment/gitlab-webservice-default -n gitlab --timeout=15m
+
 kubectl apply -f /home/ubuntu/configs/load-generation.yaml
