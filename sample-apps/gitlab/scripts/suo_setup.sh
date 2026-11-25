@@ -31,6 +31,14 @@ helm upgrade --install gitlab gitlab/gitlab \
     --timeout 20m
 
 echo "Waiting for the GitLab webservice"
-kubectl rollout status deployment/gitlab-webservice-default -n gitlab --timeout=15m
+if ! kubectl rollout status deployment/gitlab-webservice-default -n gitlab --timeout=15m; then
+    kubectl get pods -n gitlab -o wide || true
+    kubectl top pods -n gitlab || true
+    kubectl get events -n gitlab --sort-by=.lastTimestamp | tail -n 40 || true
+    kubectl describe pods -n gitlab -l app=webservice || true
+    kubectl logs -n gitlab -l app=webservice --all-containers --prefix --tail=50 || true
+    kubectl logs -n gitlab -l app=migrations --all-containers --prefix --tail=50 || true
+    exit 1
+fi
 
 kubectl apply -f /home/ubuntu/configs/load-generation.yaml
