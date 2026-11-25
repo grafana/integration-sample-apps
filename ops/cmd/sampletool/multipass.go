@@ -71,25 +71,20 @@ func multipassIP(ctx context.Context, vm string) (string, error) {
 	return info.Info[vm].IPv4[0], nil
 }
 
-const ubuntuRelease = "24.04"
-
-// dockerCloudInit is Canonical's cloud-init for a VM with Docker installed.
-const dockerCloudInit = "https://raw.githubusercontent.com/canonical/multipass/refs/heads/main/data/cloud-init-yaml/cloud-init-docker.yaml"
-
 // dbsUp launches the databases VM and starts Mimir, Loki and optionally Grafana in it.
 func dbsUp(ctx context.Context, root, name string, grafana bool) error {
-	files, err := filepath.Glob(filepath.Join(root, "ops", "qa", "dbs", "*"))
+	files, err := filepath.Glob(filepath.Join(root, dbsFilesDir, "*"))
 	if err != nil || len(files) == 0 {
-		return errors.New("no files found in ops/qa/dbs")
+		return errors.New("no files found in " + dbsFilesDir)
 	}
 	steps := [][]string{
-		{"launch", ubuntuRelease, "--name", name, "--cpus", "2", "--memory", "4G", "--disk", "40G", "--cloud-init", dockerCloudInit},
+		{"launch", ubuntuRelease, "--name", name, "--cpus", dbsCPUs, "--memory", dbsMemory, "--disk", dbsDisk, "--cloud-init", dockerCloudInit},
 		append(append([]string{"transfer", "--recursive"}, files...), name+":/home/ubuntu"),
-		{"exec", name, "--", "bash", "-c", "docker-compose -f docker-compose.yaml up -d"},
+		{"exec", name, "--", "bash", "-c", "docker-compose -f " + dbsCompose + " up -d"},
 	}
 	if grafana {
 		fmt.Println("Configuring extras for local development")
-		steps = append(steps, []string{"exec", name, "--", "bash", "-c", "docker-compose -f docker-compose.grafana.yaml up -d"})
+		steps = append(steps, []string{"exec", name, "--", "bash", "-c", "docker-compose -f " + grafanaCompose + " up -d"})
 	}
 	for _, step := range steps {
 		if err := multipass(ctx, step...); err != nil {
@@ -111,8 +106,6 @@ func dbsDown(ctx context.Context, name string) error {
 	return errors.Join(multipass(ctx, "delete", name), multipass(ctx, "purge"))
 }
 
-const hardwareFile = ".hardware_requirements"
-
 func k3sWorkers(name string) []string {
 	return []string{name + "-k3s-worker-1", name + "-k3s-worker-2"}
 }
@@ -120,11 +113,7 @@ func k3sWorkers(name string) []string {
 // k3sUp launches <name>-k3s-main and, in cluster mode, two workers joined to
 // it. A .hardware_requirements file in the working directory overrides the VM sizes.
 func k3sUp(ctx context.Context, root, name string, cluster bool) error {
-	// Cores, and gigabytes of memory and disk.
-	hw := map[string]string{
-		"PRIMARY_CPU": "4", "PRIMARY_MEMORY": "6", "PRIMARY_DISK": "20",
-		"WORKER_CPU": "2", "WORKER_MEMORY": "6", "WORKER_DISK": "20",
-	}
+	hw := maps.Clone(k3sHardware)
 	overrides, err := godotenv.Read(hardwareFile)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s: %w", hardwareFile, err)
@@ -138,7 +127,7 @@ func k3sUp(ctx context.Context, root, name string, cluster bool) error {
 	}
 
 	main := name + "-k3s-main"
-	if err := launch(main, "PRIMARY", "--cloud-init", filepath.Join(root, "ops", "qa", "k3s-main-cloud-init.yaml")); err != nil || !cluster {
+	if err := launch(main, "PRIMARY", "--cloud-init", filepath.Join(root, k3sCloudInit)); err != nil || !cluster {
 		return err
 	}
 	token, err := multipassOutput(ctx, "exec", main, "--", "sudo", "cat", "/var/lib/rancher/k3s/server/node-token")
@@ -149,7 +138,7 @@ func k3sUp(ctx context.Context, root, name string, cluster bool) error {
 	if err != nil {
 		return err
 	}
-	join := fmt.Sprintf(`curl -sfL https://get.k3s.io | K3S_URL="https://%s:6443" K3S_TOKEN="%s" sh -`, ip, token)
+	join := fmt.Sprintf(`curl -sfL %s | K3S_URL="https://%s:6443" K3S_TOKEN="%s" sh -`, k3sInstallScript, ip, token)
 	for _, worker := range k3sWorkers(name) {
 		if err := launch(worker, "WORKER"); err != nil {
 			return err

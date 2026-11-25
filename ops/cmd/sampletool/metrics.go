@@ -11,19 +11,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 )
 
-// defaultSuccessRate applies unless a test config sets METRICS_SUCCESS_RATE_REQUIRED.
-const defaultSuccessRate = 0.8
-
 // seriesExist reports whether an instant query against Mimir returns any series.
 func seriesExist(ctx context.Context, prometheus, query string) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
-	data, err := request(ctx, http.MethodGet, "http://"+prometheus+"/prometheus/api/v1/query?"+url.Values{"query": {query}}.Encode(), nil)
+	data, err := request(ctx, http.MethodGet, "http://"+prometheus+queryPath+"?"+url.Values{"query": {query}}.Encode(), nil)
 	if err != nil {
 		return false, err
 	}
@@ -76,7 +72,7 @@ type scenario struct {
 
 // loadScenario reads a tests/metrics file and its config.
 func loadScenario(a app, metricsFile string) (scenario, error) {
-	config, err := godotenv.Read(filepath.Join(a.dir, "tests", "configs", filepath.Base(metricsFile)+".config"))
+	config, err := godotenv.Read(filepath.Join(a.dir, configsDir, filepath.Base(metricsFile)+".config"))
 	if err != nil {
 		return scenario{}, fmt.Errorf("config: %w", err)
 	}
