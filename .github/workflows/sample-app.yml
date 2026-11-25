@@ -204,7 +204,13 @@ jobs:
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
           METRICS_DIR: ${{ inputs.metrics-artifact != '' && format('{0}/expected-metrics', runner.temp) || '' }}
-        run: sampletool apps test --apps "${SAMPLE_APP}" ${METRICS_DIR:+--metrics "${METRICS_DIR}"}
+        run: |
+          status=0
+          sampletool apps test --apps "${SAMPLE_APP}" ${METRICS_DIR:+--metrics "${METRICS_DIR}"} || status=$?
+          # The results table goes in the screenshots artifact too, for a calling repository to comment
+          mkdir -p "screenshots/${SAMPLE_APP}"
+          cp "${GITHUB_STEP_SUMMARY}" "screenshots/${SAMPLE_APP}/summary.md"
+          exit "${status}"
 
       - name: Capture dashboard screenshots
         if: ${{ !cancelled() && steps.run_sample_app.outcome == 'success' }}
