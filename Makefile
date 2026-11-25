@@ -10,7 +10,7 @@ ENV ?= "local"
 .PHONY: help setup-dbs stop-dbs setup-apps test-apps stop-apps stop-all
 
 help:
-	@$(SAMPLETOOL) help
+	@$(SAMPLETOOL) --help
 
 # DBs
 setup-dbs:
