@@ -39,9 +39,17 @@ func sampleApps(root, list string) ([]app, error) {
 	return apps, nil
 }
 
-// metricsFiles lists the app's expected-metrics files, sorted by name.
+// metricsFiles lists the app's expected-metrics files, sorted by name. Hidden
+// files, such as macOS's .DS_Store, and directories are skipped.
 func (a app) metricsFiles() []string {
-	files, _ := filepath.Glob(filepath.Join(a.dir, "tests", "metrics", "*"))
+	dir := filepath.Join(a.dir, "tests", "metrics")
+	entries, _ := os.ReadDir(dir)
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			files = append(files, filepath.Join(dir, entry.Name()))
+		}
+	}
 	return files
 }
 
