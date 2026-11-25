@@ -32,13 +32,17 @@ jobs:
           dir_names_max_depth: 1
           matrix: true
 
-      - name: Filter out windows
+      - name: Filter out windows and deleted sample apps
         id: filtered-changes
+        env:
+          MODIFIED_DIRS: ${{ steps.changed-files.outputs.all_modified_files }}
         run: |
-          ALL_CHANGED_DIRS='${{ steps.changed-files.outputs.all_changed_files }}'
-          # Remove windows from the JSON array
-          FILTERED_DIRS=$(echo "$ALL_CHANGED_DIRS" | jq -c '. - ["windows"]')
-          echo "filtered-dirs=$FILTERED_DIRS" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          FILTERED_DIRS=$(jq -r '.[] | select(. != "windows")' <<< "${MODIFIED_DIRS}" |
+            while IFS= read -r dir; do
+              if [[ -d "sample-apps/${dir}" ]]; then echo "${dir}"; fi
+            done | jq -Rnc '[inputs]')
+          echo "filtered-dirs=${FILTERED_DIRS}" >> "${GITHUB_OUTPUT}"
 
       - name: List all changed sample app dir_names (filtered)
         # NOTE: this is referred to as a file by the action, despite technically being a chunk of the directory in use
