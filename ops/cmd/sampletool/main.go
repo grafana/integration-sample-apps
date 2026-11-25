@@ -62,6 +62,12 @@ type envFlag struct {
 
 type appsFlag struct {
 	Apps string `required:"" help:"Comma-separated sample apps."`
+	apps []app
+}
+
+func (f *appsFlag) AfterApply(root repoRoot) (err error) {
+	f.apps, err = sampleApps(string(root), f.Apps)
+	return err
 }
 
 type dbsUpCmd struct {
@@ -87,12 +93,8 @@ type appsUpCmd struct {
 	dbsFlag  `embed:""`
 }
 
-func (c *appsUpCmd) Run(ctx context.Context, root repoRoot) error {
-	apps, err := sampleApps(string(root), c.Apps)
-	if err != nil {
-		return err
-	}
-	return appsUp(ctx, apps, c.Env, c.DBs)
+func (c *appsUpCmd) Run(ctx context.Context) error {
+	return appsUp(ctx, c.apps, c.Env, c.DBs)
 }
 
 type appsWaitCmd struct{}
@@ -108,24 +110,16 @@ type appsTestCmd struct {
 	Prometheus string `help:"Mimir host:port, instead of the one --env implies."`
 }
 
-func (c *appsTestCmd) Run(ctx context.Context, root repoRoot) error {
-	apps, err := sampleApps(string(root), c.Apps)
-	if err != nil {
-		return err
-	}
-	return appsTest(ctx, apps, c.Env, c.DBs, c.Prometheus)
+func (c *appsTestCmd) Run(ctx context.Context) error {
+	return appsTest(ctx, c.apps, c.Env, c.DBs, c.Prometheus)
 }
 
 type appsDownCmd struct {
 	appsFlag `embed:""`
 }
 
-func (c *appsDownCmd) Run(ctx context.Context, root repoRoot) error {
-	apps, err := sampleApps(string(root), c.Apps)
-	if err != nil {
-		return err
-	}
-	return appsDown(ctx, apps)
+func (c *appsDownCmd) Run(ctx context.Context) error {
+	return appsDown(ctx, c.apps)
 }
 
 type k3sUpCmd struct {
