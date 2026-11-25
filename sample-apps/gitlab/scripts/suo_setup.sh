@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Re-set the KUBECONFIG since multipass exec does not load .profile or .bashrc correctly
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
@@ -12,7 +13,7 @@ helm repo update
 kubectl create namespace gitlab || true
 
 echo "Cleaning up any existing GitLab installation..."
-helm uninstall gitlab -n gitlab 2>/dev/null 
+helm uninstall gitlab -n gitlab 2>/dev/null || true
 
 # Setup Gitaly PVC
 kubectl delete -f /home/ubuntu/configs/gitaly-pvc.yaml 2>/dev/null || true
