@@ -154,27 +154,22 @@ func (c *ciCheckCmd) Run(root repoRoot) error {
 	return err
 }
 
-func newParser(ctx context.Context, options ...kong.Option) (*kong.Kong, error) {
-	return kong.New(&cli{}, append([]kong.Option{
+func options(ctx context.Context) []kong.Option {
+	return []kong.Option{
 		kong.Name("sampletool"),
 		kong.Description("Control plane for integration sample apps."),
 		kong.UsageOnError(),
 		kong.BindTo(ctx, (*context.Context)(nil)),
 		kong.BindToProvider(findRepoRoot),
-	}, options...)...)
+	}
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	parser, err := newParser(ctx)
-	if err != nil {
-		panic(err)
-	}
-	command, err := parser.Parse(os.Args[1:])
-	parser.FatalIfErrorf(err)
-	parser.FatalIfErrorf(command.Run())
+	command := kong.Parse(&cli{}, options(ctx)...)
+	command.FatalIfErrorf(command.Run())
 }
 
 var httpClient = func() *http.Client {

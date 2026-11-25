@@ -4,10 +4,12 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/alecthomas/kong"
 )
 
 func TestParsesCommands(t *testing.T) {
-	parser, err := newParser(context.Background())
+	parser, err := kong.New(&cli{}, options(context.Background())...)
 	if err != nil {
 		t.Fatal(err)
 	}
