@@ -93,7 +93,7 @@ jobs:
 
       - name: Setup databases
         if: steps.check_ci_support.outputs.run == 'true'
-        run: sampletool dbs up --dbs dbs --env qa
+        run: sampletool dbs up --dbs dbs
 
       - name: Run ${{ matrix.sample-app }} sample-app
         if: steps.check_ci_support.outputs.run == 'true'

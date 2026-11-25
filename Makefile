@@ -14,7 +14,7 @@ help:
 
 # DBs
 setup-dbs:
-	@$(SAMPLETOOL) dbs up --dbs $(DBS_NAME) --env $(ENV)
+	@$(SAMPLETOOL) dbs up --dbs $(DBS_NAME) --grafana
 
 stop-dbs:
 	@$(SAMPLETOOL) dbs down --dbs $(DBS_NAME)

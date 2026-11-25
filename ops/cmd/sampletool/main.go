@@ -19,7 +19,7 @@ import (
 
 type cli struct {
 	DBs struct {
-		Up   dbsUpCmd   `cmd:"" help:"Launch the VM running Mimir, Loki and, for --env local, Grafana."`
+		Up   dbsUpCmd   `cmd:"" help:"Launch the VM running Mimir, Loki and, with --grafana, Grafana."`
 		Down dbsDownCmd `cmd:"" help:"Delete that VM."`
 	} `cmd:"" name:"dbs" help:"The databases that sample apps send to."`
 
@@ -72,11 +72,11 @@ func (f *appsFlag) AfterApply(root repoRoot) (err error) {
 
 type dbsUpCmd struct {
 	dbsFlag `embed:""`
-	Env     string `default:"local" enum:"local,qa" help:"local also starts Grafana. CI uses qa."`
+	Grafana bool `help:"Also start Grafana, for local development."`
 }
 
 func (c *dbsUpCmd) Run(ctx context.Context, root repoRoot) error {
-	return dbsUp(ctx, string(root), c.DBs, c.Env == "local")
+	return dbsUp(ctx, string(root), c.DBs, c.Grafana)
 }
 
 type dbsDownCmd struct {

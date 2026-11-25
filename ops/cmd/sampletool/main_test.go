@@ -20,13 +20,13 @@ func TestParsesCommands(t *testing.T) {
 		"ci check":                      "<name>",
 		"apps up":                       "missing flags: --apps",
 		"apps test --apps x --env k":    "--env must be one of",
-		"dbs up --env k3d":              "--env must be one of",
+		"dbs up --env local":            "unknown flag --env",
 		"frobnicate":                    "unexpected argument",
 		"apps down --apps no-such":      `no sample-app named "no-such"`,
 		"apps down --apps mysql,docker": "",
 		"k3s down demo --cluster":       "",
 		"k3s up --cluster demo":         "",
-		"dbs up --dbs mine --env qa":    "",
+		"dbs up --dbs mine --grafana":   "",
 	} {
 		_, err := parser.Parse(strings.Fields(args))
 		if want == "" && err != nil || want != "" && (err == nil || !strings.Contains(err.Error(), want)) {
