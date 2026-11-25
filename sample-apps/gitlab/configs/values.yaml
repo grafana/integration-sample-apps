@@ -142,6 +142,11 @@ registry:
 
 postgresql:
   install: true
+  image:
+    repository: bitnamilegacy/postgresql
+  metrics:
+    image:
+      repository: bitnamilegacy/postgres-exporter
   persistence:
     size: 8Gi
   resources:
@@ -154,6 +159,11 @@ postgresql:
 
 redis:
   install: true
+  image:
+    repository: bitnamilegacy/redis
+  metrics:
+    image:
+      repository: bitnamilegacy/redis-exporter
   persistence:
     size: 8Gi
   resources:
