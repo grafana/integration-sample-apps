@@ -53,23 +53,80 @@ func TestDashboards(t *testing.T) {
 		{url: "https://raw.example.com/master/demo-mixin/dashboards_out/overview.json", mixin: "demo-mixin", ref: "master"},
 		{url: "https://raw.example.com/feature/branch/demo-mixin/dashboards_out/overview.json", mixin: "demo-mixin", ref: "feature/branch"},
 	}
-	if listed, err := apps[0].dashboards(ctx); err != nil || !slices.Equal(listed, want) {
+	if listed, err := apps[0].dashboards(ctx, ""); err != nil || !slices.Equal(listed, want) {
 		t.Errorf("listed: got %+v, %v; want %+v", listed, err, want)
 	}
 	if strings.Join(refs, " ") != "master feature/branch" || tokens[0] != "Bearer test-token" {
 		t.Errorf("want the master and feature/branch listings with the token, got refs %q and tokens %q", refs, tokens)
 	}
-	if listed, err := apps[1].dashboards(ctx); err != nil || len(listed) != 0 {
+	if listed, err := apps[1].dashboards(ctx, ""); err != nil || len(listed) != 0 {
 		t.Errorf("none: got %+v, %v; want no dashboards and no error", listed, err)
 	}
-	if _, err := apps[2].dashboards(ctx); err == nil {
+	if _, err := apps[2].dashboards(ctx, ""); err == nil {
 		t.Error("insecure: want an error for a URL that is not https://")
 	}
-	if _, err := apps[3].dashboards(ctx); err == nil || !strings.Contains(err.Error(), "missing-mixin@master") {
+	if _, err := apps[3].dashboards(ctx, ""); err == nil || !strings.Contains(err.Error(), "missing-mixin@master") {
 		t.Errorf("missing: want an error naming the mixin, got: %v", err)
 	}
-	if _, err := apps[4].dashboards(ctx); err == nil {
+	if _, err := apps[4].dashboards(ctx, ""); err == nil {
 		t.Error("traversal: want an error for a mixin name that is not a plain directory")
+	}
+
+	// ref replaces master and each line's @ref.
+	refs = nil
+	want = []dashboard{
+		{url: "https://example.com/a.json"},
+		{url: "https://raw.example.com/abc123/demo-mixin/dashboards_out/overview.json", mixin: "demo-mixin", ref: "abc123"},
+		{url: "https://raw.example.com/abc123/demo-mixin/dashboards_out/overview.json", mixin: "demo-mixin", ref: "abc123"},
+	}
+	if listed, err := apps[0].dashboards(ctx, "abc123"); err != nil || !slices.Equal(listed, want) {
+		t.Errorf("listed at abc123: got %+v, %v; want %+v", listed, err, want)
+	}
+	if strings.Join(refs, " ") != "abc123 abc123" {
+		t.Errorf("want both listings at abc123, got refs %q", refs)
+	}
+}
+
+func TestScreenshotRejectsABadRef(t *testing.T) {
+	for _, ref := range []string{"..", "../x", "-x", "a b"} {
+		err := appsScreenshot(context.Background(), t.TempDir(), nil, "dbs", ref)
+		if err == nil || !strings.Contains(err.Error(), "--jsonnet-libs-ref") {
+			t.Errorf("ref %q: want an error naming --jsonnet-libs-ref, got %v", ref, err)
+		}
+	}
+}
+
+func TestMixinApps(t *testing.T) {
+	root := newRepo(t, map[string]string{
+		"mysql/tests/dashboards":       "# the integration's mixin\njsonnet-libs/mysql-mixin@some-branch\n",
+		"mysql/tests/metrics/main":     "up\n",
+		"kafka/tests/dashboards":       "https://example.com/a.json\njsonnet-libs/kafka-mixin\n",
+		"kafka/tests/metrics/main":     "up\n",
+		"bypassed/tests/dashboards":    "jsonnet-libs/mysql-mixin\n",
+		"bypassed/.CI_BYPASS":          "",
+		"commented/tests/dashboards":   "# jsonnet-libs/mysql-mixin\n",
+		"commented/tests/metrics/main": "up\n",
+		"none/tests/metrics/main":      "up\n",
+	})
+	apps, err := allApps(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]struct {
+		mixins []string
+		want   []string
+	}{
+		"one mixin":               {[]string{"mysql-mixin"}, []string{"mysql"}},
+		"several mixins":          {[]string{"kafka-mixin", "mysql-mixin"}, []string{"kafka", "mysql"}},
+		"a mixin no app names":    {[]string{"common-lib"}, nil},
+		"an empty name from a ,,": {[]string{""}, nil},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got, err := mixinApps(apps, tt.mixins); err != nil || !slices.Equal(got, tt.want) {
+				t.Errorf("mixinApps(%v) = %v, %v; want %v", tt.mixins, got, err, tt.want)
+			}
+		})
 	}
 }
 

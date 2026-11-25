@@ -2,7 +2,8 @@ name: "Sample app"
 
 # Runs sample-apps and checks their expected metrics arrived. Pull requests here
 # call it for the apps they change, and other repositories can call it to test
-# an integration's change against its sample-app, passing their own metric lists.
+# an integration's change against its sample-app, passing their own metric lists
+# or mixins.
 
 permissions: {}
 
@@ -10,8 +11,16 @@ on:
   workflow_call:
     inputs:
       apps:
-        description: Sample-apps to run, as a JSON array such as ["mysql"]
-        required: true
+        description: Sample-apps to run, as a JSON array such as ["mysql"]. Give this or mixins.
+        default: ""
+        type: string
+      mixins:
+        description: Comma-separated grafana/jsonnet-libs mixins, to run the apps whose tests/dashboards names them
+        default: ""
+        type: string
+      jsonnet-libs-ref:
+        description: The grafana/jsonnet-libs branch, tag or commit to capture every mixin's dashboards at
+        default: ""
         type: string
       repository:
         description: The repository to take the sample-apps from
@@ -36,8 +45,16 @@ on:
   workflow_dispatch:
     inputs:
       apps:
-        description: Sample-apps to run, as a JSON array such as ["mysql"]
-        required: true
+        description: Sample-apps to run, as a JSON array such as ["mysql"]. Give this or mixins.
+        default: ""
+        type: string
+      mixins:
+        description: Comma-separated grafana/jsonnet-libs mixins, to run the apps whose tests/dashboards names them
+        default: ""
+        type: string
+      jsonnet-libs-ref:
+        description: The grafana/jsonnet-libs branch, tag or commit to capture every mixin's dashboards at
+        default: ""
         type: string
       ref:
         description: The branch, tag or commit to take the sample-apps from (default the one this runs on)
@@ -49,15 +66,43 @@ on:
         type: string
 
 jobs:
+  apps:
+    name: Find sample-apps
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.mixin-apps.outputs.apps || inputs.apps }}
+    steps:
+      - name: Checkout
+        if: inputs.mixins != ''
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.ref || ((inputs.repository || github.repository) == github.repository && github.sha) || 'main' }}
+          persist-credentials: false
+
+      - name: Setup Go
+        if: inputs.mixins != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Find the sample-apps of the mixins
+        id: mixin-apps
+        if: inputs.mixins != ''
+        env:
+          MIXINS: ${{ inputs.mixins }}
+        run: go run ./ops/cmd/sampletool ci mixin-apps "${MIXINS}" >> "$GITHUB_OUTPUT"
+
   test:
     name: ${{ matrix.sample-app }}
+    needs: [apps]
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 30
     # An empty matrix fails the workflow
-    if: inputs.apps != '[]' && inputs.apps != ''
+    if: needs.apps.outputs.apps != '[]' && needs.apps.outputs.apps != ''
     strategy:
       matrix:
-        sample-app: ${{ fromJSON(inputs.apps) }}
+        sample-app: ${{ fromJSON(needs.apps.outputs.apps) }}
       fail-fast: false
       max-parallel: 10
     steps:
@@ -166,9 +211,10 @@ jobs:
         continue-on-error: true
         env:
           SAMPLE_APP: ${{ matrix.sample-app }}
+          JSONNET_LIBS_REF: ${{ inputs.jsonnet-libs-ref }}
           # Read-only, for listing mixin dashboards in grafana/jsonnet-libs
           GITHUB_TOKEN: ${{ github.token }}
-        run: sampletool apps screenshot --apps "${SAMPLE_APP}"
+        run: sampletool apps screenshot --apps "${SAMPLE_APP}" ${JSONNET_LIBS_REF:+--jsonnet-libs-ref "${JSONNET_LIBS_REF}"}
 
       - name: Upload dashboard screenshots
         if: ${{ !cancelled() }}

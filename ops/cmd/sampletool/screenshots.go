@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -21,17 +22,47 @@ import (
 // grafanaComposeUp starts Grafana and its image renderer in the databases VM.
 const grafanaComposeUp = "docker-compose -f docker-compose.grafana.yaml up -d"
 
+// A ref names a screenshots directory, so it can't start with a dot.
+const gitRef = `[A-Za-z0-9][A-Za-z0-9._/-]*`
+
 // mixinLine matches jsonnet-libs/<mixin>, optionally followed by @<ref>.
-var mixinLine = regexp.MustCompile(`^jsonnet-libs/([A-Za-z0-9][A-Za-z0-9._-]*)(?:@([A-Za-z0-9][A-Za-z0-9._/-]*))?$`)
+var mixinLine = regexp.MustCompile(`^jsonnet-libs/([A-Za-z0-9][A-Za-z0-9._-]*)(?:@(` + gitRef + `))?$`)
+
+var validRef = regexp.MustCompile(`^` + gitRef + `$`)
 
 // dashboard is a dashboard to capture. One listed from a mixin keeps the
 // mixin's name and ref, so its image can be grouped under them.
 type dashboard struct{ url, mixin, ref string }
 
+// mixinApps returns the apps whose tests/dashboards names any of the mixins,
+// leaving out apps CI can't test.
+func mixinApps(apps []app, mixins []string) ([]string, error) {
+	var matched []string
+	for _, a := range apps {
+		data, err := os.ReadFile(filepath.Join(a.dir, "tests", "dashboards"))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		names := slices.ContainsFunc(strings.Split(string(data), "\n"), func(line string) bool {
+			m := mixinLine.FindStringSubmatch(strings.TrimSpace(line))
+			return m != nil && slices.Contains(mixins, m[1])
+		})
+		// An app with neither expected metrics nor .CI_BYPASS fails 'apps lint' instead.
+		if run, err := ciCheck(a); names && err == nil && run {
+			matched = append(matched, a.name)
+		}
+	}
+	return matched, nil
+}
+
 // dashboards reads the app's optional tests/dashboards file. Each line is
 // either the https URL of a dashboard JSON file, or jsonnet-libs/<mixin>[@ref]
-// for every dashboard in that mixin's dashboards_out, at master by default.
-func (a app) dashboards(ctx context.Context) ([]dashboard, error) {
+// for every dashboard in that mixin's dashboards_out. Mixins are captured at
+// ref when it's set, else at the line's @ref, else at master.
+func (a app) dashboards(ctx context.Context, ref string) ([]dashboard, error) {
 	file := filepath.Join(a.dir, "tests", "dashboards")
 	data, err := os.ReadFile(file)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -44,7 +75,7 @@ func (a app) dashboards(ctx context.Context) ([]dashboard, error) {
 			continue
 		}
 		if m := mixinLine.FindStringSubmatch(line); m != nil {
-			fromMixin, err := mixinDashboards(ctx, m[1], cmp.Or(m[2], "master"))
+			fromMixin, err := mixinDashboards(ctx, m[1], cmp.Or(ref, m[2], "master"))
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", file, err)
 			}
@@ -101,11 +132,14 @@ func mixinDashboards(ctx context.Context, mixin, ref string) ([]dashboard, error
 
 // appsScreenshot saves an image of every dashboard the apps list to
 // <root>/screenshots/<app>/. Apps that list none are skipped.
-func appsScreenshot(ctx context.Context, root string, apps []app, dbsName string) error {
+func appsScreenshot(ctx context.Context, root string, apps []app, dbsName, ref string) error {
+	if ref != "" && !validRef.MatchString(ref) {
+		return fmt.Errorf("--jsonnet-libs-ref %q isn't a branch, tag or commit", ref)
+	}
 	var errs []error
 	grafana := ""
 	for _, a := range apps {
-		listed, err := a.dashboards(ctx)
+		listed, err := a.dashboards(ctx, ref)
 		if err != nil {
 			return err
 		}

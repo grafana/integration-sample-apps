@@ -91,6 +91,8 @@ jobs:
 ```
 
 - `apps` is a JSON array of sample-app names. Apps that CI can't run, with a `.CI_BYPASS` file, pass without running.
+- `mixins` runs the apps whose `tests/dashboards` names any of these comma-separated mixins, such as `mysql-mixin,kafka-mixin`. Use it instead of `apps`.
+- `jsonnet-libs-ref` takes every mixin's dashboards from that jsonnet-libs branch, tag or commit, such as a pull request's head.
 - `ref` picks the branch, tag or commit of this repository to run the sample-apps from, by default `main`. Point it at a pull request's head commit to test a change.
 - `metrics-artifact` names an artifact of the calling run, holding `<app>` or `<app>/<scenario>` files. They replace the apps' own `tests/metrics` files, as `sampletool apps test --metrics` does, while the scenario's config still applies.
 - `runner` must support nested virtualization, by default `ubuntu-latest-8-cores`.
