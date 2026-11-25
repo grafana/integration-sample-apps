@@ -53,11 +53,11 @@ func findRepoRoot() (repoRoot, error) {
 }
 
 type dbsFlag struct {
-	DBs string `name:"dbs" default:"dbs" help:"Name of the databases VM."`
+	DBs string `name:"dbs" default:"${dbsName}" help:"Name of the databases VM."`
 }
 
 type envFlag struct {
-	Env string `default:"local" enum:"local,k3d" help:"Where the databases run: local (the dbs VM) or k3d."`
+	Env string `default:"${env}" enum:"local,k3d" help:"Where the databases run: local (the dbs VM) or k3d."`
 }
 
 type appsFlag struct {
@@ -159,6 +159,7 @@ func options(ctx context.Context) []kong.Option {
 		kong.Name("sampletool"),
 		kong.Description("Control plane for integration sample apps."),
 		kong.UsageOnError(),
+		kong.Vars{"dbsName": defaultDBsName, "env": defaultEnv},
 		kong.BindTo(ctx, (*context.Context)(nil)),
 		kong.BindToProvider(findRepoRoot),
 	}

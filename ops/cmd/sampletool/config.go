@@ -14,6 +14,12 @@ const (
 	k3sCloudInit  = "ops/qa/k3s-main-cloud-init.yaml"
 )
 
+// Flag defaults.
+const (
+	defaultDBsName = "dbs"
+	defaultEnv     = "local"
+)
+
 // DBs. The ports must match ops/qa/dbs/docker-compose.yaml.
 const (
 	mimirPort    = "9009"
@@ -45,10 +51,16 @@ const (
 	dockerCloudInit  = "https://raw.githubusercontent.com/canonical/multipass/refs/heads/main/data/cloud-init-yaml/cloud-init-docker.yaml"
 	k3sInstallScript = "https://get.k3s.io"
 
+	// k3s's defaults
+	k3sAPIPort   = "6443"
+	k3sTokenFile = "/var/lib/rancher/k3s/server/node-token"
+
 	// The DBs VM's size.
 	dbsCPUs   = "2"
 	dbsMemory = "4G"
 	dbsDisk   = "40G"
+	// Where dbsFilesDir is copied to on the DBs VM, and where docker-compose runs.
+	dbsHome = "/home/ubuntu"
 )
 
 // k3s VM sizes (in cores and gigabytes) unless hardwareFile overrides them.

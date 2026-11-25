@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,7 +80,7 @@ func dbsUp(ctx context.Context, root, name string, grafana bool) error {
 	}
 	steps := [][]string{
 		{"launch", ubuntuRelease, "--name", name, "--cpus", dbsCPUs, "--memory", dbsMemory, "--disk", dbsDisk, "--cloud-init", dockerCloudInit},
-		append(append([]string{"transfer", "--recursive"}, files...), name+":/home/ubuntu"),
+		append(append([]string{"transfer", "--recursive"}, files...), name+":"+dbsHome),
 		{"exec", name, "--", "bash", "-c", "docker-compose -f " + dbsCompose + " up -d"},
 	}
 	if grafana {
@@ -130,7 +131,7 @@ func k3sUp(ctx context.Context, root, name string, cluster bool) error {
 	if err := launch(main, "PRIMARY", "--cloud-init", filepath.Join(root, k3sCloudInit)); err != nil || !cluster {
 		return err
 	}
-	token, err := multipassOutput(ctx, "exec", main, "--", "sudo", "cat", "/var/lib/rancher/k3s/server/node-token")
+	token, err := multipassOutput(ctx, "exec", main, "--", "sudo", "cat", k3sTokenFile)
 	if err != nil {
 		return err
 	}
@@ -138,7 +139,7 @@ func k3sUp(ctx context.Context, root, name string, cluster bool) error {
 	if err != nil {
 		return err
 	}
-	join := fmt.Sprintf(`curl -sfL %s | K3S_URL="https://%s:6443" K3S_TOKEN="%s" sh -`, k3sInstallScript, ip, token)
+	join := fmt.Sprintf(`curl -sfL %s | K3S_URL="https://%s" K3S_TOKEN="%s" sh -`, k3sInstallScript, net.JoinHostPort(ip, k3sAPIPort), token)
 	for _, worker := range k3sWorkers(name) {
 		if err := launch(worker, "WORKER"); err != nil {
 			return err
