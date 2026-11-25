@@ -1,4 +1,4 @@
-# A frozen copy of debnon/agent-docs' AGENTS.md and settings with the command
+# A frozen copy of agent-docs' AGENTS.md and settings with the command
 # phrasing notes (no git after cd, edit files directly, run from the root).
 description: AGENTS.md with the command phrasing notes; settings without Bash(cd *)
 model: claude-sonnet-5-5

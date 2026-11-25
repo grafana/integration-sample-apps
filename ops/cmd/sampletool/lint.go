@@ -194,28 +194,33 @@ func lintTestCase(a app, metricsFile string) []finding {
 		}
 	}
 
-	data, err := os.ReadFile(metricsFile)
+	metrics, err := readMetricList(metricsFile)
 	if err != nil {
 		add("error", "reading tests/metrics/%s: %v", scenario, err)
 		return findings
 	}
-	metrics := strings.Fields(string(data))
-	if len(metrics) == 0 {
-		add("error", "tests/metrics/%s lists no metrics", scenario)
-	}
-	var invalid, duplicates []string
+	var invalid, duplicates, rules []string
 	seen := map[string]bool{}
 	for _, m := range metrics {
 		if !metricName.MatchString(m) {
 			invalid = append(invalid, m)
+		}
+		if isRuleOutput(m) {
+			rules = append(rules, m)
 		}
 		if seen[m] && !slices.Contains(duplicates, m) {
 			duplicates = append(duplicates, m)
 		}
 		seen[m] = true
 	}
+	if len(metrics) == len(rules) {
+		add("error", "tests/metrics/%s lists no metrics, other than recording rule outputs", scenario)
+	}
 	if len(invalid) > 0 {
 		add("error", "tests/metrics/%s lists names that aren't metric names: %s", scenario, firstFew(invalid))
+	}
+	if len(rules) > 0 && len(rules) < len(metrics) {
+		add("warning", "tests/metrics/%s lists recording rule outputs, which 'apps test' skips: %s", scenario, firstFew(rules))
 	}
 	if len(duplicates) > 0 {
 		add("warning", "tests/metrics/%s lists metrics more than once, which counts them twice towards the success rate: %s", scenario, firstFew(duplicates))

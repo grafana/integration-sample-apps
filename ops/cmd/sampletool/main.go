@@ -4,6 +4,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -39,6 +40,10 @@ Usage: sampletool <group> <command> [flags] [name]
   k3s down     Delete that environment
 
   ci check     Print run=true or run=false: whether CI can test the sample app <name>
+  ci mixin-apps
+               Print apps=<JSON array>: the apps CI can test whose
+               tests/dashboards names any of the comma-separated jsonnet-libs
+               mixins <name>
 
 Flags:
 `
@@ -59,8 +64,10 @@ func run(ctx context.Context, args []string) error {
 	env := flags.String("env", "local", "where the databases run: local (the dbs VM) or k3d")
 	dbs := flags.String("dbs", "dbs", "name of the databases VM")
 	prometheus := flags.String("prometheus", "", "Mimir host:port for 'apps test', instead of the one --env implies")
+	metrics := flags.String("metrics", "", "for 'apps test': a directory of expected-metric lists, <app> or <app>/<scenario>, replacing the apps' own")
 	cluster := flags.Bool("cluster", false, "for k3s: also manage two worker nodes")
 	asJSON := flags.Bool("json", false, "for 'apps lint': print the findings as JSON")
+	jsonnetLibsRef := flags.String("jsonnet-libs-ref", "", "for 'apps screenshot': a jsonnet-libs branch, tag or commit to capture every mixin at, replacing the apps' own")
 	flags.Usage = func() {
 		fmt.Fprint(flags.Output(), usage)
 		flags.PrintDefaults()
@@ -89,7 +96,9 @@ func run(ctx context.Context, args []string) error {
 	}
 	root := strings.TrimSpace(string(out))
 	var selected []app
-	if args[0] == "ci" {
+	if args[0] == "ci" && args[1] == "mixin-apps" {
+		selected, err = allApps(root)
+	} else if args[0] == "ci" {
 		selected, err = sampleApps(root, flags.Arg(0))
 	} else if args[0] == "apps" && args[1] == "lint" && *apps == "" {
 		selected, err = allApps(root)
@@ -110,9 +119,19 @@ func run(ctx context.Context, args []string) error {
 	case "apps wait":
 		return appsWait(ctx)
 	case "apps test":
-		return appsTest(ctx, selected, *env, *dbs, *prometheus)
+		// On GitHub Actions, a table of the results also goes to the job's summary.
+		summary := io.Discard
+		if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			summary = f
+		}
+		return appsTest(ctx, selected, *env, *dbs, *prometheus, *metrics, summary)
 	case "apps screenshot":
-		return appsScreenshot(ctx, root, selected, *dbs)
+		return appsScreenshot(ctx, root, selected, *dbs, *jsonnetLibsRef)
 	case "apps down":
 		return appsDown(ctx, selected)
 	case "apps lint":
@@ -125,6 +144,21 @@ func run(ctx context.Context, args []string) error {
 		run, err := ciCheck(selected[0])
 		fmt.Printf("run=%t\n", run)
 		return err
+	case "ci mixin-apps":
+		names, err := mixinApps(selected, strings.Split(flags.Arg(0), ","))
+		if err != nil {
+			return err
+		}
+		// Workflows skip on [], and null would fail their matrix.
+		if names == nil {
+			names = []string{}
+		}
+		data, err := json.Marshal(names)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("apps=%s\n", data)
+		return nil
 	default:
 		return fmt.Errorf("unknown command %q; run 'sampletool' for usage", command)
 	}

@@ -23,6 +23,7 @@ The CI workflow expects a few things from a CI enabled sample app. For a working
     metric_name_1
     metric_name_2
     ```
+    A `#` starts a comment. Recording rule outputs, named `level:metric:operations` such as `instance:mysql_heartbeat_lag_seconds`, are skipped, since the databases in CI run no recording rules. If a sample-app has several scenarios, name the one that checks the integration's own metric list `integration`: a caller replacing the app's list with `--metrics` replaces that one.
 
     2. Add a matching config file to the `tests/configs/` directory, reusing the same name as the metrics file, but with the `.config` filetype
     - Set the `JOB_LABEL` variable to match the integration's job label
@@ -65,3 +66,35 @@ The comment is only posted for pull requests from branches of this repository. F
 In some cases, such as sample-apps relying on cloud providers, externally hosted services, or other such edge-cases it may be impossible to automatically spin up and test them with Github Actions.
 
 Should this be the case, you **must add** a blank `.CI_BYPASS` file to your sample-apps directory. If this file is not present, the Github Actions workflow will run and fail your changes.
+# Running sample-apps from another repository
+`.github/workflows/sample-app.yml` runs sample-apps and checks their metrics, as pull requests here do. Another repository can call it to test its own version of an integration's metric list against the integration's sample-app. The run, and its logs, belong to the calling repository.
+
+```yaml
+jobs:
+  metric-lists:
+    runs-on: ubuntu-latest
+    steps:
+      # One file per sample-app, named after it, in the same format as tests/metrics
+      - run: mkdir -p lists && cp path/to/mysql/metric-list lists/mysql
+      - uses: actions/upload-artifact@<sha> # pin a version
+        with:
+          name: expected-metrics
+          path: lists/
+
+  sample-apps:
+    needs: [metric-lists]
+    permissions: {}
+    uses: grafana/integration-sample-apps/.github/workflows/sample-app.yml@<sha>
+    with:
+      apps: '["mysql"]'
+      metrics-artifact: expected-metrics
+```
+
+- `apps` is a JSON array of sample-app names. Apps that CI can't run, with a `.CI_BYPASS` file, pass without running.
+- `mixins` runs the apps whose `tests/dashboards` names any of these comma-separated mixins, such as `mysql-mixin,kafka-mixin`. Use it instead of `apps`.
+- `jsonnet-libs-ref` takes every mixin's dashboards from that jsonnet-libs branch, tag or commit, such as a pull request's head.
+- `ref` picks the branch, tag or commit of this repository to run the sample-apps from, by default `main`. Point it at a pull request's head commit to test a change.
+- `metrics-artifact` names an artifact of the calling run, holding `<app>` or `<app>/<scenario>` files. They replace the apps' own `tests/metrics` files, as `sampletool apps test --metrics` does, while the scenario's config still applies.
+- `runner` must support nested virtualization, by default `ubuntu-latest-8-cores`.
+
+Each app's job summary has a table of its scenarios: pass or fail, how many expected metrics were present, and which were missing. They show on the calling run's summary page. Screenshots are uploaded as `screenshots-<app>` artifacts of the calling run, with the table as `<app>/summary.md` for the caller to comment.

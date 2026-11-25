@@ -50,7 +50,9 @@ When adding an app, copy the closest existing one rather than starting from scra
 ### Tests
 
 - `tests/metrics/<scenario>`: expected metric names, separated by whitespace, usually one per line.
-  A name listed twice counts twice towards the success rate.
+  `#` starts a comment. A name listed twice counts twice towards the success rate. Recording rule
+  outputs (`level:metric:operations`, such as `instance:mysql_heartbeat_lag_seconds`) are skipped,
+  because the databases run no rules.
 - `tests/configs/<scenario>.config`, in `.env` syntax: `JOB_LABEL` is required, and used as a regex
   (`job=~"..."`). Optional: `INSTANCE_FILTER` (space-separated instance regexes, each checked
   separately) and `METRICS_SUCCESS_RATE_REQUIRED` (default `0.8`). `sampletool` reads no other key.
@@ -60,6 +62,12 @@ When adding an app, copy the closest existing one rather than starting from scra
 The metrics list should hold what the integration's dashboards and alerts use, not every metric the
 exporter emits. A rate below `1.0` allows for listed metrics the load doesn't produce. When the list
 changes, check the rate still fits it.
+
+`sampletool apps test --metrics <dir>` replaces the lists with ones from `<dir>`: `<dir>/<app>/<scenario>`,
+or `<dir>/<app>` for an app's only scenario, or for its `integration` scenario when it has several. The
+scenario's config still applies. Other repositories use this to test their own version of an
+integration's list: `.github/workflows/sample-app.yml` takes the apps, a ref and an artifact of lists,
+and pull requests here call it for the apps they change.
 
 ## The development loop
 
@@ -85,7 +93,9 @@ Without someone to approve permission prompts, these commands are denied, so phr
    `ENV=k3d` points it at the local k3d stack (`mimir.k3d.localhost:9999`) instead, and adds the k3d
    hostnames to `/etc/hosts` on every VM the app launched.
 3. **Wait:** 3 minutes, as CI does (`go run ./ops/cmd/sampletool apps wait`).
-4. **Test:** `make test-apps APPS=mysql` prints a pass or fail per metric and per scenario.
+4. **Test:** `make test-apps APPS=mysql` prints a pass or fail per metric and per scenario. With
+   `GITHUB_STEP_SUMMARY` set, as on GitHub Actions, it also appends a Markdown table of each
+   scenario's result and missing metrics to that file.
 5. **Screenshots:** `make screenshot-apps APPS=mysql` saves each dashboard in `tests/dashboards` to
    `screenshots/mysql/`. Set `GITHUB_TOKEN` if you list mixins often: without one, GitHub allows 60
    API requests an hour.
