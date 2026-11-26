@@ -212,8 +212,6 @@ write_files:
 
 runcmd:
   - mkdir -p /var/lib/alloy/data
-  - mkdir -p /home/ubuntu/models/half_plus_two/1/assets
-  - mkdir -p /home/ubuntu/models/half_plus_two/1/config
   
   # Create keyring directory
   - mkdir -p /etc/apt/keyrings/

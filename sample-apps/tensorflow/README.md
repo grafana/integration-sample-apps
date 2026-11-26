@@ -4,7 +4,7 @@ This sample application creates an Ubuntu VM running a docker container with [Te
 
 This sample app also ships with a simple `loadgen.sh` script to generate server metrics which are the metrics prefixed with: `:tensorflow:serving:` if you are not receiving these metrics that is likely the issue.
 
-> Note: This application utilizes a pre-built docker image which includes a pre-built sample model for Tensorflow Serving to expose.
+> Note: This application runs the official `tensorflow/serving` image with TensorFlow Serving's `half_plus_two` test model, which `init.sh` downloads from the matching release.
 
 ## Prerequisites
 
