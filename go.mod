@@ -1,6 +1,6 @@
 module github.com/grafana/integration-sample-apps
 
-go 1.26.0
+go 1.27.4
 
 require (
 	github.com/alecthomas/kong v1.17.0
