@@ -9,12 +9,12 @@ This repository contains various components used to test and validate [Grafana C
 |-----------------------|-------------------|
 |[`charts/`](charts/) | A set of helm charts used to spin up temporary sample-apps for systems under observation on Kubernetes. |
 |[`sample-apps/`](sample-apps/) | A collection of stand-alone sample-apps, primarily using [Multipass](https://multipass.run/) orchestration to configure and setup a temporary application, along with requisite load-testing to generate metrics. |
-|[`ops/`](ops/) | Contains the scripts and configuration files required for CI workflows. |
+|[`ops/`](ops/) | Contains `sampletool`, the Go control plane behind the CI workflows and the `make` targets below, along with the files it deploys: the Docker Compose setup for Mimir, Loki and Grafana, and the k3s cloud-init. |
 
 
 ## Local setup instructions
 Sample apps can be run locally, as well as on Github with Github Actions.
-Currently, only Unix based systems are supported, and all scripts expect a bash shell.
+Currently, only Unix based systems are supported, and the sample-app Makefiles expect a bash shell.
 
 ### Prerequisites
 
@@ -23,6 +23,9 @@ Before you begin, ensure you have the following installed:
 - [Multipass](https://multipass.run/)
 - Docker (for rendering cloud-init files using Jinja)
 - Git (for cloning the repository)
+- [Go](https://go.dev/dl/), at least the version in [`go.mod`](go.mod) (the `make` targets build and run `sampletool` with `go run`)
+
+Every `make` target below is a thin wrapper around `sampletool`. Run `make help` to see all of its commands, or call it directly with `go run ./ops/cmd/sampletool <group> <command> -h`.
 
 #### macOS Local Network Permissions
 
@@ -37,7 +40,7 @@ make setup-dbs
 
 This will setup Grafana, Mimir, and Loki using Docker Compose in a single Multipass VM, and handle relevant port-forwarding. The `dbs` parameter is the name of the deployment, and can be changed should you want to run multiple setups in isolation.
 
-The databases mirror Grafana Cloud stack defaults where it affects what sample apps produce. The data sources are named `grafanacloud-local-prom` (the default, with a 60s scrape interval) and `grafanacloud-local-logs`. Mimir applies Grafana Cloud's non-autoscaled limits, and translates OTLP metrics with unit and type suffixes and the default promoted resource attributes. Grafana only runs for `ENV=local`. 
+The databases mirror Grafana Cloud stack defaults where it affects what sample apps produce. The data sources are named `grafanacloud-local-prom` (the default, with a 60s scrape interval) and `grafanacloud-local-logs`. Mimir applies Grafana Cloud's non-autoscaled limits, and translates OTLP metrics with unit and type suffixes and the default promoted resource attributes. `make setup-dbs` also starts Grafana, which CI leaves out.
 
 These settings come from `ops/qa/dbs` and apply to `make setup-dbs` and CI only.
 `ENV=k3d` targets a separately configured environment with Mimir, Loki, etc.
