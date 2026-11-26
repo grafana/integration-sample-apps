@@ -38,6 +38,29 @@ The CI workflow expects a few things from a CI enabled sample app. For a working
         ```
     1. `make run-ci` must be a valid make option, making use of the variables defined in 2., such that a clean cloud-init or similar configuration is generated and applied, load-testing is run, and so forth depending on sample-app requirements
 
+# Adding dashboard screenshots
+A sample-app can list the dashboards of its integration. CI then renders them against the data the sample-app produced and posts the images as a comment on the pull request, so reviewers can see that the dashboards are populated.
+
+Add a `tests/dashboards` file that names the integration's mixin in [grafana/jsonnet-libs](https://github.com/grafana/jsonnet-libs). Every dashboard in the mixin's `dashboards_out` directory on `master` is captured, so dashboards added to the mixin later are picked up without changes here:
+```
+jsonnet-libs/docker-mixin
+```
+
+To capture the dashboards of a jsonnet-libs branch, tag or commit instead, for example while a mixin change is still in review, add `@<ref>`:
+```
+jsonnet-libs/docker-mixin@my-mixin-branch
+```
+
+Dashboards from elsewhere can be listed as one `https://` URL of a dashboard `.json` file per line. Lines starting with `#` are comments.
+
+The comment groups mixin dashboards by their jsonnet-libs ref and then by mixin, with the dashboards listed by URL under each sample-app.
+
+Screenshots cover the 5 minutes before they are taken. Dashboards exported for sharing, which carry `__inputs` datasource placeholders, are skipped.
+
+Listing a mixin uses the GitHub API, which allows 60 requests an hour without a token. Set `GITHUB_TOKEN` to raise the limit; CI does this.
+
+The comment is only posted for pull requests from branches of this repository. For pull requests from forks, the images are attached to the workflow run as the `screenshots-<sample-app>` artifact instead.
+
 # Excluding your sample-app from CI runs
 In some cases, such as sample-apps relying on cloud providers, externally hosted services, or other such edge-cases it may be impossible to automatically spin up and test them with Github Actions.
 

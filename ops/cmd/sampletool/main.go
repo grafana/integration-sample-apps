@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
 )
@@ -24,10 +25,11 @@ type cli struct {
 	} `cmd:"" name:"dbs" help:"The databases that sample apps send to."`
 
 	Apps struct {
-		Up   appsUpCmd   `cmd:"" help:"Launch the --apps with 'make run-ci'."`
-		Wait appsWaitCmd `cmd:"" help:"Sleep until sample apps have had time to produce metrics."`
-		Test appsTestCmd `cmd:"" help:"Check the expected metrics of the --apps arrived in Mimir."`
-		Down appsDownCmd `cmd:"" help:"Tear the --apps down with 'make stop'."`
+		Up         appsUpCmd         `cmd:"" help:"Launch the --apps with 'make run-ci'."`
+		Wait       appsWaitCmd       `cmd:"" help:"Sleep until sample apps have had time to produce metrics."`
+		Test       appsTestCmd       `cmd:"" help:"Check the expected metrics of the --apps arrived in Mimir."`
+		Screenshot appsScreenshotCmd `cmd:"" help:"Save an image of each dashboard listed in the --apps' tests/dashboards to screenshots/<app>/."`
+		Down       appsDownCmd       `cmd:"" help:"Tear the --apps down with 'make stop'."`
 	} `cmd:"" help:"Sample apps."`
 
 	K3s struct {
@@ -36,7 +38,8 @@ type cli struct {
 	} `cmd:"" name:"k3s" help:"k3s VMs, for sample apps that run on Kubernetes."`
 
 	CI struct {
-		Check ciCheckCmd `cmd:"" help:"Print run=true or run=false: whether CI can test the sample app <name>."`
+		Check             ciCheckCmd             `cmd:"" help:"Print run=true or run=false: whether CI can test the sample app <name>."`
+		ScreenshotComment ciScreenshotCommentCmd `cmd:"" help:"Print the pull-request comment for the dashboard screenshots in <dir>."`
 	} `cmd:"" name:"ci" help:"Steps of the CI workflows."`
 }
 
@@ -114,6 +117,15 @@ func (c *appsTestCmd) Run(ctx context.Context) error {
 	return appsTest(ctx, c.apps, c.Env, c.DBs, c.Prometheus)
 }
 
+type appsScreenshotCmd struct {
+	appsFlag `embed:""`
+	dbsFlag  `embed:""`
+}
+
+func (c *appsScreenshotCmd) Run(ctx context.Context, root repoRoot) error {
+	return appsScreenshot(ctx, string(root), c.apps, c.DBs)
+}
+
 type appsDownCmd struct {
 	appsFlag `embed:""`
 }
@@ -181,7 +193,8 @@ var httpClient = func() *http.Client {
 		}
 		return new(net.Dialer).DialContext(ctx, network, addr)
 	}
-	return &http.Client{Transport: transport}
+	// Rendering a large dashboard can take minutes.
+	return &http.Client{Timeout: 5 * time.Minute, Transport: transport}
 }()
 
 // request returns the body of a successful HTTP response. A body is sent as JSON.
@@ -193,6 +206,11 @@ func request(ctx context.Context, method, url string, body []byte) ([]byte, erro
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	return do(req)
+}
+
+// do returns the body of a successful HTTP response to req.
+func do(req *http.Request) ([]byte, error) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
