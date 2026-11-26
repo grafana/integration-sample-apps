@@ -19,7 +19,7 @@ import (
 )
 
 // grafanaComposeUp starts Grafana and its image renderer in the databases VM.
-const grafanaComposeUp = "docker-compose -f docker-compose.grafana.yaml up -d"
+const grafanaComposeUp = "docker-compose -f " + grafanaCompose + " up -d"
 
 // mixinLine matches jsonnet-libs/<mixin>, optionally followed by @<ref>.
 var mixinLine = regexp.MustCompile(`^jsonnet-libs/([A-Za-z0-9][A-Za-z0-9._-]*)(?:@([A-Za-z0-9][A-Za-z0-9._/-]*))?$`)

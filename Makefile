@@ -10,11 +10,11 @@ ENV ?= "local"
 .PHONY: help setup-dbs stop-dbs setup-apps test-apps screenshot-apps stop-apps stop-all
 
 help:
-	@$(SAMPLETOOL) help
+	@$(SAMPLETOOL) --help
 
 # DBs
 setup-dbs:
-	@$(SAMPLETOOL) dbs up --dbs $(DBS_NAME) --env $(ENV)
+	@$(SAMPLETOOL) dbs up --dbs $(DBS_NAME) --grafana
 
 stop-dbs:
 	@$(SAMPLETOOL) dbs down --dbs $(DBS_NAME)

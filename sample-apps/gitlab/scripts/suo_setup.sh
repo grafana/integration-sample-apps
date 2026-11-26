@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Re-set the KUBECONFIG since multipass exec does not load .profile or .bashrc correctly
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
@@ -12,7 +13,7 @@ helm repo update
 kubectl create namespace gitlab || true
 
 echo "Cleaning up any existing GitLab installation..."
-helm uninstall gitlab -n gitlab 2>/dev/null 
+helm uninstall gitlab -n gitlab 2>/dev/null || true
 
 # Setup Gitaly PVC
 kubectl delete -f /home/ubuntu/configs/gitaly-pvc.yaml 2>/dev/null || true
@@ -28,5 +29,8 @@ helm upgrade --install gitlab gitlab/gitlab \
     --values /home/ubuntu/configs/values.yaml \
     --version 9.1.2 \
     --timeout 20m
+
+echo "Waiting for the GitLab webservice"
+kubectl rollout status deployment/gitlab-webservice-default -n gitlab --timeout=15m
 
 kubectl apply -f /home/ubuntu/configs/load-generation.yaml

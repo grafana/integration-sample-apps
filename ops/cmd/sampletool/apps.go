@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -12,9 +13,6 @@ import (
 	"strings"
 	"time"
 )
-
-// setupTime is how long sample apps get to produce metrics before the test.
-const setupTime = 180 * time.Second
 
 // app is one directory below sample-apps/.
 type app struct{ name, dir string }
@@ -26,7 +24,7 @@ func sampleApps(root, list string) ([]app, error) {
 		if name == "" {
 			continue
 		}
-		dir := filepath.Join(root, "sample-apps", name)
+		dir := filepath.Join(root, sampleAppsDir, name)
 		// Names come from CI inputs, so keep them inside sample-apps/.
 		if name != filepath.Base(name) || name[0] == '.' || !exists(dir) {
 			return nil, fmt.Errorf("no sample-app named %q", name)
@@ -39,9 +37,17 @@ func sampleApps(root, list string) ([]app, error) {
 	return apps, nil
 }
 
-// metricsFiles lists the app's expected-metrics files, sorted by name.
+// metricsFiles lists the app's expected-metrics files, sorted by name. Hidden
+// files, such as macOS's .DS_Store, and directories are skipped.
 func (a app) metricsFiles() []string {
-	files, _ := filepath.Glob(filepath.Join(a.dir, "tests", "metrics", "*"))
+	dir := filepath.Join(a.dir, metricsDir)
+	entries, _ := os.ReadDir(dir)
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			files = append(files, filepath.Join(dir, entry.Name()))
+		}
+	}
 	return files
 }
 
@@ -50,9 +56,9 @@ func endpoints(ctx context.Context, env, dbsName string) (prometheus, loki strin
 	switch env {
 	case "local":
 		ip, err := multipassIP(ctx, dbsName)
-		return ip + ":9009", ip + ":3100", err
+		return net.JoinHostPort(ip, mimirPort), net.JoinHostPort(ip, lokiPort), err
 	case "k3d":
-		return "mimir.k3d.localhost:9999", "loki.k3d.localhost:9999", nil
+		return net.JoinHostPort(k3dMimirHost, k3dPort), net.JoinHostPort(k3dLokiHost, k3dPort), nil
 	default:
 		return "", "", fmt.Errorf("invalid environment %q (want local or k3d)", env)
 	}
@@ -108,7 +114,8 @@ func newVMs(before, after map[string]bool) []string {
 
 // k3dHostsScript replaces the VM's /etc/hosts entry for the k3d hostnames with
 // one for the address in $1.
-const k3dHostsScript = `sed -i '/[[:space:]]loki\.k3d\.localhost[[:space:]]/d' /etc/hosts && echo "$1 loki.k3d.localhost mimir.k3d.localhost" >> /etc/hosts`
+var k3dHostsScript = fmt.Sprintf(`sed -i '/[[:space:]]%s[[:space:]]/d' /etc/hosts && echo "$1 %s %s" >> /etc/hosts`,
+	regexp.QuoteMeta(k3dLokiHost), k3dLokiHost, k3dMimirHost)
 
 // configureK3dDNS points loki.k3d.localhost and mimir.k3d.localhost at the VM's
 // DNS server, which is the host that runs k3d.
@@ -161,7 +168,7 @@ func appsDown(ctx context.Context, apps []app) error {
 // ciCheck reports whether CI should launch and test the app. It fails for an
 // app that has neither expected metrics nor a .CI_BYPASS file.
 func ciCheck(a app) (bool, error) {
-	bypass := exists(filepath.Join(a.dir, ".CI_BYPASS"))
+	bypass := exists(filepath.Join(a.dir, ciBypassFile))
 	testable := len(a.metricsFiles()) > 0
 	if !testable && !bypass {
 		return false, fmt.Errorf("[FAIL] The %s sample-app is not CI compatible and does not have a CI bypass file", a.name)

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -15,112 +14,174 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/alecthomas/kong"
 )
 
-const usage = `sampletool - control plane for integration sample apps
+type cli struct {
+	DBs struct {
+		Up   dbsUpCmd   `cmd:"" help:"Launch the VM running Mimir, Loki and, with --grafana, Grafana."`
+		Down dbsDownCmd `cmd:"" help:"Delete that VM."`
+	} `cmd:"" name:"dbs" help:"The databases that sample apps send to."`
 
-Usage: sampletool <group> <command> [flags] [name]
+	Apps struct {
+		Up         appsUpCmd         `cmd:"" help:"Launch the --apps with 'make run-ci'."`
+		Wait       appsWaitCmd       `cmd:"" help:"Sleep until sample apps have had time to produce metrics."`
+		Test       appsTestCmd       `cmd:"" help:"Check the expected metrics of the --apps arrived in Mimir."`
+		Screenshot appsScreenshotCmd `cmd:"" help:"Save an image of each dashboard listed in the --apps' tests/dashboards to screenshots/<app>/."`
+		Down       appsDownCmd       `cmd:"" help:"Tear the --apps down with 'make stop'."`
+	} `cmd:"" help:"Sample apps."`
 
-  dbs up       Launch the VM running Mimir, Loki and (for --env local) Grafana
-  dbs down     Delete that VM
+	K3s struct {
+		Up   k3sUpCmd   `cmd:"" help:"Launch <name>-k3s-main, plus two workers with --cluster. VM sizes come from .hardware_requirements in the working directory."`
+		Down k3sDownCmd `cmd:"" help:"Delete that environment."`
+	} `cmd:"" name:"k3s" help:"k3s VMs, for sample apps that run on Kubernetes."`
 
-  apps up      Launch the --apps with 'make run-ci'
-  apps wait    Sleep until sample apps have had time to produce metrics
-  apps test    Check the expected metrics of the --apps arrived in Mimir
-  apps screenshot
-               Save an image of each dashboard listed in the --apps'
-               tests/dashboards to screenshots/<app>/
-  apps down    Tear the --apps down with 'make stop'
+	CI struct {
+		Check ciCheckCmd `cmd:"" help:"Print run=true or run=false: whether CI can test the sample app <name>."`
+	} `cmd:"" name:"ci" help:"Steps of the CI workflows."`
+}
 
-  k3s up       Launch <name>-k3s-main, plus two workers with --cluster; VM sizes
-               come from .hardware_requirements in the working directory
-  k3s down     Delete that environment
+// repoRoot is the top of the integration-sample-apps checkout, found only for
+// the commands that use it.
+type repoRoot string
 
-  ci check     Print run=true or run=false: whether CI can test the sample app <name>
+func findRepoRoot() (repoRoot, error) {
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return "", errors.New("not inside a git checkout of integration-sample-apps")
+	}
+	return repoRoot(strings.TrimSpace(string(out))), nil
+}
 
-Flags:
-`
+type dbsFlag struct {
+	DBs string `name:"dbs" default:"${dbsName}" help:"Name of the databases VM."`
+}
+
+type envFlag struct {
+	Env string `default:"${env}" enum:"local,k3d" help:"Where the databases run: local (the dbs VM) or k3d."`
+}
+
+type appsFlag struct {
+	Apps string `required:"" help:"Comma-separated sample apps."`
+	apps []app
+}
+
+func (f *appsFlag) AfterApply(root repoRoot) (err error) {
+	f.apps, err = sampleApps(string(root), f.Apps)
+	return err
+}
+
+type dbsUpCmd struct {
+	dbsFlag `embed:""`
+	Grafana bool `help:"Also start Grafana, for local development."`
+}
+
+func (c *dbsUpCmd) Run(ctx context.Context, root repoRoot) error {
+	return dbsUp(ctx, string(root), c.DBs, c.Grafana)
+}
+
+type dbsDownCmd struct {
+	dbsFlag `embed:""`
+}
+
+func (c *dbsDownCmd) Run(ctx context.Context) error {
+	return dbsDown(ctx, c.DBs)
+}
+
+type appsUpCmd struct {
+	appsFlag `embed:""`
+	envFlag  `embed:""`
+	dbsFlag  `embed:""`
+}
+
+func (c *appsUpCmd) Run(ctx context.Context) error {
+	return appsUp(ctx, c.apps, c.Env, c.DBs)
+}
+
+type appsWaitCmd struct{}
+
+func (c *appsWaitCmd) Run(ctx context.Context) error {
+	return appsWait(ctx)
+}
+
+type appsTestCmd struct {
+	appsFlag   `embed:""`
+	envFlag    `embed:""`
+	dbsFlag    `embed:""`
+	Prometheus string `help:"Mimir host:port, instead of the one --env implies."`
+}
+
+func (c *appsTestCmd) Run(ctx context.Context) error {
+	return appsTest(ctx, c.apps, c.Env, c.DBs, c.Prometheus)
+}
+
+type appsScreenshotCmd struct {
+	appsFlag `embed:""`
+	dbsFlag  `embed:""`
+}
+
+func (c *appsScreenshotCmd) Run(ctx context.Context, root repoRoot) error {
+	return appsScreenshot(ctx, string(root), c.apps, c.DBs)
+}
+
+type appsDownCmd struct {
+	appsFlag `embed:""`
+}
+
+func (c *appsDownCmd) Run(ctx context.Context) error {
+	return appsDown(ctx, c.apps)
+}
+
+type k3sUpCmd struct {
+	Cluster bool   `help:"Also launch two worker nodes."`
+	Name    string `arg:"" help:"Prefix of the VM names."`
+}
+
+func (c *k3sUpCmd) Run(ctx context.Context, root repoRoot) error {
+	return k3sUp(ctx, string(root), c.Name, c.Cluster)
+}
+
+type k3sDownCmd struct {
+	Cluster bool   `help:"Also delete the two worker nodes."`
+	Name    string `arg:"" help:"Prefix of the VM names."`
+}
+
+func (c *k3sDownCmd) Run(ctx context.Context) error {
+	return k3sDown(ctx, c.Name, c.Cluster)
+}
+
+type ciCheckCmd struct {
+	Name string `arg:"" help:"The sample app."`
+}
+
+func (c *ciCheckCmd) Run(root repoRoot) error {
+	apps, err := sampleApps(string(root), c.Name)
+	if err != nil {
+		return err
+	}
+	run, err := ciCheck(apps[0])
+	fmt.Printf("run=%t\n", run)
+	return err
+}
+
+func options(ctx context.Context) []kong.Option {
+	return []kong.Option{
+		kong.Name("sampletool"),
+		kong.Description("Control plane for integration sample apps."),
+		kong.UsageOnError(),
+		kong.Vars{"dbsName": defaultDBsName, "env": defaultEnv},
+		kong.BindTo(ctx, (*context.Context)(nil)),
+		kong.BindToProvider(findRepoRoot),
+	}
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	if err := run(ctx, os.Args[1:]); err != nil && !errors.Is(err, flag.ErrHelp) {
-		fmt.Fprintln(os.Stderr, "sampletool:", err)
-		os.Exit(1)
-	}
-}
-
-func run(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("sampletool", flag.ContinueOnError)
-	apps := flags.String("apps", "", "comma-separated sample apps")
-	env := flags.String("env", "local", "where the databases run: local (the dbs VM) or k3d")
-	dbs := flags.String("dbs", "dbs", "name of the databases VM")
-	prometheus := flags.String("prometheus", "", "Mimir host:port for 'apps test', instead of the one --env implies")
-	cluster := flags.Bool("cluster", false, "for k3s: also manage two worker nodes")
-	flags.Usage = func() {
-		fmt.Fprint(flags.Output(), usage)
-		flags.PrintDefaults()
-	}
-
-	if len(args) < 2 {
-		flags.Usage()
-		return flag.ErrHelp
-	}
-	if err := flags.Parse(args[2:]); err != nil {
-		return err
-	}
-	names := 0
-	if args[0] == "k3s" || args[0] == "ci" {
-		names = 1
-	}
-	if names == 1 && flags.Arg(0) == "" {
-		return fmt.Errorf("%s %s needs a name; run 'sampletool' for usage", args[0], args[1])
-	}
-	if flags.NArg() > names {
-		return fmt.Errorf("unexpected argument %q (flags go before the name; run 'sampletool' for usage)", flags.Arg(names))
-	}
-	out, err := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		return errors.New("not inside a git checkout of integration-sample-apps")
-	}
-	root := strings.TrimSpace(string(out))
-	var selected []app
-	if args[0] == "ci" {
-		selected, err = sampleApps(root, flags.Arg(0))
-	} else if args[0] == "apps" && args[1] != "wait" {
-		selected, err = sampleApps(root, *apps)
-	}
-	if err != nil {
-		return err
-	}
-
-	switch command := args[0] + " " + args[1]; command {
-	case "dbs up":
-		return dbsUp(ctx, root, *dbs, *env == "local")
-	case "dbs down":
-		return dbsDown(ctx, *dbs)
-	case "apps up":
-		return appsUp(ctx, selected, *env, *dbs)
-	case "apps wait":
-		return appsWait(ctx)
-	case "apps test":
-		return appsTest(ctx, selected, *env, *dbs, *prometheus)
-	case "apps screenshot":
-		return appsScreenshot(ctx, root, selected, *dbs)
-	case "apps down":
-		return appsDown(ctx, selected)
-	case "k3s up":
-		return k3sUp(ctx, root, flags.Arg(0), *cluster)
-	case "k3s down":
-		return k3sDown(ctx, flags.Arg(0), *cluster)
-	case "ci check":
-		run, err := ciCheck(selected[0])
-		fmt.Printf("run=%t\n", run)
-		return err
-	default:
-		return fmt.Errorf("unknown command %q; run 'sampletool' for usage", command)
-	}
+	command := kong.Parse(&cli{}, options(ctx)...)
+	command.FatalIfErrorf(command.Run())
 }
 
 var httpClient = func() *http.Client {

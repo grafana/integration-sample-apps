@@ -57,6 +57,26 @@ func TestSampleAppsValidatesNames(t *testing.T) {
 	}
 }
 
+func TestMetricsFilesSkipsHiddenFiles(t *testing.T) {
+	root := newRepo(t, map[string]string{
+		"demo/tests/metrics/b":           "up\n",
+		"demo/tests/metrics/a":           "up\n",
+		"demo/tests/metrics/.DS_Store":   "\x00\x00",
+		"demo/tests/metrics/nested/file": "up\n",
+	})
+	apps, err := sampleApps(root, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, file := range apps[0].metricsFiles() {
+		names = append(names, filepath.Base(file))
+	}
+	if want := []string{"a", "b"}; !slices.Equal(names, want) {
+		t.Errorf("metricsFiles = %v, want %v", names, want)
+	}
+}
+
 func TestCICheck(t *testing.T) {
 	root := newRepo(t, map[string]string{
 		"tested/tests/metrics/main":              "up\n",
@@ -64,12 +84,14 @@ func TestCICheck(t *testing.T) {
 		"bypassed-with-tests/.CI_BYPASS":         "",
 		"bypassed-with-tests/tests/metrics/main": "up\n",
 		"broken/Makefile":                        "",
+		"hidden-only/tests/metrics/.DS_Store":    "",
 	})
 	tests := map[string]struct{ run, fails bool }{
 		"tested":              {run: true},
 		"bypassed":            {},
 		"bypassed-with-tests": {},
 		"broken":              {fails: true},
+		"hidden-only":         {fails: true},
 	}
 	for name, want := range tests {
 		apps, err := sampleApps(root, name)
