@@ -48,7 +48,7 @@ const (
 // The VMs and their installations
 const (
 	ubuntuRelease    = "24.04"
-	dockerCloudInit  = "https://raw.githubusercontent.com/canonical/multipass/refs/heads/main/data/cloud-init-yaml/cloud-init-docker.yaml"
+	dockerCloudInit  = "https://raw.githubusercontent.com/canonical/multipass/refs/tags/v1.17.2/data/cloud-init-yaml/cloud-init-docker.yaml"
 	k3sInstallScript = "https://get.k3s.io"
 
 	// k3s's defaults
