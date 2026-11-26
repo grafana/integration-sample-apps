@@ -187,58 +187,40 @@ jobs:
       # Comment on the pull request
       pull-requests: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
       - name: Download dashboard screenshots
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: screenshots-*
           merge-multiple: true
-          path: screenshots
+          path: ${{ runner.temp }}/screenshots
 
-      - name: Comment on the pull request
+      - name: Store the screenshots
+        id: store
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          SCREENSHOTS: ${{ runner.temp }}/screenshots
         run: |
           # The download creates no directory when no sample-app produced screenshots
-          mkdir -p screenshots && cd screenshots
-          shopt -s nullglob
-          # <app>/<dashboard>.png, or <app>/<ref>/<mixin>/<dashboard>.png for one listed from a mixin
-          images=()
-          mixin_images=()
-          other_images=()
-          segment='[A-Za-z0-9][A-Za-z0-9_.-]*'
-          for image in */*.png */*/*/*.png; do
-            # File names come from the pull request, skip unexpected ones
-            if [[ "$image" =~ ^${segment}/${segment}/${segment}/[A-Za-z0-9_-]+\.png$ ]]; then
-              mixin_images+=("$image")
-            elif [[ "$image" =~ ^${segment}/[A-Za-z0-9_-]+\.png$ ]]; then
-              other_images+=("$image")
-            else
-              continue
-            fi
-            images+=("$image")
-          done
-          if [ ${#images[@]} -eq 0 ]; then
+          mkdir -p "${SCREENSHOTS}" && cd "${SCREENSHOTS}"
+          first=$(find . -name '*.png' -printf '%P\n' -quit)
+          if [ -z "${first}" ]; then
             echo "No sample-app produced screenshots"
             exit 0
           fi
-
-          # Other workflows comment as github-actions[bot] too, so the screenshot comment is found by its marker
-          marker="<!-- sample-app-screenshots -->"
-          comment=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments?per_page=100" \
-            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | tail -n 1)
-
-          # Earlier runs are carried over from the existing comment, collapsed
-          earlier=""
-          if [ -n "${comment}" ]; then
-            earlier=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" --jq .body \
-              | sed -n '/^<details open><summary>Run /,$p' | sed 's/^<details open><summary>Run /<details><summary>Run /')
-          fi
-
-          # The images go to a ref of their own in this repository. 
+          # The images go to a ref of their own in this repository
           git init --quiet
-          git add -- "${images[@]}"
+          git add -- '*.png'
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit --quiet --message "Dashboard screenshots for #${PR}"
           base=""
@@ -246,85 +228,48 @@ jobs:
             url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/$(git rev-parse HEAD)"
             # The links take a moment to work
             for attempt in 1 2 3 4 5; do
-              if curl --silent --fail --head --output /dev/null "${url}/${images[0]}"; then base="${url}"; break; fi
+              if curl --silent --fail --head --output /dev/null "${url}/${first}"; then base="${url}"; break; fi
               sleep 3
             done
           fi
 
-          run="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          section() { echo; echo "<details${2:+ open}><summary>$1</summary>"; echo; echo "<blockquote>"; echo; }
-          end_section() { echo; echo "</blockquote>"; echo "</details>"; }
-          screenshot() {
-            local name="${1##*/}"
-            section "${name%.png}" open
-            echo "![${name%.png}](${base}/$1)"
-            end_section
-          }
-          header() {
-            echo "${marker}"
-            echo "### Dashboard screenshots"
-            echo
-            echo "<details open><summary>Run ${GITHUB_RUN_NUMBER} · commit ${SHA::7} · $(date -u '+%d %b %H:%M UTC')</summary>"
-            echo
-            echo "<blockquote>"
-            echo
-            echo "Rendered from the data each sample-app produced in [this run](${run}), covering its last 5 minutes."
-          }
-          footer() { echo; echo "</blockquote>"; echo "</details>"; echo; }
-          {
-            header
-            if [ -z "${base}" ]; then
-              echo
-              echo "The images could not be stored for display here. They are in the artifacts of [this run](${run})."
-            else
-              # Mixin dashboards nest under their mixin, named with its jsonnet-libs ref unless that is master
-              for group in $(printf '%s\n' "${mixin_images[@]}" | awk -F/ 'NF == 4 { print $3 "/" $2 "/" $1 }' | sort -u); do
-                IFS=/ read -r mixin ref app <<< "${group}"
-                matching=()
-                for image in "${mixin_images[@]}"; do
-                  if [[ "$image" == "${app}/${ref}/${mixin}/"* ]]; then matching+=("$image"); fi
-                done
-                label="${mixin}"
-                if [ "${ref}" != master ]; then label="${mixin}@${ref}"; fi
-                section "${label} · ${app} sample-app · ${#matching[@]} dashboard$([ ${#matching[@]} -eq 1 ] || echo s)"
-                for image in "${matching[@]}"; do screenshot "$image"; done
-                end_section
-              done
-              # Dashboards listed by URL nest under their sample-app
-              for app in $(printf '%s\n' "${other_images[@]}" | cut -d/ -f1 | sort -u); do
-                matching=()
-                for image in "${other_images[@]}"; do
-                  if [[ "$image" == "${app}/"* ]]; then matching+=("$image"); fi
-                done
-                section "${app} sample-app · ${#matching[@]} dashboard$([ ${#matching[@]} -eq 1 ] || echo s)"
-                for image in "${matching[@]}"; do screenshot "$image"; done
-                end_section
-              done
-            fi
-            footer
-          } > current.md
-
-          limit=65000
-          if [ "$(wc -c < current.md)" -gt "${limit}" ]; then
-            {
-              header
-              echo
-              echo "This run captured too many screenshots to show here. They are in the artifacts of [this run](${run})."
-              footer
-            } > current.md
-          fi
-          # Earlier runs are kept newest first while they fit, dropping the oldest
-          printf '%s\n' "${earlier}" | awk -v budget="$(( limit - $(wc -c < current.md) ))" '
-            /^<details><summary>Run / { if (block != "") runs[++n] = block; block = "" }
-            { block = block $0 "\n" }
-            END {
-              if (block != "") runs[++n] = block
-              for (i = 1; i <= n && used + length(runs[i]) <= budget; i++) { used += length(runs[i]); printf "%s", runs[i] }
-            }' > earlier.md
-          cat current.md earlier.md > comment.md
-
+          # Other workflows comment as github-actions[bot] too, so the screenshot comment is found by its marker
+          comment=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments?per_page=100" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- sample-app-screenshots -->"))) | .id' | tail -n 1)
           if [ -n "${comment}" ]; then
-            gh api --silent --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" -F body=@comment.md
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${comment}" --jq .body > "${RUNNER_TEMP}/earlier.md"
           else
-            gh api --silent --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@comment.md
+            : > "${RUNNER_TEMP}/earlier.md"
+          fi
+          {
+            echo "images=true"
+            echo "base=${base}"
+            echo "comment=${comment}"
+          } >> "${GITHUB_OUTPUT}"
+
+      # Without the token, as the pull request's own code runs here
+      - name: Write the comment
+        if: steps.store.outputs.images == 'true'
+        env:
+          SHA: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ steps.store.outputs.base }}
+        run: |
+          go run ./ops/cmd/sampletool ci screenshot-comment "${RUNNER_TEMP}/screenshots" \
+            --run-number "${GITHUB_RUN_NUMBER}" --sha "${SHA}" \
+            --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            ${BASE:+--base-url "${BASE}"} --earlier "${RUNNER_TEMP}/earlier.md" > "${RUNNER_TEMP}/comment.md"
+
+      - name: Comment on the pull request
+        if: steps.store.outputs.images == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          COMMENT: ${{ steps.store.outputs.comment }}
+        run: |
+          if [ ! -s "${RUNNER_TEMP}/comment.md" ]; then
+            echo "No screenshots with names the comment can show"
+          elif [ -n "${COMMENT}" ]; then
+            gh api --silent --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT}" -F body=@"${RUNNER_TEMP}/comment.md"
+          else
+            gh api --silent --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@"${RUNNER_TEMP}/comment.md"
           fi

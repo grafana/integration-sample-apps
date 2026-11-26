@@ -38,7 +38,8 @@ type cli struct {
 	} `cmd:"" name:"k3s" help:"k3s VMs, for sample apps that run on Kubernetes."`
 
 	CI struct {
-		Check ciCheckCmd `cmd:"" help:"Print run=true or run=false: whether CI can test the sample app <name>."`
+		Check             ciCheckCmd             `cmd:"" help:"Print run=true or run=false: whether CI can test the sample app <name>."`
+		ScreenshotComment ciScreenshotCommentCmd `cmd:"" help:"Print the pull-request comment for the dashboard screenshots in <dir>."`
 	} `cmd:"" name:"ci" help:"Steps of the CI workflows."`
 }
 
